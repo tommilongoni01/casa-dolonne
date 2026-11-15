@@ -209,6 +209,11 @@ export const ContattoFoglio = {
     }
 };
 
+// Registrato qui perché ContattoFoglio è definito dopo le pagine che lo usano
+// (senza registrazione Vue ignora il tag e il pulsante + non apre nulla).
+ContattiLista.components.ContattoFoglio = ContattoFoglio;
+ContattoPagina.components.ContattoFoglio = ContattoFoglio;
+
 /// Legge uno o più contatti da un file vCard (esportato dall'app Contatti di iOS).
 export function leggiVCard(testo) {
     const righe = testo.replace(/\r\n[ \t]/g, '').replace(/\n[ \t]/g, '').split(/\r?\n/);

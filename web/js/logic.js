@@ -110,6 +110,16 @@ export function analisiScorta(prodotto) {
     };
 }
 
+/// Prodotti a scorta gestiti da un'operazione: tutti i prodotti pH per l'operazione pH, altrimenti quello collegato.
+export function prodottiOperazione(operazione) {
+    if (!operazione) return [];
+    if (operazione.tipo === 'ph') {
+        return db.prodotti.filter(p => p.categoria === 'ph').sort((a, b) => a.ordine - b.ordine || a.nome.localeCompare(b.nome));
+    }
+    const p = db.prodotti.find(p => p.id === operazione.prodotto_id);
+    return p ? [p] : [];
+}
+
 export const sottoScorta = p => (Number(p.scorta_minima) || 0) > 0 && analisiScorta(p).giacenza <= Number(p.scorta_minima);
 export const mostraPrevisioni = p => p.categoria !== 'ph';
 
@@ -178,8 +188,7 @@ export function allarmi(operazione) {
 
 export function statoOperazione(operazione) {
     const stati = allarmi(operazione).map(a => a.stato);
-    const prodotto = prodottoDi(operazione.prodotto_id);
-    if (prodotto && sottoScorta(prodotto)) stati.push('scaduta');
+    if (prodottiOperazione(operazione).some(sottoScorta)) stati.push('scaduta');
     return stati.sort((a, b) => ORDINE_STATI[a] - ORDINE_STATI[b])[0] ?? null;
 }
 

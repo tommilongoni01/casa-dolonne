@@ -109,6 +109,9 @@ create table if not exists prodotti (
     ordine int not null default 0
 );
 
+-- Schede tecniche dei prodotti a scorta (documenti senza sezione).
+alter table documenti add column if not exists prodotto_id uuid references prodotti(id) on delete cascade;
+
 create table if not exists movimenti (
     id uuid primary key default gen_random_uuid(),
     prodotto_id uuid references prodotti(id) on delete cascade,

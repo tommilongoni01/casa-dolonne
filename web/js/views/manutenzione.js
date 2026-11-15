@@ -9,6 +9,7 @@ import {
     ultimoRiempimento, interventiDi, carichiOrdinati, svuotamentiOrdinati, formatiDi, nomeConfezione, descriviConfezioni
 } from '../logic.js';
 import { COLORE_SEZIONE } from '../icone.js';
+import { backend } from '../backend.js';
 
 const COLORE_GRAVITA = { scaduto: 'var(--rosso)', inScadenza: 'var(--arancione)', inCorso: 'var(--blu)', info: 'var(--secondario)' };
 const STATO_GRAVITA = { scaduto: 'scaduta', inScadenza: 'inScadenza', inCorso: 'inScadenza', info: 'ok' };
@@ -447,6 +448,7 @@ export const SezioniScorta = {
           </template>
         </Riga>
       </Gruppo>
+      <SchedeTecniche :prodotto="prodotto"/>
       <MovimentoFoglio v-if="movimento" :prodotto="prodotto" :tipo="movimento.tipo" :movimento="movimento.voce" @chiudi="movimento = null"/>`,
     data() { return { movimento: null }; },
     computed: {
@@ -475,6 +477,39 @@ export const SezioniScorta = {
     },
     setup() { return { f }; }
 };
+
+/// Schede tecniche (e altri documenti) allegate a un prodotto a scorta.
+export const SchedeTecniche = {
+    props: { prodotto: Object },
+    template: `
+      <Gruppo v-if="documenti.length || puoModificare()" :titolo="'Schede tecniche · ' + prodotto.nome"
+              :nota="documenti.length && puoModificare() ? 'Per eliminare una scheda apri le impostazioni del prodotto.' : ''">
+        <RigaDocumento v-for="d in documenti" :key="d.id" :documento="d"/>
+        <label v-if="puoModificare()" class="riga toccabile azione"><span class="riga-icona"><Icona nome="graffetta"/></span>
+          <span class="riga-testi">{{ caricamento ? 'Caricamento…' : 'Allega scheda tecnica' }}</span>
+          <input type="file" multiple hidden accept=".pdf,image/*" @change="allega">
+        </label>
+      </Gruppo>`,
+    data() { return { caricamento: false }; },
+    computed: { documenti() { return schedeDi(this.prodotto); } },
+    methods: {
+        puoModificare,
+        async allega(e) {
+            this.caricamento = true;
+            try {
+                for (const file of e.target.files) {
+                    const percorso = await caricaFile(file, 'schede');
+                    await salva('documenti', { prodotto_id: this.prodotto.id, sezione_id: null, titolo: file.name.replace(/\.[^.]+$/, ''),
+                                               nome_file: file.name, percorso, dimensione: file.size });
+                }
+            } catch (errore) {
+                alert('Caricamento non riuscito: ' + (errore?.message ?? errore));
+            } finally { this.caricamento = false; e.target.value = ''; }
+        }
+    }
+};
+
+export const schedeDi = prodotto => db.documenti.filter(d => d.prodotto_id === prodotto.id).sort((a, b) => a.titolo.localeCompare(b.titolo));
 
 export const MovimentoFoglio = {
     props: { prodotto: Object, tipo: String, movimento: Object },
@@ -597,6 +632,9 @@ export const ProdottoFoglio = {
           <CampoNumero v-model="b.consumo_mensile" etichetta="Consumo mensile" :unita="b.unita + '/mese'"/>
         </Gruppo>
         <Gruppo titolo="Note"><CampoTesto v-model="b.note" multilinea segnaposto="Note"/></Gruppo>
+        <Gruppo v-if="schede.length" titolo="Schede tecniche" nota="Tocca una scheda per eliminarla.">
+          <Riga v-for="d in schede" :key="d.id" icona="cestino" colore="var(--rosso)" :titolo="d.titolo" @click="eliminaScheda(d)"/>
+        </Gruppo>
         <Gruppo v-if="prodotto"><Riga distruttiva titolo="Elimina prodotto e movimenti" @click="eliminaProdotto"/></Gruppo>
       </Foglio>`,
     data() {
@@ -608,8 +646,16 @@ export const ProdottoFoglio = {
             formati: formatiDi(p).map(v => String(v).replace('.', ',')).join(', ')
         } };
     },
-    computed: { categorie() { return Object.entries(CATEGORIE).map(([valore, nome]) => ({ valore, nome })); } },
+    computed: {
+        categorie() { return Object.entries(CATEGORIE).map(([valore, nome]) => ({ valore, nome })); },
+        schede() { return this.prodotto ? schedeDi(this.prodotto) : []; }
+    },
     methods: {
+        async eliminaScheda(d) {
+            if (!confirm(`Eliminare la scheda "${d.titolo}"?`)) return;
+            await elimina('documenti', d.id);
+            backend.rimuoviFile(d.percorso).catch(() => {});
+        },
         async salvaProdotto() {
             const { formati, ...campi } = this.b;
             const confezioni = [...new Set(formati.split(/[;\s]+|,\s+/).map(f.leggiNumero).filter(v => v > 0))];
@@ -630,4 +676,4 @@ export const ProdottoFoglio = {
 };
 
 // Componenti usati anche dalle altre schermate.
-export const componentiManutenzione = { RigaContratto, RigaProdotto, SezioniScorta, MovimentoFoglio, ProdottoFoglio, ContrattoFoglio, PaginaMancante };
+export const componentiManutenzione = { RigaContratto, RigaProdotto, SezioniScorta, SchedeTecniche, MovimentoFoglio, ProdottoFoglio, ContrattoFoglio, PaginaMancante };

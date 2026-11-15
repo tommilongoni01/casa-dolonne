@@ -50,7 +50,8 @@ export async function inizializzaDati(avanzamento = () => {}) {
 
     avanzamento('Prodotti…');
     const ossigeno = await salva('prodotti', { nome: 'Ossigeno attivo', categoria: 'ossigeno', unita: 'l', scorta_minima: 50, confezioni: [5, 1], ordine: 0 });
-    await salva('prodotti', { nome: 'Correttore pH', categoria: 'ph', unita: 'kg', scorta_minima: 0, ordine: 1 });
+    await salva('prodotti', { nome: 'pH-', categoria: 'ph', unita: 'kg', scorta_minima: 0, ordine: 1 });
+    await salva('prodotti', { nome: 'pH+', categoria: 'ph', unita: 'kg', scorta_minima: 0, ordine: 2 });
 
     avanzamento('Operazioni…');
     const operazioni = [

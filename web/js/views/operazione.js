@@ -5,7 +5,7 @@ import * as f from '../format.js';
 import {
     TIPI_OPERAZIONE, allarmi, tipologieDi, interventiDi, ultimoInterventoDi, prossimaScadenza,
     statoScadenza, analisiProcesso, calcoliCarico, carichiOrdinati, svuotamentiOrdinati, consumoCenere,
-    prodottoDi, sezioneDi
+    prodottoDi, prodottiOperazione, sezioneDi
 } from '../logic.js';
 
 // ---------------------------------------------------------------------
@@ -36,11 +36,15 @@ export const OperazionePagina = {
         </Gruppo>
 
         <MisurePH v-if="o.tipo === 'ph'"/>
-        <ProdottiPH v-if="o.tipo === 'ph'"/>
-        <template v-if="o.tipo === 'ossigeno' || (o.tipo === 'generica' && prodotto)">
-          <SezioniScorta v-if="prodotto" :prodotto="prodotto"/>
-          <Gruppo v-if="prodotto"><Riga titolo="Grafici e dettaglio scorta" freccia @click="apri({ nome: 'prodotto', id: prodotto.id })"/></Gruppo>
+        <!-- Stesso blocco di scorta per tutti i prodotti: ossigeno, pH-, pH+… -->
+        <template v-for="p in prodottiScorta" :key="p.id">
+          <SezioniScorta :prodotto="p"/>
+          <Gruppo><Riga :titolo="'Grafici e dettaglio · ' + p.nome" freccia @click="apri({ nome: 'prodotto', id: p.id })"/></Gruppo>
         </template>
+        <Gruppo v-if="o.tipo === 'ph' && puoModificare()">
+          <Riga azione icona="piuCerchio" titolo="Aggiungi prodotto pH" @click="nuovoProdotto = true"/>
+        </Gruppo>
+        <ProdottoFoglio v-if="nuovoProdotto" categoria="ph" @chiudi="nuovoProdotto = false"/>
         <CambioAcqua v-if="o.tipo === 'cambioAcqua'"/>
         <Pellet v-if="o.tipo === 'pellet'"/>
         <Cenere v-if="o.tipo === 'cenere'"/>
@@ -58,10 +62,10 @@ export const OperazionePagina = {
         <DescrizioneFoglio v-if="descrizione" :operazione="o" @chiudi="descrizione = false"/>
       </Pagina>
       <PaginaMancante v-else/>`,
-    data() { return { descrizione: false }; },
+    data() { return { descrizione: false, nuovoProdotto: false }; },
     computed: {
         o() { return db.operazioni.find(o => o.id === this.id); },
-        prodotto() { return prodottoDi(this.o?.prodotto_id); },
+        prodottiScorta() { return prodottiOperazione(this.o); },
         guida() { return db.guide.find(g => g.id === this.o?.guida_id); },
         allarmiAttivi() { return allarmi(this.o).filter(a => a.stato !== 'ok'); },
         opzioniGuide() {
@@ -122,12 +126,14 @@ export const NotificheOperazione = {
                         @update:model-value="v => aggiorna({ giorni_allarme: v ? 20 : 0 })"/>
           <Passo v-if="o.giorni_allarme > 0" :model-value="o.giorni_allarme" :min="1" :max="365" :disabilitato="!modifica"
                  @update:model-value="v => aggiorna({ giorni_allarme: v })">Dopo {{ o.giorni_allarme }} giorni</Passo>
-          <Interruttore etichetta="Avviso scorta bassa" :model-value="prodotto.scorta_minima > 0" :disabilitato="!modifica"
-                        @update:model-value="v => salva('prodotti', { ...prodotto, scorta_minima: v ? 50 : 0 })"/>
+        </template>
+        <template v-for="p in prodotti" :key="p.id">
+          <Interruttore :etichetta="prodotti.length > 1 ? 'Scorta bassa · ' + p.nome : 'Avviso scorta bassa'" :model-value="p.scorta_minima > 0"
+                        :disabilitato="!modifica" @update:model-value="v => salva('prodotti', { ...p, scorta_minima: v ? sogliaPredefinita(p) : 0 })"/>
           <!-- Salva solo a fine modifica: salvando a ogni tasto l'aggiornamento in tempo reale riscriveva il campo. -->
-          <CampoNumero v-if="prodotto.scorta_minima > 0 && modifica" etichetta="Sotto" :unita="prodotto.unita" :model-value="Number(prodotto.scorta_minima)"
-                       @fine="v => v > 0 && v !== Number(prodotto.scorta_minima) && salva('prodotti', { ...prodotto, scorta_minima: v })"/>
-          <Riga v-else-if="prodotto.scorta_minima > 0" titolo="Sotto" :valore="f.quantita(prodotto.scorta_minima, prodotto.unita)"/>
+          <CampoNumero v-if="p.scorta_minima > 0 && modifica" etichetta="Sotto" :unita="p.unita" :model-value="Number(p.scorta_minima)"
+                       @fine="v => v > 0 && v !== Number(p.scorta_minima) && salva('prodotti', { ...p, scorta_minima: v })"/>
+          <Riga v-else-if="p.scorta_minima > 0" titolo="Sotto" :valore="f.quantita(p.scorta_minima, p.unita)"/>
         </template>
         <template v-if="o.tipo === 'storico'">
           <Passo v-for="t in tipologie" :key="t.id" :model-value="t.mesi_avviso" :min="0" :max="120" :disabilitato="!modifica"
@@ -137,12 +143,12 @@ export const NotificheOperazione = {
           </Passo>
           <Riga v-if="modifica" azione icona="piu" titolo="Aggiungi tipologia" @click="aggiungiTipologia"/>
         </template>
-        <Riga v-if="!prodotto && o.tipo !== 'storico'" class="secondario"
-              :titolo="o.tipo === 'ph' ? 'La scorta minima si imposta nella scheda di ogni prodotto pH.' : 'Nessuna notifica'"/>
+        <Riga v-if="!prodotti.length && o.tipo !== 'storico'" class="secondario" titolo="Nessuna notifica"/>
       </Gruppo>`,
     computed: {
         o() { return this.operazione; },
         prodotto() { return prodottoDi(this.o.prodotto_id); },
+        prodotti() { return prodottiOperazione(this.o); },
         tipologie() { return tipologieDi(this.o); },
         modifica() { return puoModificare(); },
         nota() {
@@ -152,6 +158,7 @@ export const NotificheOperazione = {
     },
     methods: {
         salva,
+        sogliaPredefinita: p => p.categoria === 'ossigeno' ? 50 : 5,
         aggiorna(campi) { salva('operazioni', { ...this.o, ...campi }); },
         async aggiungiTipologia() {
             const nome = prompt('Nome della tipologia (es. Verifica periodica)');
@@ -241,19 +248,6 @@ const MisuraFoglio = {
         async salvaMisura() { await salva('misure_ph', { ...this.b, id: this.misura?.id }); this.$emit('chiudi'); },
         async eliminaMisura() { if (confirm('Eliminare la misura?')) { await elimina('misure_ph', this.misura.id); this.$emit('chiudi'); } }
     }
-};
-
-const ProdottiPH = {
-    template: `
-      <Gruppo titolo="Prodotti pH a scorta" nota="Apri un prodotto per registrare acquisti, riempimenti e rettifiche della giacenza.">
-        <Riga v-if="!prodotti.length" titolo="Nessun prodotto" class="secondario"/>
-        <RigaProdotto v-for="p in prodotti" :key="p.id" :prodotto="p" @click="apri({ nome: 'prodotto', id: p.id })"/>
-        <Riga v-if="puoModificare()" azione icona="piuCerchio" titolo="Aggiungi prodotto" @click="nuovo = true"/>
-      </Gruppo>
-      <ProdottoFoglio v-if="nuovo" categoria="ph" @chiudi="nuovo = false"/>`,
-    data() { return { nuovo: false }; },
-    computed: { prodotti() { return db.prodotti.filter(p => p.categoria === 'ph').sort((a, b) => a.nome.localeCompare(b.nome)); } },
-    methods: { apri, puoModificare }
 };
 
 // ---------------------------------------------------------------------
@@ -663,7 +657,7 @@ const InterventoFoglio = {
 };
 
 // Le sezioni vengono registrate come componenti locali della pagina operazione.
-OperazionePagina.components = { MisurePH, ProdottiPH, CambioAcqua, Pellet, Cenere, Storico, NotificheOperazione, DescrizioneFoglio };
+OperazionePagina.components = { MisurePH, CambioAcqua, Pellet, Cenere, Storico, NotificheOperazione, DescrizioneFoglio };
 CambioAcqua.components = { AvvioFoglio };
 MisurePH.components = { MisuraFoglio };
 Pellet.components = { CaricoFoglio };
