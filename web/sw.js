@@ -1,6 +1,6 @@
 // Servizio offline: i file dell'app vengono tenuti in cache, così si apre anche senza rete
 // (i dati condivisi richiedono comunque la connessione). Cambia VERSIONE a ogni aggiornamento.
-const VERSIONE = 'casa-dolonne-3';
+const VERSIONE = 'casa-dolonne-4';
 
 self.addEventListener('install', evento => {
     self.skipWaiting();
@@ -23,7 +23,9 @@ self.addEventListener('fetch', evento => {
     if (richiesta.method !== 'GET' || new URL(richiesta.url).origin !== self.location.origin) return;
     evento.respondWith((async () => {
         try {
-            const risposta = await fetch(richiesta);
+            // "no-cache": chiede sempre al server se il file è cambiato, invece di usare
+            // la copia del browser (GitHub Pages la considera valida per 10 minuti).
+            const risposta = await fetch(richiesta, { cache: 'no-cache' });
             if (risposta.ok) (await caches.open(VERSIONE)).put(richiesta, risposta.clone());
             return risposta;
         } catch {
