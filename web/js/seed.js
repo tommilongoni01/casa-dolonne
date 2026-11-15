@@ -49,7 +49,7 @@ export async function inizializzaDati(avanzamento = () => {}) {
     const id = nome => sezioni.find(s => s.nome === nome).id;
 
     avanzamento('Prodotti…');
-    const ossigeno = await salva('prodotti', { nome: 'Ossigeno attivo', categoria: 'ossigeno', unita: 'l', scorta_minima: 50, ordine: 0 });
+    const ossigeno = await salva('prodotti', { nome: 'Ossigeno attivo', categoria: 'ossigeno', unita: 'l', scorta_minima: 50, confezioni: [5, 1], ordine: 0 });
     await salva('prodotti', { nome: 'Correttore pH', categoria: 'ph', unita: 'kg', scorta_minima: 0, ordine: 1 });
 
     avanzamento('Operazioni…');

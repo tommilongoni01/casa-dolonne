@@ -124,8 +124,10 @@ export const NotificheOperazione = {
                  @update:model-value="v => aggiorna({ giorni_allarme: v })">Dopo {{ o.giorni_allarme }} giorni</Passo>
           <Interruttore etichetta="Avviso scorta bassa" :model-value="prodotto.scorta_minima > 0" :disabilitato="!modifica"
                         @update:model-value="v => salva('prodotti', { ...prodotto, scorta_minima: v ? 50 : 0 })"/>
-          <CampoNumero v-if="prodotto.scorta_minima > 0" etichetta="Sotto" :unita="prodotto.unita" :model-value="Number(prodotto.scorta_minima)"
-                       @update:model-value="v => v !== null && salva('prodotti', { ...prodotto, scorta_minima: v })"/>
+          <!-- Salva solo a fine modifica: salvando a ogni tasto l'aggiornamento in tempo reale riscriveva il campo. -->
+          <CampoNumero v-if="prodotto.scorta_minima > 0 && modifica" etichetta="Sotto" :unita="prodotto.unita" :model-value="Number(prodotto.scorta_minima)"
+                       @fine="v => v > 0 && v !== Number(prodotto.scorta_minima) && salva('prodotti', { ...prodotto, scorta_minima: v })"/>
+          <Riga v-else-if="prodotto.scorta_minima > 0" titolo="Sotto" :valore="f.quantita(prodotto.scorta_minima, prodotto.unita)"/>
         </template>
         <template v-if="o.tipo === 'storico'">
           <Passo v-for="t in tipologie" :key="t.id" :model-value="t.mesi_avviso" :min="0" :max="120" :disabilitato="!modifica"
@@ -167,7 +169,8 @@ export const NotificheOperazione = {
             }
             await salva('tipologie', { ...t, nome: nome.trim() });
         }
-    }
+    },
+    setup() { return { f }; }
 };
 
 // ---------------------------------------------------------------------

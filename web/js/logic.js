@@ -45,20 +45,45 @@ export function movimentiDi(prodotto) {
         .sort((a, b) => (b.data || '').localeCompare(a.data || ''));
 }
 
+// Confezioni (es. taniche da 5 l e da 1 l): il prodotto ne elenca i formati,
+// ogni movimento indica quante confezioni di ciascun formato.
+/// Formati del prodotto, dal più grande.
+export const formatiDi = prodotto => (prodotto?.confezioni ?? []).map(Number).filter(v => v > 0).sort((a, b) => b - a);
+
+export const nomeConfezione = (prodotto, numero) => prodotto?.unita === 'l'
+    ? (numero === 1 ? 'tanica' : 'taniche')
+    : (numero === 1 ? 'confezione' : 'confezioni');
+
+/// "2 taniche da 5 l · 1 tanica da 1 l"
+export function descriviConfezioni(prodotto, confezioni) {
+    return (confezioni ?? []).filter(c => c.numero > 0)
+        .map(c => `${c.numero} ${nomeConfezione(prodotto, c.numero)} da ${quantita(c.litri, prodotto.unita)}`).join(' · ');
+}
+
 /// Giacenza, consumi e costi calcolati dai movimenti (nessuna stima: giacenza reale).
 export function analisiScorta(prodotto) {
     const ordinati = movimentiDi(prodotto).slice().reverse();
     let giacenza = 0, acquistato = 0, consumato = 0, costo = 0;
     let primaData = ordinati[0]?.data ?? null, ultimaDataConsumo = null;
     const andamento = [];
+    // Confezioni presenti per formato: { 5: 3, 1: 2 }.
+    const confezioni = {};
     for (const m of ordinati) {
         const q = Number(m.quantita) || 0;
+        const righe = (m.confezioni ?? []).filter(c => Number(c.litri) > 0);
         if (m.tipo === 'acquisto') { giacenza += q; acquistato += q; costo += Number(m.costo) || 0; }
         else if (m.tipo === 'consumo') { giacenza -= q; consumato += q; ultimaDataConsumo = m.data; }
         else if (m.tipo === 'rettifica') {
             const differenza = giacenza - q;
             if (differenza > 0) { consumato += differenza; ultimaDataConsumo = m.data; }
             giacenza = q;
+            // Una rettifica con le confezioni fissa il conteggio di tutti i formati.
+            if (righe.length) for (const k of Object.keys(confezioni)) confezioni[k] = 0;
+        }
+        for (const c of righe) {
+            const n = Number(c.numero) || 0;
+            const segno = m.tipo === 'consumo' ? -1 : 1;
+            confezioni[c.litri] = (m.tipo === 'rettifica' ? 0 : (confezioni[c.litri] ?? 0)) + segno * n;
         }
         andamento.push({ data: m.data, valore: giacenza });
     }
@@ -79,6 +104,7 @@ export function analisiScorta(prodotto) {
         consumoMensile: consumoGiornaliero ? consumoGiornaliero * 30.4 : null,
         consumoImpostato: fisso > 0,
         autonomia,
+        confezioni: formatiDi(prodotto).map(litri => ({ litri, numero: Math.max(0, confezioni[litri] ?? 0) })),
         esaurimento: autonomia !== null ? aggiungiGiorni(new Date(), autonomia) : null,
         andamento
     };

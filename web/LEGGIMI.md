@@ -73,6 +73,15 @@ Le foto e i PDF delle guide e i carichi pellet sono **privati** (c'è anche lo s
 Apri `https://TUO-NOME.github.io/casa-dolonne/` in Safari → pulsante **Condividi** → **Aggiungi alla schermata Home**.
 Al primo avvio ognuno inserisce la propria email e il codice ricevuto; poi resta collegato.
 
+## Modifiche all'app
+
+1. Le modifiche si fanno nei file della cartella `web/` (anche chiedendole a Claude in Xcode).
+2. **Prova sul Mac** prima di pubblicare: `cd ~/Documents/App_Dolonne/web && python3 -m http.server 8765` e apri http://127.0.0.1:8765.
+3. **Se la modifica richiede nuovi campi nel database** c'è un file `supabase/aggiornamento-….sql`: va eseguito una volta nel SQL Editor di Supabase **prima** di pubblicare.
+4. **Pubblica** dal Terminale: `cd ~/Documents/App_Dolonne && git push`. Dopo un paio di minuti tutti i dispositivi ricevono la nuova versione alla prossima apertura dell'app (eventualmente chiudila e riaprila).
+
+I dati (letture, acquisti, guide…) non passano da qui: sono in Supabase e si aggiornano subito per tutti.
+
 ## Limiti del piano gratuito
 
 | Servizio | Limite | Per noi |

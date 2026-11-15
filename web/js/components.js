@@ -157,19 +157,22 @@ export const CampoTesto = {
 
 export const CampoNumero = {
     props: { etichetta: String, modelValue: Number, unita: String, segnaposto: String, negativi: Boolean },
-    emits: ['update:modelValue'],
+    // 'fine': valore definitivo, quando si esce dal campo o si preme Invio.
+    emits: ['update:modelValue', 'fine'],
     template: `
       <label class="campo">
         <span class="campo-etichetta">{{ etichetta }}</span>
         <input class="numero" :value="testo" :inputmode="negativi ? 'text' : 'decimal'" :placeholder="segnaposto ?? '–'"
-               @input="aggiorna($event.target.value)" @blur="testo = mostra(modelValue)">
+               @input="aggiorna($event.target.value)" @change="$emit('fine', leggi(testo))" @keyup.enter="$event.target.blur()"
+               @blur="testo = mostra(modelValue)">
         <span v-if="unita" class="campo-unita">{{ unita }}</span>
       </label>`,
     data() { return { testo: numeroCampo(this.modelValue) }; },
     watch: { modelValue(v) { if (leggiNumero(this.testo) !== v) this.testo = numeroCampo(v); } },
     methods: {
         aggiorna(testo) { this.testo = testo; this.$emit('update:modelValue', leggiNumero(testo)); },
-        mostra: numeroCampo
+        mostra: numeroCampo,
+        leggi: leggiNumero
     }
 };
 

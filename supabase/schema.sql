@@ -103,6 +103,8 @@ create table if not exists prodotti (
     unita text not null default 'pz',
     scorta_minima numeric not null default 0,
     consumo_mensile numeric,
+    -- Formati di confezione in unità del prodotto, es. [5, 1] = taniche da 5 l e da 1 l.
+    confezioni jsonb not null default '[]',
     note text not null default '',
     ordine int not null default 0
 );
@@ -116,6 +118,8 @@ create table if not exists movimenti (
     costo numeric not null default 0,
     fornitore text not null default '',
     descrizione_prodotto text not null default '',
+    -- Confezioni del movimento, es. [{"litri": 5, "numero": 2, "prezzo": 30}].
+    confezioni jsonb not null default '[]',
     note text not null default ''
 );
 

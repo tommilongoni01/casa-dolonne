@@ -6,7 +6,7 @@ import * as f from '../format.js';
 import {
     avvisi, prossime, operazioniDi, statoOperazione, TIPI_OPERAZIONE, analisiScorta, sottoScorta,
     mostraPrevisioni, movimentiDi, nomeMovimento, CATEGORIE, statoScadenza, nomeContatto, sezioneDi,
-    ultimoRiempimento, interventiDi, carichiOrdinati, svuotamentiOrdinati
+    ultimoRiempimento, interventiDi, carichiOrdinati, svuotamentiOrdinati, formatiDi, nomeConfezione, descriviConfezioni
 } from '../logic.js';
 import { COLORE_SEZIONE } from '../icone.js';
 
@@ -419,6 +419,8 @@ export const SezioniScorta = {
           <div class="numero" :class="{ rosso: basso }">{{ f.quantita(a.giacenza, prodotto.unita) }}</div>
           <div v-if="basso" class="arancione-t" style="font-size:14px">Sotto la scorta minima ({{ f.quantita(prodotto.scorta_minima, prodotto.unita) }})</div>
         </div>
+        <Riga v-for="c in a.confezioni" :key="c.litri" :titolo="maiuscola(nomeConfezione(prodotto, 2)) + ' da ' + f.quantita(c.litri, prodotto.unita)"
+              :valore="String(c.numero)"/>
         <Riga v-if="a.ultimoMovimento" titolo="Ultimo movimento" :valore="f.data(a.ultimoMovimento)"/>
         <template v-if="previsioni">
           <Riga v-if="a.consumoMensile" titolo="Consumo medio" :sottotitolo="a.consumoImpostato ? 'impostato' : 'calcolato dai riempimenti'"
@@ -461,11 +463,15 @@ export const SezioniScorta = {
         }
     },
     methods: {
-        puoModificare, nomeMovimento,
+        puoModificare, nomeMovimento, nomeConfezione,
+        maiuscola: t => t.charAt(0).toUpperCase() + t.slice(1),
         icona: t => ({ acquisto: 'carrello', consumo: 'meno', rettifica: 'lista' })[t],
         colore: t => ({ acquisto: 'var(--verde)', consumo: 'var(--arancione)', rettifica: 'var(--blu)' })[t],
         segno: t => ({ acquisto: '+', consumo: '−', rettifica: '= ' })[t],
-        sottotitolo(m) { return [f.dataBreve(m.data), m.descrizione_prodotto, m.fornitore, m.note].filter(Boolean).join(' · '); }
+        sottotitolo(m) {
+            return [f.dataBreve(m.data), descriviConfezioni(this.prodotto, m.confezioni), m.descrizione_prodotto, m.fornitore, m.note]
+                .filter(Boolean).join(' · ');
+        }
     },
     setup() { return { f }; }
 };
@@ -474,15 +480,28 @@ export const MovimentoFoglio = {
     props: { prodotto: Object, tipo: String, movimento: Object },
     emits: ['chiudi'],
     template: `
-      <Foglio :titolo="nomeMovimento(tipo, prodotto.categoria)" :conferma-disabilitata="b.quantita === null"
+      <Foglio :titolo="nomeMovimento(tipo, prodotto.categoria)" :conferma-disabilitata="quantitaFinale === null"
               @annulla="$emit('chiudi')" @conferma="salvaMovimento">
         <Gruppo :nota="nota">
           <CampoData v-model="b.data" etichetta="Data"/>
           <CampoTesto v-if="tipo === 'acquisto'" v-model="b.descrizione_prodotto" segnaposto="Prodotto acquistato (nome, marca)"/>
-          <CampoNumero v-model="b.quantita" :etichetta="tipo === 'rettifica' ? 'Quantità presente' : 'Quantità'" :unita="prodotto.unita"/>
+        </Gruppo>
+        <Gruppo v-if="formati.length" :titolo="maiuscola(nomeConfezione(prodotto, 2))" :nota="notaConfezioni">
+          <Passo v-for="litri in formati" :key="litri" v-model="b.numeri[litri]" :min="0">
+            Da {{ f.quantita(litri, prodotto.unita) }}<br>
+            <small class="secondario">{{ b.numeri[litri] }} {{ nomeConfezione(prodotto, b.numeri[litri]) }}</small>
+          </Passo>
+        </Gruppo>
+        <Gruppo>
+          <Riga v-if="conConfezioni" :titolo="etichettaQuantita" :valore="f.quantita(quantitaFinale, prodotto.unita)" style="font-weight:600"/>
+          <CampoNumero v-else v-model="b.quantita" :etichetta="etichettaQuantita" :unita="prodotto.unita"/>
         </Gruppo>
         <Gruppo v-if="tipo === 'acquisto'" titolo="Acquisto">
-          <CampoNumero v-model="b.prezzo" :etichetta="'Costo al ' + prodotto.unita" unita="€"/>
+          <template v-if="conConfezioni">
+            <CampoNumero v-for="litri in formatiUsati" :key="litri" v-model="b.prezzi[litri]"
+                         :etichetta="'Costo ' + nomeConfezione(prodotto, 1) + ' da ' + f.quantita(litri, prodotto.unita)" unita="€"/>
+          </template>
+          <CampoNumero v-else v-model="b.prezzo" :etichetta="'Costo al ' + prodotto.unita" unita="€"/>
           <Riga titolo="Costo totale" :valore="f.euro(totale)" style="font-weight:600"/>
           <CampoTesto v-model="b.fornitore" segnaposto="Fornitore"/>
         </Gruppo>
@@ -491,14 +510,37 @@ export const MovimentoFoglio = {
       </Foglio>`,
     data() {
         const m = this.movimento ?? {};
+        const numeri = {}, prezzi = {};
+        for (const litri of formatiDi(this.prodotto)) {
+            const c = (m.confezioni ?? []).find(c => Number(c.litri) === litri);
+            numeri[litri] = Number(c?.numero) || 0;
+            prezzi[litri] = c?.prezzo ?? null;
+        }
+        const conConfezioni = Object.values(numeri).some(n => n > 0);
         return { b: {
             data: m.data ?? f.oggiISO(), quantita: m.quantita ?? null, fornitore: m.fornitore ?? '',
-            descrizione_prodotto: m.descrizione_prodotto ?? '', note: m.note ?? '',
-            prezzo: m.costo && m.quantita ? m.costo / m.quantita : null
+            descrizione_prodotto: m.descrizione_prodotto ?? '', note: m.note ?? '', numeri, prezzi,
+            prezzo: !conConfezioni && m.costo && m.quantita ? m.costo / m.quantita : null
         } };
     },
     computed: {
-        totale() { return (this.b.quantita || 0) * (this.b.prezzo || 0); },
+        formati() { return formatiDi(this.prodotto); },
+        formatiUsati() { return this.formati.filter(l => this.b.numeri[l] > 0); },
+        conConfezioni() { return this.formatiUsati.length > 0; },
+        /// Con le confezioni la quantità è la loro somma, altrimenti quella scritta a mano.
+        quantitaFinale() {
+            return this.conConfezioni ? this.formati.reduce((t, l) => t + l * this.b.numeri[l], 0) : this.b.quantita;
+        },
+        totale() {
+            if (this.conConfezioni) return this.formatiUsati.reduce((t, l) => t + this.b.numeri[l] * (this.b.prezzi[l] || 0), 0);
+            return (this.b.quantita || 0) * (this.b.prezzo || 0);
+        },
+        etichettaQuantita() { return this.tipo === 'rettifica' ? 'Quantità presente' : 'Quantità'; },
+        notaConfezioni() {
+            const nome = nomeConfezione(this.prodotto, 2);
+            if (this.tipo === 'rettifica') return `Quante ${nome} ci sono adesso. Se ne resta una aperta, lasciale a zero e scrivi la quantità a mano.`;
+            return `La quantità si calcola dalle ${nome}. Lasciale a zero per scriverla a mano (es. una ${nomeConfezione(this.prodotto, 1)} usata a metà).`;
+        },
         nota() {
             return {
                 acquisto: 'Il carico si aggiunge alla scorta.',
@@ -508,13 +550,20 @@ export const MovimentoFoglio = {
         }
     },
     methods: {
-        nomeMovimento,
+        nomeMovimento, nomeConfezione,
+        maiuscola: t => t.charAt(0).toUpperCase() + t.slice(1),
         async salvaMovimento() {
             const acquisto = this.tipo === 'acquisto';
+            // La rettifica registra tutti i formati (anche a zero): fissa il conteggio delle confezioni.
+            const formati = this.tipo === 'rettifica' ? this.formati : this.formatiUsati;
+            const confezioni = formati.map(litri => ({
+                litri, numero: this.b.numeri[litri],
+                ...(acquisto && this.b.prezzi[litri] !== null ? { prezzo: this.b.prezzi[litri] } : {})
+            }));
             await salva('movimenti', {
                 id: this.movimento?.id, prodotto_id: this.prodotto.id, tipo: this.tipo, data: this.b.data,
-                quantita: this.b.quantita, costo: acquisto ? this.totale : 0, fornitore: acquisto ? this.b.fornitore : '',
-                descrizione_prodotto: acquisto ? this.b.descrizione_prodotto : '', note: this.b.note
+                quantita: this.quantitaFinale, costo: acquisto ? this.totale : 0, fornitore: acquisto ? this.b.fornitore : '',
+                descrizione_prodotto: acquisto ? this.b.descrizione_prodotto : '', note: this.b.note, confezioni
             });
             this.$emit('chiudi');
         },
@@ -538,6 +587,9 @@ export const ProdottoFoglio = {
           <CampoScelta v-model="b.categoria" etichetta="Categoria" :opzioni="categorie"/>
           <CampoTesto v-model="b.unita" etichetta="Unità di misura" segnaposto="kg, l, sacchi…"/>
         </Gruppo>
+        <Gruppo nota="Facoltativo. Formati in cui si compra, separati da virgola (es. 5, 1 per taniche da 5 l e da 1 l): negli acquisti e nei consumi si indica il numero di confezioni e l'app tiene il conto anche di quelle.">
+          <CampoTesto v-model="b.formati" etichetta="Confezioni da" :segnaposto="'es. 5, 1 (' + (b.unita || 'unità') + ')'"/>
+        </Gruppo>
         <Gruppo nota="Sotto questa quantità il prodotto viene segnalato.">
           <CampoNumero v-model="b.scorta_minima" etichetta="Scorta minima" :unita="b.unita"/>
         </Gruppo>
@@ -552,14 +604,17 @@ export const ProdottoFoglio = {
         return { b: {
             nome: p.nome ?? '', categoria: p.categoria ?? this.categoria ?? 'altro',
             unita: p.unita ?? (this.categoria === 'ph' ? 'kg' : 'pz'),
-            scorta_minima: p.scorta_minima || null, consumo_mensile: p.consumo_mensile ?? null, note: p.note ?? ''
+            scorta_minima: p.scorta_minima || null, consumo_mensile: p.consumo_mensile ?? null, note: p.note ?? '',
+            formati: formatiDi(p).map(v => String(v).replace('.', ',')).join(', ')
         } };
     },
     computed: { categorie() { return Object.entries(CATEGORIE).map(([valore, nome]) => ({ valore, nome })); } },
     methods: {
         async salvaProdotto() {
+            const { formati, ...campi } = this.b;
+            const confezioni = [...new Set(formati.split(/[;\s]+|,\s+/).map(f.leggiNumero).filter(v => v > 0))];
             await salva('prodotti', {
-                ...this.b, id: this.prodotto?.id, scorta_minima: this.b.scorta_minima ?? 0,
+                ...campi, confezioni, id: this.prodotto?.id, scorta_minima: this.b.scorta_minima ?? 0,
                 consumo_mensile: this.b.consumo_mensile > 0 ? this.b.consumo_mensile : null,
                 ordine: this.prodotto?.ordine ?? db.prodotti.length
             });
