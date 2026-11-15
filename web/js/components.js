@@ -121,7 +121,7 @@ export const Foglio = {
               <button class="pulsante-testo" @click="$emit('annulla')">{{ soloChiudi ? 'Chiudi' : 'Annulla' }}</button>
               <div class="foglio-titolo">{{ titolo }}</div>
               <button v-if="!soloChiudi" class="pulsante-testo forte" :disabled="confermaDisabilitata || inCorso"
-                      @click="conferma">{{ inCorso ? '…' : conferma }}</button>
+                      @click="confermaFoglio">{{ inCorso ? '…' : conferma }}</button>
               <span v-else class="pulsante-testo segnaposto"></span>
             </header>
             <div class="foglio-contenuto"><slot/></div>
@@ -130,10 +130,13 @@ export const Foglio = {
       </Teleport>`,
     data() { return { inCorso: false }; },
     methods: {
-        async conferma() {
+        // Nome diverso dal prop "conferma" (testo del pulsante): con lo stesso nome Vue usa il prop e il clic non fa nulla.
+        async confermaFoglio() {
             // Il genitore può restituire una Promise: il pulsante resta disattivato finché non finisce.
             this.inCorso = true;
-            try { await this.$attrs.onConferma?.(); } finally { this.inCorso = false; }
+            try { await this.$attrs.onConferma?.(); }
+            catch (errore) { alert('Salvataggio non riuscito: ' + (errore?.message ?? errore)); }
+            finally { this.inCorso = false; }
         }
     },
     inheritAttrs: false,
