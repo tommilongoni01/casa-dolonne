@@ -1,0 +1,1388 @@
+{
+  "sourceLanguage" : "it",
+  "strings" : {
+    "" : {
+
+    },
+    "–" : {
+
+    },
+    "%@ · scadenza %@" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ · scadenza %2$@"
+          }
+        }
+      }
+    },
+    "%@ (%@)" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ (%2$@)"
+          }
+        }
+      }
+    },
+    "%@ / %@" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ / %2$@"
+          }
+        }
+      }
+    },
+    "%@ €" : {
+
+    },
+    "%@ al mese" : {
+
+    },
+    "%@ cm" : {
+
+    },
+    "%@ cm · %@ cm di variazione" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ cm · %2$@ cm di variazione"
+          }
+        }
+      }
+    },
+    "%@ in corso" : {
+
+    },
+    "%@ kg" : {
+
+    },
+    "%@ piscina in corso" : {
+
+    },
+    "%@: %@" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@: %2$@"
+          }
+        }
+      }
+    },
+    "%@: da fare" : {
+
+    },
+    "%@: entro il %@" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@: entro il %2$@"
+          }
+        }
+      }
+    },
+    "%@%@ cm" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@%2$@ cm"
+          }
+        }
+      }
+    },
+    "%@%%" : {
+
+    },
+    "%lld" : {
+
+    },
+    "%lld avvisi" : {
+
+    },
+    "%lld documenti" : {
+
+    },
+    "%lld giorni" : {
+
+    },
+    "%lld giorni (fino al %@)" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld giorni (fino al %2$@)"
+          }
+        }
+      }
+    },
+    "%lld guide" : {
+
+    },
+    "%lld h" : {
+
+    },
+    "%lld manutenzioni" : {
+
+    },
+    "%lld min" : {
+
+    },
+    "%lld operazioni" : {
+
+    },
+    "%lld passaggi" : {
+
+    },
+    "%lld." : {
+
+    },
+    "+%@" : {
+
+    },
+    "+%lld" : {
+
+    },
+    "1 documento" : {
+
+    },
+    "1 guida" : {
+
+    },
+    "1 manutenzione" : {
+
+    },
+    "1 operazione" : {
+
+    },
+    "A cosa serve, quando va fatta…" : {
+
+    },
+    "A–Z" : {
+
+    },
+    "Acquisti e %@" : {
+
+    },
+    "Acquisto" : {
+
+    },
+    "Aggiornata il %@" : {
+
+    },
+    "Aggiungi" : {
+
+    },
+    "Aggiungi ai preferiti" : {
+
+    },
+    "Aggiungi contratto" : {
+
+    },
+    "Aggiungi foto" : {
+
+    },
+    "Aggiungi i contratti di manutenzione degli impianti." : {
+
+    },
+    "Aggiungi manutenzioni periodiche, ispezioni e verifiche per ricevere promemoria." : {
+
+    },
+    "Aggiungi passaggio" : {
+
+    },
+    "Aggiungi prodotto" : {
+
+    },
+    "Aggiungi tecnici e fornitori dei vari impianti." : {
+
+    },
+    "Aggiungi testo" : {
+
+    },
+    "Aggiungi tipologia" : {
+
+    },
+    "Aliquota IVA" : {
+
+    },
+    "Allarme dopo l'ultimo riempimento" : {
+
+    },
+    "Allega manuale o documento" : {
+
+    },
+    "Allega PDF o foto" : {
+
+    },
+    "Altri contatti" : {
+
+    },
+    "Altro" : {
+
+    },
+    "Andamento giacenza" : {
+
+    },
+    "Andamento livello" : {
+
+    },
+    "anni" : {
+
+    },
+    "Annulla" : {
+
+    },
+    "Apri contratto" : {
+
+    },
+    "Apri un prodotto per registrare acquisti, riempimenti e rettifiche della giacenza." : {
+
+    },
+    "Archivio" : {
+
+    },
+    "Arrivo stimato" : {
+
+    },
+    "Aspetto" : {
+
+    },
+    "Attività attiva" : {
+
+    },
+    "Attività coperte" : {
+
+    },
+    "Automatico" : {
+
+    },
+    "Automatico segue l'impostazione chiaro/scuro del dispositivo." : {
+
+    },
+    "Autonomia" : {
+
+    },
+    "Autonomia: %lld giorni" : {
+
+    },
+    "Avvia" : {
+
+    },
+    "Avvia %@" : {
+
+    },
+    "Avvisa %lld giorni prima" : {
+
+    },
+    "Avvisi" : {
+
+    },
+    "Avviso ogni %lld mesi" : {
+
+    },
+    "Avviso scorta bassa" : {
+
+    },
+    "Azienda" : {
+
+    },
+    "calcolato dai riempimenti" : {
+
+    },
+    "Cambia guida" : {
+
+    },
+    "Cambio acqua" : {
+
+    },
+    "Categoria" : {
+
+    },
+    "cellulare" : {
+
+    },
+    "Cellulare" : {
+
+    },
+    "Centimetri riempiti" : {
+
+    },
+    "Centimetri svuotati" : {
+
+    },
+    "Cerca guide e documenti" : {
+
+    },
+    "Cerca nome, azienda, ruolo" : {
+
+    },
+    "chiama" : {
+
+    },
+    "Chiaro" : {
+
+    },
+    "Chiudi" : {
+
+    },
+    "Cliente" : {
+
+    },
+    "cm" : {
+
+    },
+    "Cognome" : {
+
+    },
+    "Collega una guida" : {
+
+    },
+    "Con una data di scadenza ricevi l'avviso prima che il contratto scada." : {
+
+    },
+    "consumati %@ kg" : {
+
+    },
+    "Consumo" : {
+
+    },
+    "Consumo medio" : {
+
+    },
+    "Consumo mensile" : {
+
+    },
+    "Contatti" : {
+
+    },
+    "Contatti aggiunti: %lld. Aprili per collegarli ai sistemi." : {
+
+    },
+    "Contratti" : {
+
+    },
+    "Contratto" : {
+
+    },
+    "Contratto di manutenzione" : {
+
+    },
+    "Contratto in scadenza" : {
+
+    },
+    "Correttore pH" : {
+
+    },
+    "Cosa è stato fatto" : {
+
+    },
+    "Cosa è stato fatto, chi l'ha fatto…" : {
+
+    },
+    "Cosa va fatto, materiali, note…" : {
+
+    },
+    "Costi" : {
+
+    },
+    "Costo" : {
+
+    },
+    "Costo al %@" : {
+
+    },
+    "Costo al quintale" : {
+
+    },
+    "Costo al quintale nel tempo (IVA esclusa)" : {
+
+    },
+    "Costo annuo" : {
+
+    },
+    "Costo medio" : {
+
+    },
+    "Costo totale" : {
+
+    },
+    "Da fare subito" : {
+
+    },
+    "Data" : {
+
+    },
+    "Dati finali" : {
+
+    },
+    "Deposito" : {
+
+    },
+    "Deposito dopo il carico" : {
+
+    },
+    "Descrizione" : {
+
+    },
+    "Descrizione breve" : {
+
+    },
+    "Didascalia (facoltativa)" : {
+
+    },
+    "Disattivala per consultare l'app in sola lettura, senza rischio di modifiche accidentali." : {
+
+    },
+    "Documenti" : {
+
+    },
+    "Documenti del fornitore" : {
+
+    },
+    "Documento" : {
+
+    },
+    "Dopo" : {
+
+    },
+    "Dopo %lld giorni" : {
+
+    },
+    "Dopo averla aggiunta imposti ogni quanti mesi va fatta." : {
+
+    },
+    "Durata" : {
+
+    },
+    "Durata totale" : {
+
+    },
+    "Elimina" : {
+
+    },
+    "Elimina blocco" : {
+
+    },
+    "Elimina carico" : {
+
+    },
+    "Elimina contatto" : {
+
+    },
+    "Elimina operazione" : {
+
+    },
+    "Elimina tipologia" : {
+
+    },
+    "Eliminare il carico?" : {
+
+    },
+    "Eliminare il contatto?" : {
+
+    },
+    "Eliminare l'operazione e i suoi collegamenti?" : {
+
+    },
+    "email" : {
+
+    },
+    "Email" : {
+
+    },
+    "Eseguito da" : {
+
+    },
+    "Facoltativo. Se lo indichi, l'autonomia si calcola come giacenza diviso questo consumo; altrimenti si usa il consumo medio dei riempimenti registrati." : {
+
+    },
+    "Fine" : {
+
+    },
+    "Flocculante" : {
+
+    },
+    "Fornitore" : {
+
+    },
+    "Forza la giacenza al valore indicato, ad esempio dopo aver controllato quanto è rimasto davvero. La differenza viene conteggiata come consumo." : {
+
+    },
+    "Frequenza" : {
+
+    },
+    "Generale" : {
+
+    },
+    "Giacenza" : {
+
+    },
+    "Giacenza attuale" : {
+
+    },
+    "giorni" : {
+
+    },
+    "Giorni trascorsi" : {
+
+    },
+    "Grafici e dettaglio scorta" : {
+
+    },
+    "Guida collegata" : {
+
+    },
+    "Guida vuota" : {
+
+    },
+    "Guide" : {
+
+    },
+    "Guide e documenti dei vari impianti." : {
+
+    },
+    "Ha una scadenza" : {
+
+    },
+    "I documenti allegati compaiono anche nel Manuale, sezione %@." : {
+
+    },
+    "Icona" : {
+
+    },
+    "Il carico in kg indicato dal pannello della caldaia (Deposito) al momento dello svuotamento." : {
+
+    },
+    "Il carico si aggiunge alla scorta." : {
+
+    },
+    "Il consumo è calcolato dalla scorta dello svuotamento precedente, più i carichi di pellet registrati nel frattempo." : {
+
+    },
+    "Il livello pieno è 0 cm; svuotando scende a -5, -10 cm… Con il livello obiettivo (es. -30 cm per lo svuotamento, 0 cm per il riempimento) l'app stima quando terminerà." : {
+
+    },
+    "Importa dalla Rubrica" : {
+
+    },
+    "Importa documento" : {
+
+    },
+    "Importazione dalla Rubrica" : {
+
+    },
+    "Importazione non riuscita" : {
+
+    },
+    "impostato" : {
+
+    },
+    "Impostazioni" : {
+
+    },
+    "Impostazioni prodotto" : {
+
+    },
+    "In arrivo" : {
+
+    },
+    "In corso" : {
+
+    },
+    "In scadenza / in corso" : {
+
+    },
+    "indirizzo" : {
+
+    },
+    "Indirizzo" : {
+
+    },
+    "Iniziato alle %@" : {
+
+    },
+    "Inizio" : {
+
+    },
+    "Interventi" : {
+
+    },
+    "Ispezione" : {
+
+    },
+    "IVA" : {
+
+    },
+    "IVA in euro" : {
+
+    },
+    "La fascia verde indica l'intervallo ideale 7,2 – 7,6." : {
+
+    },
+    "La prossima scadenza viene calcolata dall'ultimo intervento registrato." : {
+
+    },
+    "La quantità utilizzata (o messa in piscina) viene sottratta dalla scorta." : {
+
+    },
+    "La scorta minima si imposta nella scheda di ogni prodotto pH." : {
+
+    },
+    "Le notifiche arrivano alle 9:00." : {
+
+    },
+    "Letture" : {
+
+    },
+    "Livello" : {
+
+    },
+    "Livello finale" : {
+
+    },
+    "Livello iniziale" : {
+
+    },
+    "Livello obiettivo" : {
+
+    },
+    "Manuale" : {
+
+    },
+    "Manuali e documenti" : {
+
+    },
+    "Manutenzione" : {
+
+    },
+    "Manutenzione %@" : {
+
+    },
+    "Manutenzione in scadenza" : {
+
+    },
+    "Manutenzioni" : {
+
+    },
+    "Manutenzioni periodiche" : {
+
+    },
+    "Max" : {
+
+    },
+    "Mese" : {
+
+    },
+    "mesi" : {
+
+    },
+    "messaggio" : {
+
+    },
+    "Min" : {
+
+    },
+    "Minuti" : {
+
+    },
+    "Misure pH" : {
+
+    },
+    "Modalità modifica" : {
+
+    },
+    "Modifica" : {
+
+    },
+    "Modifica attività" : {
+
+    },
+    "Modifica carico" : {
+
+    },
+    "Modifica contatto" : {
+
+    },
+    "Modifica contratto" : {
+
+    },
+    "Modifica descrizione" : {
+
+    },
+    "Modifica guida" : {
+
+    },
+    "Modifica intervento" : {
+
+    },
+    "Modifica lettura" : {
+
+    },
+    "Modifica manutenzione" : {
+
+    },
+    "Modifica misura" : {
+
+    },
+    "Modifica operazione" : {
+
+    },
+    "Modifica prodotto" : {
+
+    },
+    "Modifica sezione" : {
+
+    },
+    "Modifica svuotamento" : {
+
+    },
+    "Nessun avviso" : {
+
+    },
+    "Nessun carico registrato" : {
+
+    },
+    "Nessun contatto" : {
+
+    },
+    "Nessun contatto nuovo: quelli scelti erano già presenti." : {
+
+    },
+    "Nessun contatto selezionato" : {
+
+    },
+    "Nessun contratto" : {
+
+    },
+    "Nessun documento" : {
+
+    },
+    "nessun intervento registrato" : {
+
+    },
+    "Nessun intervento registrato" : {
+
+    },
+    "Nessun movimento registrato" : {
+
+    },
+    "Nessun processo registrato" : {
+
+    },
+    "Nessun prodotto" : {
+
+    },
+    "Nessun prodotto collegato. Collegalo da Modifica." : {
+
+    },
+    "Nessuna" : {
+
+    },
+    "Nessuna attività" : {
+
+    },
+    "Nessuna descrizione" : {
+
+    },
+    "Nessuna guida" : {
+
+    },
+    "Nessuna guida collegata" : {
+
+    },
+    "Nessuna manutenzione registrata" : {
+
+    },
+    "Nessuna misura registrata" : {
+
+    },
+    "Nessuna notifica" : {
+
+    },
+    "Nessuna operazione" : {
+
+    },
+    "Nessuna operazione per questo sistema" : {
+
+    },
+    "Nessuna tipologia di manutenzione. Aggiungila da Modifica." : {
+
+    },
+    "Nessuno" : {
+
+    },
+    "Nessuno svuotamento registrato" : {
+
+    },
+    "No" : {
+
+    },
+    "Nome" : {
+
+    },
+    "Nome (es. Verifica periodica)" : {
+
+    },
+    "Nome sezione" : {
+
+    },
+    "Note" : {
+
+    },
+    "Note (es. aggiunto correttore)" : {
+
+    },
+    "Note (es. liquido o polvere)" : {
+
+    },
+    "Note sull'impianto, codici, riferimenti…" : {
+
+    },
+    "Notifiche" : {
+
+    },
+    "Numero" : {
+
+    },
+    "Numero contratto" : {
+
+    },
+    "Nuova attività" : {
+
+    },
+    "Nuova guida" : {
+
+    },
+    "Nuova manutenzione" : {
+
+    },
+    "Nuova manutenzione periodica" : {
+
+    },
+    "Nuova misura" : {
+
+    },
+    "Nuova operazione" : {
+
+    },
+    "Nuova sezione" : {
+
+    },
+    "Nuova tipologia" : {
+
+    },
+    "Nuovo carico" : {
+
+    },
+    "Nuovo contatto" : {
+
+    },
+    "Nuovo contratto" : {
+
+    },
+    "Nuovo intervento" : {
+
+    },
+    "Nuovo prodotto" : {
+
+    },
+    "Obiettivo" : {
+
+    },
+    "Ogni %lld" : {
+
+    },
+    "Ogni %lld %@" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Ogni %1$lld %2$@"
+          }
+        }
+      }
+    },
+    "Ogni %lld anni" : {
+
+    },
+    "Ogni %lld mesi" : {
+
+    },
+    "Ogni anno" : {
+
+    },
+    "Ogni mese" : {
+
+    },
+    "Ogni tipologia ha la sua scadenza, calcolata dall'ultimo intervento dello stesso tipo. Con 0 mesi non c'è avviso (es. manutenzioni fatte da noi)." : {
+
+    },
+    "Ogni tipologia ha la sua scadenza, calcolata dall'ultimo intervento dello stesso tipo. Ricevi una notifica 14 giorni prima e il giorno stesso. Con 0 mesi non c'è avviso." : {
+
+    },
+    "OK" : {
+
+    },
+    "Operazione" : {
+
+    },
+    "Operazioni" : {
+
+    },
+    "Opzioni blocco" : {
+
+    },
+    "Ora" : {
+
+    },
+    "Ore" : {
+
+    },
+    "Ossigeno" : {
+
+    },
+    "Passaggi" : {
+
+    },
+    "Passaggio" : {
+
+    },
+    "Pellet" : {
+
+    },
+    "Pellet a scorta" : {
+
+    },
+    "Per sistema" : {
+
+    },
+    "pH" : {
+
+    },
+    "pH %@" : {
+
+    },
+    "Post carico" : {
+
+    },
+    "Postcarico" : {
+
+    },
+    "Pre carico" : {
+
+    },
+    "Precarico" : {
+
+    },
+    "Precarico: pellet presente nel deposito prima del carico. Il postcarico si calcola sommando la quantità acquistata." : {
+
+    },
+    "Preferiti" : {
+
+    },
+    "Prima scadenza" : {
+
+    },
+    "Principale" : {
+
+    },
+    "Prodotti a scorta" : {
+
+    },
+    "Prodotti pH a scorta" : {
+
+    },
+    "Prodotto a scorta" : {
+
+    },
+    "Prodotto acquistato (nome, marca)" : {
+
+    },
+    "Promemoria" : {
+
+    },
+    "Promemoria per scadenze, manutenzioni, riempimenti e scorte basse." : {
+
+    },
+    "Prossima scadenza" : {
+
+    },
+    "Prossima scadenza: %@ da questa data." : {
+
+    },
+    "Prossimi %lld giorni" : {
+
+    },
+    "Prossimo allarme" : {
+
+    },
+    "Pulizia" : {
+
+    },
+    "Quantità" : {
+
+    },
+    "Quantità acquistata" : {
+
+    },
+    "Quantità presente" : {
+
+    },
+    "Raggruppa" : {
+
+    },
+    "Recapiti" : {
+
+    },
+    "Registra carico" : {
+
+    },
+    "Registra intervento eseguito" : {
+
+    },
+    "Registra livello" : {
+
+    },
+    "Registra manutenzione" : {
+
+    },
+    "Registra misura" : {
+
+    },
+    "Registra svuotamento" : {
+
+    },
+    "Registra un riempimento per attivare l'allarme." : {
+
+    },
+    "Registro carichi" : {
+
+    },
+    "Restano circa %@" : {
+
+    },
+    "Rettifica giacenza" : {
+
+    },
+    "Riempimento" : {
+
+    },
+    "Riempimento %@" : {
+
+    },
+    "Rimuovi dai preferiti" : {
+
+    },
+    "Rimuovi documento" : {
+
+    },
+    "Rinnovo automatico" : {
+
+    },
+    "Rinomina" : {
+
+    },
+    "Rinomina documento" : {
+
+    },
+    "Rinomina tipologia" : {
+
+    },
+    "Ruolo (es. tecnico caldaia)" : {
+
+    },
+    "Salva" : {
+
+    },
+    "Scadenza" : {
+
+    },
+    "Scadenza contratto" : {
+
+    },
+    "Scadenze" : {
+
+    },
+    "Scegli un sistema o un avviso dall'elenco." : {
+
+    },
+    "Scorri di lato per vedere tutte le colonne." : {
+
+    },
+    "Scorri di lato per vedere tutte le colonne. Tocca una riga per modificarla." : {
+
+    },
+    "Scorri verso sinistra per eliminare un passaggio, tieni premuto per spostarlo." : {
+
+    },
+    "Scorta" : {
+
+    },
+    "Scorta · %@" : {
+
+    },
+    "scorta %@" : {
+
+    },
+    "Scorta bassa: %@" : {
+
+    },
+    "Scorta e notifiche" : {
+
+    },
+    "Scorta minima" : {
+
+    },
+    "Scorta sotto %@: restano circa %@" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Scorta sotto %1$@: restano circa %2$@"
+          }
+        }
+      }
+    },
+    "Scuro" : {
+
+    },
+    "Seleziona un sistema" : {
+
+    },
+    "Senza nome" : {
+
+    },
+    "Senza titolo" : {
+
+    },
+    "settimane" : {
+
+    },
+    "Sì" : {
+
+    },
+    "Sistema" : {
+
+    },
+    "Sistemi" : {
+
+    },
+    "Sistemi di riferimento" : {
+
+    },
+    "sito web" : {
+
+    },
+    "Sito web" : {
+
+    },
+    "Sospesa" : {
+
+    },
+    "Sotto" : {
+
+    },
+    "Sotto %@" : {
+
+    },
+    "Sotto la scorta minima (%@)" : {
+
+    },
+    "Sotto questa quantità il prodotto viene segnalato." : {
+
+    },
+    "Sotto scorta" : {
+
+    },
+    "Spesa" : {
+
+    },
+    "Spesa (IVA incl.)" : {
+
+    },
+    "Spesa totale" : {
+
+    },
+    "Spese per mese" : {
+
+    },
+    "Sposta giù" : {
+
+    },
+    "Sposta su" : {
+
+    },
+    "Storico" : {
+
+    },
+    "Storico interventi" : {
+
+    },
+    "Storico manutenzioni" : {
+
+    },
+    "Storico misure" : {
+
+    },
+    "Strumento" : {
+
+    },
+    "Svuotamento" : {
+
+    },
+    "Svuotamento cenere" : {
+
+    },
+    "telefono" : {
+
+    },
+    "Telefono" : {
+
+    },
+    "Temperatura acqua" : {
+
+    },
+    "Temperatura finale" : {
+
+    },
+    "Temperatura iniziale" : {
+
+    },
+    "Tempo totale" : {
+
+    },
+    "Tempo trascorso" : {
+
+    },
+    "Termina %@" : {
+
+    },
+    "Termina processo" : {
+
+    },
+    "Tieni premuto su una sezione per rinominarla o cambiarne l'icona." : {
+
+    },
+    "Tipo" : {
+
+    },
+    "Tipologie di manutenzione" : {
+
+    },
+    "Titolo" : {
+
+    },
+    "Titolo (es. Assistenza caldaia)" : {
+
+    },
+    "Titolo (es. pulizia caldaia)" : {
+
+    },
+    "Titolo della guida" : {
+
+    },
+    "Tocca Modifica per scrivere il contenuto." : {
+
+    },
+    "Tocca per aggiungere una breve descrizione e i passaggi" : {
+
+    },
+    "Totale" : {
+
+    },
+    "Totale (costo + IVA)" : {
+
+    },
+    "Totale acquistato" : {
+
+    },
+    "Totale annuo" : {
+
+    },
+    "Totale consumato" : {
+
+    },
+    "Tutto in regola" : {
+
+    },
+    "Ultima esecuzione" : {
+
+    },
+    "ultima il %@" : {
+
+    },
+    "Ultima il %@" : {
+
+    },
+    "Ultima misura del %@" : {
+
+    },
+    "Ultimo carico" : {
+
+    },
+    "Ultimo carico il %@ · %@" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Ultimo carico il %1$@ · %2$@"
+          }
+        }
+      }
+    },
+    "Ultimo il %@" : {
+
+    },
+    "Ultimo movimento" : {
+
+    },
+    "Ultimo riempimento %lld giorni fa" : {
+
+    },
+    "Ultimo svuotamento" : {
+
+    },
+    "Ultimo svuotamento %lld giorni fa" : {
+
+    },
+    "Unità" : {
+
+    },
+    "Unità di misura (sacchi, kg, l…)" : {
+
+    },
+    "Valori pH" : {
+
+    },
+    "Variazione dall'inizio" : {
+
+    },
+    "Variazione totale" : {
+
+    },
+    "Velocità media" : {
+
+    },
+    "Verifica periodica" : {
+
+    },
+    "Verrà eliminato anche il suo storico manutenzioni. Scorte, misure, carichi e processi restano salvati." : {
+
+    },
+    "Versione" : {
+
+    },
+    "WhatsApp" : {
+
+    }
+  },
+  "version" : "1.0"
+}

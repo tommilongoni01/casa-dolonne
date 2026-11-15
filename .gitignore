@@ -1,0 +1,10 @@
+
+# --- Dati privati: non vanno pubblicati su GitHub (il repository è pubblico) ---
+# Foto e PDF delle guide (contengono anche credenziali), carichi pellet, file originali.
+web/seed/
+App_Dolonne/ContenutiIniziali/
+Materiale_Manuale/
+Strumenti_conversione/*.docx
+*.xlsx
+.DS_Store
+xcuserdata/

@@ -1,0 +1,21 @@
+# Supabase sospende i progetti gratuiti dopo 7 giorni senza attività:
+# ogni lunedì e giovedì questa azione fa una piccola richiesta per tenerlo attivo.
+name: Risveglio Supabase
+
+on:
+  schedule:
+    - cron: '0 6 * * 1,4'
+  workflow_dispatch:
+
+jobs:
+  risveglio:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Richiesta al database
+        run: |
+          URL=$(grep -o "supabaseUrl: '[^']*'" web/js/config.js | cut -d"'" -f2)
+          CHIAVE=$(grep -o "supabaseChiave: '[^']*'" web/js/config.js | cut -d"'" -f2)
+          if [ -z "$URL" ]; then echo "Supabase non ancora configurato"; exit 0; fi
+          curl -sS -f -X POST "$URL/rest/v1/rpc/risveglio" \
+            -H "apikey: $CHIAVE" -H "Content-Type: application/json" -d '{}'
