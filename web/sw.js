@@ -1,12 +1,12 @@
 // Servizio offline: i file dell'app vengono tenuti in cache, così si apre anche senza rete
 // (i dati condivisi richiedono comunque la connessione). Cambia VERSIONE a ogni aggiornamento.
-const VERSIONE = 'casa-dolonne-10';
+const VERSIONE = 'casa-dolonne-11';
 
 self.addEventListener('install', evento => {
     self.skipWaiting();
     evento.waitUntil(caches.open(VERSIONE).then(cache => cache.addAll([
         './', './index.html', './css/app.css', './manifest.webmanifest',
-        './vendor/vue.esm-browser.prod.js', './vendor/supabase.js', './icone/icona-180.png'
+        './vendor/vue.esm-browser.prod.js', './vendor/supabase.js', './vendor/qrcode.js', './icone/icona-180.png'
     ])));
 });
 

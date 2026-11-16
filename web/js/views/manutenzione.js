@@ -7,7 +7,7 @@ import {
     avvisi, prossime, operazioniDi, statoOperazione, TIPI_OPERAZIONE, analisiScorta, sottoScorta,
     mostraPrevisioni, movimentiDi, nomeMovimento, CATEGORIE, statoScadenza, nomeContatto, sezioneDi,
     ultimoRiempimento, interventiDi, carichiOrdinati, svuotamentiOrdinati, formatiDi, nomeConfezione, descriviConfezioni,
-    prodottiOperazione, operazioneDiProdotto, categoriaPerOperazione, STATI_PRODOTTO
+    prodottiOperazione, operazioneDiProdotto, categoriaPerOperazione, STATI_PRODOTTO, allarmi
 } from '../logic.js';
 import { COLORE_SEZIONE } from '../icone.js';
 import { backend } from '../backend.js';
@@ -34,10 +34,134 @@ export const RigaAvviso = {
 };
 
 // ---------------------------------------------------------------------
+// Riquadri degli impianti (come l'app Casa di Apple)
+// ---------------------------------------------------------------------
+/// "oggi", "tra 5 giorni", "tra 4 mesi", "tra 2 anni"
+function traQuanto(data) {
+    const giorni = f.giorniTra(new Date(), data);
+    if (giorni <= 0) return 'oggi';
+    if (giorni === 1) return 'domani';
+    if (giorni < 45) return `tra ${giorni} giorni`;
+    if (giorni < 548) return `tra ${Math.round(giorni / 30.4)} mesi`;
+    return `tra ${Math.round(giorni / 365)} anni`;
+}
+
+/// Dati principali di un'operazione da mostrare nel riquadro dell'impianto (al massimo uno).
+function datoChiave(o) {
+    if (o.tipo === 'ph') {
+        const ultima = db.misure_ph.slice().sort((a, b) => b.data.localeCompare(a.data))[0];
+        return ultima ? `pH ${f.ph(ultima.dosimetro ?? ultima.scuba)}` : null;
+    }
+    if (o.tipo === 'cenere') {
+        const ultimo = svuotamentiOrdinati()[0];
+        return ultimo ? `Cenere ${f.giorniTrascorsi(ultimo.data)} gg fa` : null;
+    }
+    if (o.tipo === 'cambioAcqua') {
+        const inCorso = db.processi_acqua.find(p => !p.fine);
+        return inCorso ? `${inCorso.tipo === 'svuotamento' ? 'Svuotamento' : 'Riempimento'} in corso` : null;
+    }
+    const prodotti = prodottiOperazione(o);
+    if (prodotti.length === 1) {
+        const p = prodotti[0], a = analisiScorta(p);
+        const autonomia = mostraPrevisioni(p) && a.autonomia !== null ? ` · ${a.autonomia} gg` : '';
+        return `${o.titolo} ${f.quantita(a.giacenza, p.unita)}${autonomia}`;
+    }
+    return null;
+}
+
+/// Stato (rosso/arancione/verde/grigio), dati principali e prossima scadenza di un impianto.
+export function riassuntoImpianto(sezione) {
+    const operazioni = operazioniDi(sezione);
+    const elenco = avvisi({ sezione });
+    const stato = !operazioni.length ? 'vuoto'
+        : elenco.some(a => a.gravita === 'scaduto') ? 'scaduto'
+        : elenco.some(a => a.gravita === 'inScadenza' || a.gravita === 'inCorso') ? 'inScadenza' : 'ok';
+    const etichetta = {
+        vuoto: 'Nessuna operazione',
+        scaduto: `${elenco.filter(a => a.gravita === 'scaduto').length} da fare`,
+        inScadenza: elenco.length === 1 ? '1 avviso' : `${elenco.length} avvisi`,
+        ok: 'In regola'
+    }[stato];
+    const dati = operazioni.map(datoChiave).filter(Boolean).slice(0, 2);
+    const future = operazioni.flatMap(o => allarmi(o)).filter(a => a.stato === 'ok' && a.data);
+    const prossima = future.sort((a, b) => a.data - b.data)[0];
+    return { stato, etichetta, dati, prossima: prossima ? `${prossima.titolo.replace(` · ${sezione.nome}`, '').replace(` ${sezione.nome}`, '')} ${traQuanto(prossima.data)}` : '' };
+}
+
+export const TesseraImpianto = {
+    props: { sezione: Object, selezionata: Boolean },
+    template: `
+      <button class="tessera-impianto" :class="['stato-' + r.stato, { selezionata }]">
+        <span class="ti-testa">
+          <IconaQuadrata :nome="sezione.icona" :dimensione="34"/>
+          <span class="ti-stato"><i></i>{{ r.etichetta }}</span>
+        </span>
+        <span class="ti-nome">{{ sezione.nome }}</span>
+        <span v-for="d in r.dati" :key="d" class="ti-dato">{{ d }}</span>
+        <span v-if="r.prossima" class="ti-prossima"><Icona nome="calendario" :dimensione="13"/>{{ r.prossima }}</span>
+      </button>`,
+    computed: { r() { return riassuntoImpianto(this.sezione); } }
+};
+
+// ---------------------------------------------------------------------
+// Codici QR da stampare e attaccare sugli impianti
+// ---------------------------------------------------------------------
+/// Indirizzo che apre direttamente un impianto (anche da fotocamera).
+export const indirizzoImpianto = sezione => `${location.origin}${location.pathname}#manutenzione/sistema:${sezione.id}`;
+
+/// SVG del codice QR (libreria qrcode-generator, in vendor/qrcode.js).
+function svgQR(testo) {
+    const qr = window.qrcode(0, 'M');
+    qr.addData(testo);
+    qr.make();
+    return qr.createSvgTag({ cellSize: 4, margin: 2, scalable: true });
+}
+
+export const CodiciQR = {
+    props: { id: String },
+    template: `
+      <Pagina :titolo="id ? 'Codice QR' : 'Codici QR degli impianti'">
+        <template #azioni>
+          <button class="pulsante-barra" @click="stampa"><Icona nome="stampa" :dimensione="20"/> Stampa</button>
+        </template>
+        <Gruppo nota="Stampa e attacca il codice vicino all'impianto (caldaia, locale piscina, quadro elettrico…): inquadrandolo con la fotocamera dell'iPhone si apre direttamente la sua pagina, con operazioni, guide e contatti. La prima volta, nel browser, chiede l'accesso con email e codice.">
+        </Gruppo>
+        <div ref="area" class="codici-qr">
+          <div v-for="s in impianti" :key="s.id" class="cartellino-qr">
+            <div class="cartellino-testa"><img src="icone/icona-180.png" alt=""><span>Casa Dolonne</span></div>
+            <div class="cartellino-nome"><IconaQuadrata :nome="s.icona" :dimensione="30"/>{{ s.nome }}</div>
+            <div class="cartellino-codice" v-html="qr(s)"></div>
+            <div class="cartellino-nota">Inquadra con la fotocamera per aprire istruzioni, operazioni e contatti</div>
+          </div>
+        </div>
+      </Pagina>`,
+    computed: {
+        impianti() {
+            const tutte = db.sezioni.slice().sort((a, b) => a.ordine - b.ordine);
+            return this.id ? tutte.filter(s => s.id === this.id) : tutte;
+        }
+    },
+    methods: {
+        qr: s => svgQR(indirizzoImpianto(s)),
+        /// Stampa solo i cartellini: copia temporanea fuori dall'app, nascosta sullo schermo.
+        stampa() {
+            const copia = document.createElement('div');
+            copia.id = 'stampa';
+            copia.innerHTML = this.$refs.area.outerHTML;
+            document.body.append(copia);
+            document.body.classList.add('in-stampa');
+            const fine = () => { copia.remove(); document.body.classList.remove('in-stampa'); window.removeEventListener('afterprint', fine); };
+            window.addEventListener('afterprint', fine);
+            setTimeout(() => window.print(), 100);
+        }
+    }
+};
+
+// ---------------------------------------------------------------------
 // Home
 // ---------------------------------------------------------------------
 export const ManutenzioneHome = {
-    components: { RigaAvviso },
+    components: { RigaAvviso, TesseraImpianto },
     template: `
       <Pagina titolo="Manutenzione" grande :con-indietro="false">
         <Vuoto v-if="!sezioni.length" icona="casa" titolo="Ancora nessun dato"
@@ -63,13 +187,13 @@ export const ManutenzioneHome = {
           <RigaAvviso v-for="a in elencoProssime" :key="a.id" :avviso="a" :selezionata="selezionata(a.pagina)" @apri="apriDaElenco"/>
         </Gruppo>
 
-        <Gruppo titolo="Sistemi">
-          <Riga v-for="s in sezioni" :key="s.id" :icona="s.icona" quadrata :titolo="s.nome"
-                :sottotitolo="riepilogoSistema(s)" :selezionata="selezionata({ nome: 'sistema', id: s.id })" freccia
-                @click="apriDaElenco({ nome: 'sistema', id: s.id })">
-            <template #fine><span v-if="avvisiSistema(s)" class="contatore-avvisi">{{ avvisiSistema(s) }}</span></template>
-          </Riga>
-        </Gruppo>
+        <div v-if="sezioni.length" class="gruppo">
+          <h3 class="gruppo-titolo">Impianti</h3>
+          <div class="griglia-impianti">
+            <TesseraImpianto v-for="s in sezioni" :key="s.id" :sezione="s"
+                             :selezionata="selezionata({ nome: 'sistema', id: s.id })" @click="apriDaElenco({ nome: 'sistema', id: s.id })"/>
+          </div>
+        </div>
 
       </Pagina>`,
     setup() {
@@ -159,6 +283,10 @@ export const Sistema = {
         </Gruppo>
         <Gruppo v-if="contratti.length" titolo="Contratti">
           <RigaContratto v-for="c in contratti" :key="c.id" :contratto="c" @click="apri({ nome: 'contratto', id: c.id })"/>
+        </Gruppo>
+        <Gruppo>
+          <Riga icona="qr" titolo="Codice QR da stampare" sottotitolo="Da attaccare vicino all'impianto per aprire subito questa pagina"
+                freccia @click="apri({ nome: 'codiciQR', id: sezione.id })"/>
         </Gruppo>
 
         <Foglio v-if="nuova" titolo="Nuova operazione" :conferma-disabilitata="!nuova.titolo.trim()"
@@ -772,4 +900,4 @@ export const ProdottoFoglio = {
 };
 
 // Componenti usati anche dalle altre schermate.
-export const componentiManutenzione = { RigaContratto, RigaProdotto, SezioniScorta, SchedeTecniche, MovimentoFoglio, ProdottoFoglio, ContrattoFoglio, PaginaMancante };
+export const componentiManutenzione = { TesseraImpianto, RigaContratto, RigaProdotto, SezioniScorta, SchedeTecniche, MovimentoFoglio, ProdottoFoglio, ContrattoFoglio, PaginaMancante };

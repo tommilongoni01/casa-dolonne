@@ -41,7 +41,8 @@ const PAGINE = {
     sezione: manuale.SezionePagina,
     guida: manuale.GuidaPagina,
     contatto: contatti.ContattoPagina,
-    famiglia: impostazioni.Famiglia
+    famiglia: impostazioni.Famiglia,
+    codiciQR: manutenzione.CodiciQR
 };
 
 const ETICHETTE = {

@@ -31,6 +31,8 @@ const P = {
     avviso: '<path d="M12 3 2 20h20z"/><path d="M12 10v4M12 17h.01"/>',
     orologio: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
     calendario: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
+    stampa: '<path d="M7 9V3h10v6M7 17H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2"/><rect x="7" y="14" width="10" height="7" rx="1"/>',
+    qr: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM20 14v.01M14 20h.01M17 17h4v4h-4"/>',
     spunta: '<path d="m5 12 5 5 9-11"/>',
     sigillo: '<circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/>',
     campana: '<path d="M6 17V11a6 6 0 0 1 12 0v6l2 2H4z"/><path d="M10 21h4"/>',

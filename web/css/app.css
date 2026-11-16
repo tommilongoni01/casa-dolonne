@@ -389,3 +389,50 @@ table.tabella { border-collapse: collapse; width: 100%; font-size: 14px; font-va
 /* Sezioni standard della pagina operazione (Prodotti, Gestione scorte, Altre operazioni, Avvisi, Manuale) */
 .sezione-operazione { margin: 34px 4px -14px; font-size: 22px; font-weight: 700; letter-spacing: -0.3px; }
 .sezione-operazione + .segmenti { margin-top: 22px; }
+
+/* Riquadri degli impianti (home Manutenzione) */
+.griglia-impianti { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+.tessera-impianto {
+    display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-height: 132px; padding: 14px; text-align: left;
+    background: var(--cella); border-radius: var(--raggio); box-shadow: var(--ombra); position: relative; overflow: hidden;
+    transition: transform .15s, box-shadow .15s, background-color .15s;
+}
+.tessera-impianto::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: var(--colore-stato, transparent); }
+.tessera-impianto:active { transform: scale(0.97); }
+.ti-testa { display: flex; justify-content: space-between; align-items: flex-start; width: 100%; margin-bottom: 6px; }
+.ti-stato { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; color: var(--colore-stato, var(--secondario)); }
+.ti-stato i { width: 8px; height: 8px; border-radius: 50%; background: var(--colore-stato, var(--terziario)); }
+.ti-nome { font-size: 16px; font-weight: 600; letter-spacing: -0.2px; line-height: 1.2; }
+.ti-dato { font-size: 13px; color: var(--testo); font-variant-numeric: tabular-nums; opacity: 0.85; }
+.ti-prossima { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--secondario); margin-top: auto; padding-top: 6px; }
+.stato-ok { --colore-stato: var(--verde); }
+.stato-inScadenza { --colore-stato: var(--arancione); }
+.stato-scaduto { --colore-stato: var(--rosso); }
+.stato-scaduto { background: color-mix(in srgb, var(--rosso) 6%, var(--cella)); }
+.stato-vuoto { --colore-stato: transparent; }
+.stato-vuoto .ti-nome, .stato-vuoto .icona-quadrata { opacity: 0.55; }
+.tessera-impianto.selezionata { box-shadow: 0 0 0 2px var(--accento), var(--ombra); }
+@media (hover: hover) and (pointer: fine) {
+    .tessera-impianto:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(0,0,0,.08), var(--ombra); }
+}
+
+/* Cartellini con codice QR */
+.codici-qr { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; margin-top: 14px; }
+.cartellino-qr { background: #fff; color: #000; border-radius: var(--raggio); box-shadow: var(--ombra); padding: 16px; display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; }
+.cartellino-testa { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: #6e6e73; }
+.cartellino-testa img { width: 22px; height: 22px; border-radius: 6px; }
+.cartellino-nome { display: flex; align-items: center; gap: 8px; font-size: 20px; font-weight: 700; letter-spacing: -0.3px; }
+.cartellino-codice { width: 100%; max-width: 220px; }
+.cartellino-codice svg { width: 100%; height: auto; display: block; }
+.cartellino-nota { font-size: 12px; color: #6e6e73; max-width: 220px; }
+#stampa { display: none; }
+@media print {
+    @page { margin: 12mm; }
+    body.in-stampa { background: #fff; height: auto; }
+    body.in-stampa > *:not(#stampa) { display: none !important; }
+    #stampa { display: block; }
+    #stampa .codici-qr { grid-template-columns: repeat(2, 1fr); gap: 10mm; margin: 0; }
+    #stampa .cartellino-qr { box-shadow: none; border: 1px dashed #bbb; break-inside: avoid; padding: 8mm; }
+    #stampa .cartellino-codice { max-width: 60mm; }
+    #stampa .icona-quadrata { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}

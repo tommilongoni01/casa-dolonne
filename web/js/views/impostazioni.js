@@ -19,6 +19,11 @@ export const Impostazioni = {
           <Riga v-if="stato.modo === 'supabase'" icona="esci" titolo="Esci" @click="esciConferma"/>
         </Gruppo>
 
+        <Gruppo v-if="db.sezioni.length" titolo="Impianti" nota="Cartellini con codice QR da stampare e attaccare vicino a ogni impianto.">
+          <Riga icona="qr" titolo="Codici QR degli impianti" freccia
+                :selezionata="nav.largo && stessaPagina(pila()[0], { nome: 'codiciQR' })" @click="apriDaElenco({ nome: 'codiciQR' })"/>
+        </Gruppo>
+
         <Gruppo v-if="puoModificare() && !db.sezioni.length" titolo="Contenuti iniziali"
                 nota="Crea i sistemi e le operazioni e carica le guide della Caldaia (con foto e PDF) e i 16 carichi di pellet. Va fatto una sola volta.">
           <Riga azione icona="importa" :titolo="avanzamento || 'Carica contenuti iniziali'" :disabilitata="!!avanzamento" @click="inizializza"/>
