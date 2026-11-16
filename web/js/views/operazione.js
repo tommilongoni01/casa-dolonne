@@ -232,8 +232,8 @@ const MisurePH = {
         <Riga v-else titolo="Nessuna misura registrata" class="secondario"/>
         <Riga v-if="puoModificare()" azione icona="piuCerchio" titolo="Registra misura" @click="foglio = {}"/>
       </Gruppo>
-      <Gruppo v-if="misure.length > 1" nota="La fascia verde indica l'intervallo ideale 7,2 – 7,6." nota-sempre>
-        <Grafico :serie="serie" :fascia="{ min: 7.2, max: 7.6 }"/>
+      <Gruppo v-if="misure.length > 1" nota="La fascia verde indica l'intervallo ideale 6,8 – 7,8." nota-sempre>
+        <Grafico :serie="serie" :fascia="{ min: 6.8, max: 7.8 }" :formato-y="v => f.ph(v)" valori/>
       </Gruppo>
       <Gruppo v-if="misure.length" titolo="Storico misure">
         <Riga v-for="m in (tutti ? misure : misure.slice(0, 1))" :key="m.id" :titolo="f.data(m.data)" :sottotitolo="m.note"
@@ -257,7 +257,7 @@ const MisurePH = {
         puoModificare,
         colore(v) {
             if (v === null || v === undefined) return 'secondario';
-            return v >= 7.2 && v <= 7.6 ? 'verde' : v >= 7.0 && v <= 7.8 ? 'arancione-t' : 'rosso-t';
+            return v >= 6.8 && v <= 7.8 ? 'verde' : v >= 6.6 && v <= 8.0 ? 'arancione-t' : 'rosso-t';
         }
     },
     setup() { return { f }; }
@@ -358,7 +358,7 @@ export const ProcessoPagina = {
     template: `
       <Pagina v-if="p" :titolo="p.tipo === 'svuotamento' ? 'Svuotamento' : 'Riempimento'">
         <template #azioni>
-          <button v-if="puoModificare() && p.fine" class="pulsante-barra" @click="fine = true">Modifica</button>
+          <button v-if="puoModificare()" class="pulsante-barra" @click="dati = true">Modifica</button>
         </template>
         <Gruppo>
           <div class="valore-grande" style="display:flex;justify-content:space-between;align-items:flex-end">
@@ -367,6 +367,7 @@ export const ProcessoPagina = {
             <div style="text-align:right"><div class="etichetta">Livello</div><div class="numero" style="font-size:26px">{{ f.numero(a.livello) }} cm</div></div>
           </div>
           <Riga titolo="Inizio" :valore="f.dataOra(p.inizio)"/>
+          <Riga v-if="p.fine" titolo="Fine" :valore="f.dataOra(p.fine)"/>
           <Riga titolo="Livello iniziale" :valore="f.numero(p.livello_iniziale) + ' cm'"/>
           <Riga :titolo="p.tipo === 'svuotamento' ? 'Centimetri svuotati' : 'Centimetri riempiti'" :valore="f.numero(a.variazione) + ' cm'"/>
           <Riga v-if="a.velocita" titolo="Velocità media" :valore="f.numero(Math.abs(a.velocita)) + ' cm/h'"/>
@@ -374,7 +375,6 @@ export const ProcessoPagina = {
           <Riga v-if="a.arrivo" titolo="Arrivo stimato" :valore="f.ora(a.arrivo)"/>
           <Riga v-if="p.temperatura_iniziale !== null" titolo="Temperatura iniziale" :valore="f.numero(p.temperatura_iniziale) + ' °C'"/>
           <Riga v-if="p.temperatura_finale !== null && p.temperatura_finale !== undefined" titolo="Temperatura finale" :valore="f.numero(p.temperatura_finale) + ' °C'"/>
-          <Riga v-if="p.fine" titolo="Fine" :valore="f.dataOra(p.fine)"/>
         </Gruppo>
         <template v-if="!p.fine && puoModificare()">
           <div style="margin-top:18px"><button class="pulsante-pieno" @click="lettura = {}"><Icona nome="righello"/> Registra livello</button></div>
@@ -382,21 +382,21 @@ export const ProcessoPagina = {
         </template>
         <Gruppo v-if="a.punti.length > 1" titolo="Andamento livello">
           <Grafico :serie="[{ nome: 'Livello', colore: 'var(--blu)', punti: a.punti.map(x => ({ x: x.ora, y: x.livello })) }]"
-                   :riferimento="p.livello_obiettivo ?? undefined" :formato-y="v => f.numero(v)"/>
+                   :riferimento="p.livello_obiettivo ?? undefined" :formato-y="v => f.numero(v) + ' cm'" valori/>
         </Gruppo>
         <Gruppo titolo="Letture">
-          <Riga titolo="Inizio" :sottotitolo="f.ora(p.inizio)" :valore="f.numero(p.livello_iniziale) + ' cm'"/>
-          <Riga v-for="(l, i) in letture" :key="l.ora + i" :titolo="f.ora(l.ora)"
+          <Riga titolo="Inizio" :sottotitolo="f.dataOra(p.inizio)" :valore="f.numero(p.livello_iniziale) + ' cm'"/>
+          <Riga v-for="(l, i) in letture" :key="l.ora + i" :titolo="quando(l.ora)"
                 :sottotitolo="'+' + f.durata(new Date(l.ora) - new Date(p.inizio))"
                 :valore="f.numero(l.livello) + ' cm (' + delta(i) + ')'" @click="puoModificare() && (lettura = { indice: i })"/>
-          <Riga v-if="p.fine && p.livello_finale !== null" titolo="Fine" :sottotitolo="f.ora(p.fine)" :valore="f.numero(p.livello_finale) + ' cm'"/>
+          <Riga v-if="p.fine && p.livello_finale !== null" titolo="Fine" :sottotitolo="quando(p.fine)" :valore="f.numero(p.livello_finale) + ' cm'"/>
         </Gruppo>
         <Gruppo v-if="p.note" titolo="Note"><div class="riga testo-descrizione">{{ p.note }}</div></Gruppo>
         <Gruppo v-if="puoModificare()"><Riga distruttiva titolo="Elimina processo" @click="eliminaProcesso"/></Gruppo>
 
         <Foglio v-if="lettura" :titolo="lettura.indice !== undefined ? 'Modifica lettura' : 'Registra livello'"
-                conferma="Salva" :conferma-disabilitata="bl.livello === null" @annulla="lettura = null" @conferma="salvaLettura">
-          <Gruppo>
+                conferma="Salva" :conferma-disabilitata="bl.livello === null || primaDellInizio(bl.ora)" @annulla="lettura = null" @conferma="salvaLettura">
+          <Gruppo :nota="primaDellInizio(bl.ora) ? avvisoData : ''" nota-sempre>
             <CampoData v-model="bl.ora" etichetta="Ora" con-ora/>
             <CampoNumero v-model="bl.livello" etichetta="Livello" unita="cm" negativi/>
           </Gruppo>
@@ -406,9 +406,9 @@ export const ProcessoPagina = {
           <Gruppo v-if="lettura.indice !== undefined"><Riga distruttiva titolo="Elimina lettura" @click="eliminaLettura"/></Gruppo>
         </Foglio>
 
-        <Foglio v-if="fine" :titolo="p.fine ? 'Dati finali' : 'Termina processo'" :conferma-disabilitata="bf.livello === null"
+        <Foglio v-if="fine" titolo="Termina processo" :conferma-disabilitata="bf.livello === null || primaDellInizio(bf.fine)"
                 @annulla="fine = false" @conferma="salvaFine">
-          <Gruppo>
+          <Gruppo :nota="primaDellInizio(bf.fine) ? avvisoData : ''" nota-sempre>
             <CampoData v-model="bf.fine" etichetta="Fine" con-ora/>
             <CampoNumero v-model="bf.livello" etichetta="Livello finale" unita="cm" negativi/>
             <CampoNumero v-model="bf.temperatura" etichetta="Temperatura acqua" unita="°C"/>
@@ -416,10 +416,29 @@ export const ProcessoPagina = {
           </Gruppo>
           <Gruppo titolo="Note"><CampoTesto v-model="bf.note" multilinea segnaposto="Note"/></Gruppo>
         </Foglio>
+        <Foglio v-if="dati" titolo="Dati del processo" :conferma-disabilitata="bd.livello === null || fineSbagliata"
+                @annulla="dati = false" @conferma="salvaDati">
+          <Gruppo titolo="Inizio">
+            <CampoData v-model="bd.inizio" etichetta="Inizio" con-ora/>
+            <CampoNumero v-model="bd.livello" etichetta="Livello iniziale" unita="cm" negativi/>
+            <CampoNumero v-model="bd.obiettivo" etichetta="Livello obiettivo" unita="cm" negativi/>
+            <CampoNumero v-model="bd.temperatura" etichetta="Temperatura acqua" unita="°C"/>
+          </Gruppo>
+          <Gruppo v-if="p.fine" titolo="Fine" :nota="fineSbagliata ? avvisoFine : ''" nota-sempre>
+            <CampoData v-model="bd.fine" etichetta="Fine" con-ora/>
+            <CampoNumero v-model="bd.livelloFinale" etichetta="Livello finale" unita="cm" negativi/>
+            <CampoNumero v-model="bd.temperaturaFinale" etichetta="Temperatura acqua" unita="°C"/>
+            <Riga titolo="Tempo totale" :valore="f.durata(new Date(bd.fine) - new Date(bd.inizio))"/>
+          </Gruppo>
+          <Gruppo titolo="Note"><CampoTesto v-model="bd.note" multilinea segnaposto="Note"/></Gruppo>
+        </Foglio>
       </Pagina>
       <PaginaMancante v-else/>`,
-    data() { return { lettura: null, fine: false, bl: {}, bf: {} }; },
+    data() { return { lettura: null, fine: false, dati: false, bl: {}, bf: {}, bd: {} }; },
     computed: {
+        fineSbagliata() { return !!(this.p.fine && this.bd.fine && new Date(this.bd.fine) < new Date(this.bd.inizio)); },
+        avvisoFine() { return "La fine è prima dell'inizio: controlla giorno e ora."; },
+        avvisoData() { return `È prima dell'inizio del processo (${f.dataOra(this.p.inizio)}): controlla giorno e ora.`; },
         p() { return db.processi_acqua.find(p => p.id === this.id); },
         a() { return analisiProcesso(this.p); },
         letture() { return [...(this.p.letture ?? [])].sort((a, b) => a.ora.localeCompare(b.ora)); }
@@ -430,6 +449,12 @@ export const ProcessoPagina = {
             const esistente = v.indice !== undefined ? this.letture[v.indice] : null;
             this.bl = { ora: esistente?.ora ?? new Date().toISOString(), livello: esistente?.livello ?? this.a.livello };
         },
+        dati(v) {
+            if (!v) return;
+            this.bd = { inizio: this.p.inizio, livello: Number(this.p.livello_iniziale), obiettivo: this.p.livello_obiettivo ?? null,
+                        temperatura: this.p.temperatura_iniziale ?? null, fine: this.p.fine ?? null,
+                        livelloFinale: this.p.livello_finale ?? null, temperaturaFinale: this.p.temperatura_finale ?? null, note: this.p.note ?? '' };
+        },
         fine(v) {
             if (!v) return;
             this.bf = { fine: this.p.fine ?? new Date().toISOString(), livello: this.p.livello_finale ?? this.a.livello,
@@ -438,6 +463,17 @@ export const ProcessoPagina = {
     },
     methods: {
         puoModificare,
+        /// Ora della lettura, con il giorno se è diverso da quello di inizio.
+        quando(v) { return new Date(v).toDateString() === new Date(this.p.inizio).toDateString() ? f.ora(v) : f.dataOra(v); },
+        primaDellInizio(v) { return !!v && new Date(v) < new Date(this.p.inizio); },
+        async salvaDati() {
+            const b = this.bd;
+            await salva('processi_acqua', {
+                ...this.p, inizio: b.inizio, livello_iniziale: b.livello, livello_obiettivo: b.obiettivo, temperatura_iniziale: b.temperatura,
+                note: b.note, ...(this.p.fine ? { fine: b.fine, livello_finale: b.livelloFinale, temperatura_finale: b.temperaturaFinale } : {})
+            });
+            this.dati = false;
+        },
         delta(i) {
             const prima = i === 0 ? Number(this.p.livello_iniziale) : Number(this.letture[i - 1].livello);
             const d = Number(this.letture[i].livello) - prima;

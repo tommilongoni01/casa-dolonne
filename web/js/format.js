@@ -74,7 +74,9 @@ export const dataOra = v => v ? fDataOra.format(new Date(v)) : '–';
 /// "1 h 20 min" a partire da millisecondi.
 export function durata(ms) {
     const minuti = Math.max(0, Math.round(ms / 60000));
-    const h = Math.floor(minuti / 60), m = minuti % 60;
+    const giorni = Math.floor(minuti / 1440), h = Math.floor((minuti % 1440) / 60), m = minuti % 60;
+    // Oltre un giorno: "2 g 3 h" (i minuti non servono più).
+    if (giorni > 0) return h ? `${giorni} g ${h} h` : `${giorni} g`;
     if (h === 0) return `${m} min`;
     return m === 0 ? `${h} h` : `${h} h ${m} min`;
 }

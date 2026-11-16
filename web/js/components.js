@@ -196,25 +196,41 @@ export const CampoNumero = {
 export const CampoData = {
     props: { etichetta: String, modelValue: String, conOra: Boolean },
     emits: ['update:modelValue'],
+    // Con l'ora: due campi separati (giorno e ora), più affidabili del campo unico su iPhone, iPad e Mac.
     template: `
       <label class="campo">
         <span class="campo-etichetta">{{ etichetta }}</span>
-        <input :type="conOra ? 'datetime-local' : 'date'" class="data" :value="valoreCampo"
-               @input="cambia($event.target.value)">
+        <span class="campo-data-ora">
+          <input type="date" class="data" :value="giorno" @input="cambiaGiorno($event.target.value)" @change="cambiaGiorno($event.target.value)">
+          <input v-if="conOra" type="time" class="data" :value="orario" @input="cambiaOra($event.target.value)" @change="cambiaOra($event.target.value)">
+        </span>
       </label>`,
     computed: {
-        valoreCampo() {
+        locale() { return this.modelValue ? new Date(this.modelValue) : null; },
+        giorno() {
             if (!this.modelValue) return '';
             if (!this.conOra) return this.modelValue.slice(0, 10);
-            const d = new Date(this.modelValue);
+            const d = this.locale, due = n => String(n).padStart(2, '0');
+            return `${d.getFullYear()}-${due(d.getMonth() + 1)}-${due(d.getDate())}`;
+        },
+        orario() {
+            if (!this.locale) return '';
             const due = n => String(n).padStart(2, '0');
-            return `${d.getFullYear()}-${due(d.getMonth() + 1)}-${due(d.getDate())}T${due(d.getHours())}:${due(d.getMinutes())}`;
+            return `${due(this.locale.getHours())}:${due(this.locale.getMinutes())}`;
         }
     },
     methods: {
-        cambia(v) {
+        cambiaGiorno(v) {
             if (!v) return;
-            this.$emit('update:modelValue', this.conOra ? new Date(v).toISOString() : v);
+            if (!this.conOra) { if (v !== this.modelValue) this.$emit('update:modelValue', v); return; }
+            this.emetti(v, this.orario || '12:00');
+        },
+        cambiaOra(v) { if (v) this.emetti(this.giorno || new Date().toISOString().slice(0, 10), v); },
+        /// Giorno e ora locali → istante ISO.
+        emetti(giorno, ora) {
+            const [a, m, g] = giorno.split('-').map(Number), [h, min] = ora.split(':').map(Number);
+            const iso = new Date(a, m - 1, g, h, min).toISOString();
+            if (iso !== this.modelValue) this.$emit('update:modelValue', iso);
         }
     }
 };
@@ -297,52 +313,73 @@ export const Grafico = {
         fascia: Object,            // { min, max } evidenziata in verde
         riferimento: Number,       // linea tratteggiata (es. livello obiettivo)
         formatoY: { type: Function, default: v => String(Math.round(v * 10) / 10).replace('.', ',') },
-        gradini: Boolean
+        gradini: Boolean,
+        valori: Boolean            // scrive il valore misurato accanto a ogni punto
     },
     template: `
       <div class="grafico">
-        <svg :viewBox="'0 0 ' + L + ' ' + altezza" preserveAspectRatio="none" :style="{ height: altezza + 'px' }">
+        <svg :viewBox="'0 0 ' + L + ' ' + altezza" :style="{ height: altezza + 'px' }">
           <rect v-if="fascia" :x="sx" :width="L - sx - dx" :y="y(fascia.max)" :height="Math.max(0, y(fascia.min) - y(fascia.max))" class="grafico-fascia"/>
           <g v-for="t in tacche" :key="t">
             <line :x1="sx" :x2="L - dx" :y1="y(t)" :y2="y(t)" class="grafico-griglia"/>
             <text :x="sx - 6" :y="y(t) + 4" text-anchor="end" class="grafico-etichetta">{{ formatoY(t) }}</text>
           </g>
           <line v-if="riferimento !== undefined && riferimento !== null" :x1="sx" :x2="L - dx" :y1="y(riferimento)" :y2="y(riferimento)" class="grafico-riferimento"/>
-          <g v-for="s in serie" :key="s.nome">
+          <g v-for="(s, si) in serie" :key="s.nome">
             <path :d="percorso(s.punti)" :stroke="s.colore" class="grafico-linea"/>
             <circle v-for="(p, i) in s.punti" :key="i" :cx="x(p.x)" :cy="y(p.y)" r="3.5" :fill="s.colore"/>
+            <template v-if="valori">
+              <text v-for="e in etichettePunti(s.punti, si)" :key="e.chiave" :x="e.x" :y="e.y" :text-anchor="e.ancora"
+                    class="grafico-valore" :fill="s.colore">{{ formatoY(e.valore) }}</text>
+            </template>
           </g>
-          <text v-for="e in etichetteX" :key="e.x" :x="e.x" :y="altezza - 4" text-anchor="middle" class="grafico-etichetta">{{ e.testo }}</text>
+          <text v-for="(e, i) in etichetteX" :key="i" :x="e.x" :y="altezza - 6" :text-anchor="e.ancora" class="grafico-etichetta">{{ e.testo }}</text>
         </svg>
         <div v-if="serie.length > 1" class="grafico-legenda">
           <span v-for="s in serie" :key="s.nome"><i :style="{ background: s.colore }"></i>{{ s.nome }}</span>
         </div>
       </div>`,
-    data() { return { L: 600, sx: 44, dx: 12, sopra: 10, sotto: 22 }; },
+    // L = larghezza reale del grafico in pixel: così testi e punti non vengono deformati.
+    data() { return { L: 600, dx: 14, sopra: 22, sotto: 26 }; },
+    mounted() {
+        const misura = () => { const w = this.$el.clientWidth - 16; if (w > 100) this.L = Math.round(w); };
+        misura();
+        this.osservatore = new ResizeObserver(misura);
+        this.osservatore.observe(this.$el);
+    },
+    unmounted() { this.osservatore?.disconnect(); },
     computed: {
         tutti() { return this.serie.flatMap(s => s.punti); },
         minX() { return Math.min(...this.tutti.map(p => +p.x)); },
         maxX() { return Math.max(...this.tutti.map(p => +p.x)); },
-        estremiY() {
+        /// Margine sinistro adatto all'etichetta più lunga dell'asse Y.
+        sx() { return 14 + Math.max(...this.tacche.map(t => this.formatoY(t).length)) * 6.6; },
+        /// Valori "tondi" per l'asse Y (es. -10, -5, 0 oppure 6,8 · 7 · 7,2…).
+        passo() {
             const valori = this.tutti.map(p => p.y);
             if (this.fascia) valori.push(this.fascia.min, this.fascia.max);
             if (this.riferimento !== undefined && this.riferimento !== null) valori.push(this.riferimento);
             let min = Math.min(...valori), max = Math.max(...valori);
             if (min === max) { min -= 1; max += 1; }
-            const margine = (max - min) * 0.1;
-            return [min - margine, max + margine];
+            const grezzo = (max - min) / 4, ordine = 10 ** Math.floor(Math.log10(grezzo));
+            const passo = [1, 2, 2.5, 5, 10].map(m => m * ordine).find(v => v >= grezzo);
+            return { passo, min: Math.floor(min / passo) * passo, max: Math.ceil(max / passo) * passo };
         },
+        estremiY() { return [this.passo.min, this.passo.max]; },
         tacche() {
-            const [min, max] = this.estremiY;
-            return [0, 1, 2, 3].map(i => min + (max - min) * (i / 3)).map(v => Math.round(v * 100) / 100);
+            const { passo, min, max } = this.passo, elenco = [];
+            for (let v = min; v <= max + passo / 2; v += passo) elenco.push(Math.round(v * 1000) / 1000);
+            return elenco;
         },
         etichetteX() {
             if (!this.tutti.length) return [];
-            const f = new Intl.DateTimeFormat('it-IT', this.maxX - this.minX < 2 * 86_400_000
-                ? { hour: '2-digit', minute: '2-digit' } : { month: 'short', year: '2-digit' });
-            return [0, 0.5, 1].map(t => {
-                const valore = this.minX + (this.maxX - this.minX) * t;
-                return { x: this.x(valore), testo: f.format(new Date(valore)) };
+            const span = this.maxX - this.minX;
+            const f = new Intl.DateTimeFormat('it-IT', span < 2 * 86_400_000 ? { hour: '2-digit', minute: '2-digit' }
+                : span < 120 * 86_400_000 ? { day: 'numeric', month: 'short' } : { month: 'short', year: '2-digit' });
+            const passi = this.L > 520 ? [0, 0.25, 0.5, 0.75, 1] : [0, 0.5, 1];
+            return passi.map(t => {
+                const valore = this.minX + span * t;
+                return { x: this.x(valore), testo: f.format(new Date(valore)), ancora: t === 0 ? 'start' : t === 1 ? 'end' : 'middle' };
             });
         }
     },
@@ -354,6 +391,28 @@ export const Grafico = {
         y(v) {
             const [min, max] = this.estremiY;
             return this.sopra + (1 - (v - min) / (max - min)) * (this.altezza - this.sopra - this.sotto);
+        },
+        /// Etichette dei valori: sopra il punto (sotto se il valore scende); con tanti punti solo primo, ultimo, minimo e massimo.
+        etichettePunti(punti, indiceSerie = 0) {
+            const ordinati = [...punti].sort((a, b) => a.x - b.x);
+            let scelti = ordinati.map((p, i) => i);
+            if (ordinati.length > 14) {
+                const ys = ordinati.map(p => p.y);
+                scelti = [...new Set([0, ordinati.length - 1, ys.indexOf(Math.min(...ys)), ys.indexOf(Math.max(...ys))])];
+            }
+            return scelti.map(i => {
+                // Con due serie (es. Dosimetro e Scuba): nello stesso giorno il valore più alto sopra, il più basso sotto.
+                const p = ordinati[i], prima = ordinati[i - 1];
+                const altro = this.serie.length > 1 ? this.serie[1 - indiceSerie]?.punti.find(q => +q.x === +p.x) : null;
+                const scende = altro ? (p.y < altro.y || (p.y === altro.y && indiceSerie === 1)) : prima && p.y < prima.y;
+                const x = this.x(p.x), y = this.y(p.y);
+                return {
+                    // Sotto il punto se il livello scende, ma senza finire sull'asse dei tempi (né fuori in alto).
+                    chiave: i, valore: p.y, x,
+                    y: (scende && y + 16 < this.altezza - this.sotto) || y - 8 < 12 ? y + 16 : y - 8,
+                    ancora: x < this.sx + 20 ? 'start' : x > this.L - this.dx - 20 ? 'end' : 'middle'
+                };
+            });
         },
         percorso(punti) {
             const ordinati = [...punti].sort((a, b) => a.x - b.x);
