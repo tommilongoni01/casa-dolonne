@@ -67,6 +67,25 @@ const App = {
       <div v-else class="app" :class="{ largo: nav.largo }">
         <div v-if="stato.modo === 'prova'" class="striscia-prova">Modalità prova · i dati restano solo su questo dispositivo</div>
         <div class="colonne">
+          <!-- Schermo largo: barra laterale come nelle app Apple per Mac e iCloud.com -->
+          <aside v-if="nav.largo" class="barra-laterale">
+            <div class="marchio"><img src="icone/icona-180.png" alt=""><span>Casa Dolonne</span></div>
+            <nav class="laterale-voci">
+              <button v-for="s in schede" :key="s" class="laterale-voce" :class="{ attiva: nav.scheda === s }"
+                      :title="etichette[s].nome" @click="cambiaScheda(s)">
+                <Icona :nome="etichette[s].icona" :dimensione="20"/>
+                <span class="laterale-nome">{{ etichette[s].nome }}</span>
+                <span v-if="s === 'manutenzione' && numeroAvvisi" class="contatore-avvisi">{{ numeroAvvisi }}</span>
+              </button>
+            </nav>
+            <div class="laterale-utente" :title="stato.membro.email">
+              <span class="avatar" style="width:32px;height:32px;font-size:13px">{{ (stato.membro.nome || stato.membro.email).slice(0, 1).toUpperCase() }}</span>
+              <span class="laterale-nome">
+                <span>{{ stato.membro.nome || stato.membro.email }}</span>
+                <small>{{ puoModificare() ? 'Può modificare' : 'Sola lettura' }}</small>
+              </span>
+            </div>
+          </aside>
           <div class="colonna-elenco">
             <component :is="radice" :key="nav.scheda"/>
             <div v-if="!nav.largo && cima" class="sovrapposta" :key="chiaveCima">
@@ -78,9 +97,9 @@ const App = {
             <div v-else class="pagina"><Vuoto :icona="etichette[nav.scheda].icona" :titolo="segnaposto"/></div>
           </div>
         </div>
-        <nav class="schede">
+        <nav v-if="!nav.largo" class="schede">
           <button v-for="s in schede" :key="s" class="scheda" :class="{ attiva: nav.scheda === s }" @click="cambiaScheda(s)">
-            <Icona :nome="etichette[s].icona" :dimensione="nav.largo ? 18 : 24"/>
+            <Icona :nome="etichette[s].icona" :dimensione="24"/>
             <span>{{ etichette[s].nome }}</span>
             <span v-if="s === 'manutenzione' && numeroAvvisi" class="contatore-avvisi">{{ numeroAvvisi }}</span>
           </button>
