@@ -2,6 +2,7 @@
 // Gli stessi dati dell'app iOS. Si caricano una sola volta, da un account editor.
 import { backend } from './backend.js';
 import { db, salva, salvaMolti, caricaTutto } from './store.js';
+import { DESCRIZIONI } from './descrizioni.js';
 
 const SEZIONI = [
     ['Impianto idraulico', 'goccia'], ['Impianto elettrico', 'fulmine'], ['Caldaia', 'fiamma'],
@@ -66,7 +67,8 @@ export async function inizializzaDati(avanzamento = () => {}) {
     const ordini = {}, create = {};
     for (const [sezione, titolo, tipo, extra, tipologie] of operazioni) {
         ordini[sezione] = (ordini[sezione] ?? -1) + 1;
-        const o = await salva('operazioni', { sezione_id: id(sezione), titolo, tipo, ordine: ordini[sezione], passaggi: [], ...extra });
+        const testi = DESCRIZIONI[sezione]?.[tipo] ?? { descrizione: '', passaggi: [] };
+        const o = await salva('operazioni', { sezione_id: id(sezione), titolo, tipo, ordine: ordini[sezione], ...testi, ...extra });
         create[tipo] ??= o;
         if (tipologie) {
             await salvaMolti('tipologie', tipologie.map(([nome, mesi_avviso], ordine) => ({ operazione_id: o.id, nome, mesi_avviso, ordine })));
