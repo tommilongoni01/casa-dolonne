@@ -247,7 +247,9 @@ export function avvisi({ sezione = null } = {}) {
         elenco.push({
             id: `scorta-${p.id}`, gravita: 'inScadenza', icona: 'scatola',
             titolo: `Scorta bassa: ${p.nome}`, dettaglio: `Restano ${quantita(analisiScorta(p).giacenza, p.unita)}`,
-            data: null, pagina: { nome: 'prodotto', id: p.id },
+            data: null,
+            // Le scorte si gestiscono nell'operazione: l'avviso apre quella (o il prodotto, se non è collegato).
+            pagina: operazioneDiProdotto(p) ? { nome: 'operazione', id: operazioneDiProdotto(p).id } : { nome: 'prodotto', id: p.id },
             sezione_id: operazioneDiProdotto(p)?.sezione_id ?? null
         });
     }

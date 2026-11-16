@@ -353,31 +353,19 @@ export const ContrattoFoglio = {
 // ---------------------------------------------------------------------
 // Prodotti a scorta
 // ---------------------------------------------------------------------
+/// Riga di catalogo: nome, codice, stato e confezioni (le scorte si gestiscono nelle operazioni).
 export const RigaProdotto = {
     props: { prodotto: Object, conOperazione: Boolean },
-    template: `
-      <Riga icona="scatola" :titolo="prodotto.nome" :sottotitolo="sottotitolo" freccia>
-        <template #fine>
-          <span class="riga-valore" :class="{ 'rosso-t': basso }">{{ f.quantita(analisi.giacenza, prodotto.unita) }}</span>
-        </template>
-      </Riga>`,
+    template: `<Riga icona="scatola" :titolo="prodotto.nome" :sottotitolo="sottotitolo" freccia/>`,
     computed: {
-        analisi() { return analisiScorta(this.prodotto); },
-        basso() { return sottoScorta(this.prodotto); },
         sottotitolo() {
-            const parti = [this.prodotto.codice];
-            if (this.conOperazione) parti.push(operazioneDiProdotto(this.prodotto)?.titolo);
-            const confezioni = this.analisi.confezioni.filter(c => c.numero > 0);
-            if (confezioni.length) parti.push(confezioni.map(c => `${c.numero} × ${f.quantita(c.litri, this.prodotto.unita)}`).join(' + '));
-            if (this.basso) parti.push(`sotto la scorta minima (${f.quantita(this.prodotto.scorta_minima, this.prodotto.unita)})`);
-            else if (mostraPrevisioni(this.prodotto) && this.analisi.autonomia !== null) parti.push(`autonomia ${this.analisi.autonomia} giorni`);
-            return parti.filter(Boolean).join(' · ');
+            const p = this.prodotto;
+            return [p.codice, this.conOperazione && operazioneDiProdotto(p)?.titolo, p.stato, descriviFormati(p)].filter(Boolean).join(' · ');
         }
-    },
-    setup() { return { f }; }
+    }
 };
 
-/// Magazzino: tutti i prodotti a scorta, divisi per impianto.
+/// Magazzino: archivio dei prodotti (dati, fornitore, schede tecniche), diviso per impianto.
 export const Magazzino = {
     template: `
       <Pagina titolo="Magazzino" grande :con-indietro="false">
@@ -387,7 +375,7 @@ export const Magazzino = {
         <label v-if="db.prodotti.length > 4" class="campo-ricerca"><Icona nome="ricerca" :dimensione="18"/>
           <input v-model="ricerca" placeholder="Cerca nome, codice, fornitore" type="search"></label>
         <Vuoto v-if="!db.prodotti.length" icona="scatola" titolo="Magazzino vuoto"
-               testo="Aggiungi i prodotti a scorta (ossigeno, correttori pH…) e collegali all'operazione in cui si usano."/>
+               testo="Aggiungi i prodotti che usate (ossigeno, correttori pH…) e collegali all'operazione in cui si usano: acquisti e consumi si registrano lì."/>
         <Gruppo v-for="g in gruppi" :key="g.id" :titolo="g.nome">
           <RigaProdotto v-for="p in g.prodotti" :key="p.id" :prodotto="p" con-operazione
                         :selezionata="selezionata(p)" @click="apriDaElenco({ nome: 'prodotto', id: p.id })"/>
@@ -423,14 +411,14 @@ export const ProdottoPagina = {
         </template>
         <Gruppo titolo="Scheda prodotto">
           <Riga titolo="Codice" :valore="prodotto.codice || '–'"/>
-          <Riga titolo="Impianto" :valore="impianto || 'Non collegato'" :freccia="!!operazione" @click="operazione && apriOperazione()"/>
+          <Riga titolo="Impianto" :valore="impianto || 'Non collegato'"/>
           <Riga titolo="Stato" :valore="prodotto.stato || '–'"/>
           <Riga titolo="Confezioni" :valore="confezioni"/>
           <Riga titolo="Fornitore" :valore="prodotto.fornitore || '–'" :sottotitolo="prodotto.fornitore_link"
                 :freccia="!!prodotto.fornitore_link" @click="prodotto.fornitore_link && apriSito()"/>
           <div v-if="prodotto.note" class="riga testo-descrizione">{{ prodotto.note }}</div>
         </Gruppo>
-        <SezioniScorta :prodotto="prodotto" con-grafici/>
+        <SchedeTecniche :prodotto="prodotto"/>
         <ProdottoFoglio v-if="impostazioni" :prodotto="prodotto" @chiudi="impostazioni = false"/>
       </Pagina>
       <PaginaMancante v-else/>`,
@@ -446,10 +434,6 @@ export const ProdottoPagina = {
     },
     methods: {
         puoModificare,
-        apriOperazione() {
-            nav.scheda = 'manutenzione';
-            nav.pile.manutenzione = [{ nome: 'sistema', id: this.operazione.sezione_id }, { nome: 'operazione', id: this.operazione.id }];
-        },
         apriSito() {
             const link = this.prodotto.fornitore_link;
             window.open(/^https?:\/\//i.test(link) ? link : 'https://' + link, '_blank', 'noopener');
@@ -487,10 +471,18 @@ export const SezioniScorta = {
         <Riga titolo="Totale consumato" :valore="f.quantita(a.consumato, prodotto.unita)"/>
         <Riga v-if="a.costo" titolo="Spesa totale" :valore="f.euro(a.costo)"/>
         <Riga v-if="a.costoMedio" titolo="Costo medio" :valore="f.euro(a.costoMedio) + ' / ' + prodotto.unita"/>
+        <CampoNumero v-if="previsioni && puoModificare()" etichetta="Consumo previsto" :unita="prodotto.unita + '/mese'"
+                     :model-value="prodotto.consumo_mensile ?? null" segnaposto="dai consumi"
+                     @fine="v => salva('prodotti', { ...prodotto, consumo_mensile: v > 0 ? v : null })"/>
       </Gruppo>
       <Azioni v-if="puoModificare()" :voci="azioni" @scegli="t => movimento = { tipo: t }"/>
-      <Gruppo v-if="conGrafici && a.andamento.length > 1" titolo="Andamento giacenza">
-        <Grafico :serie="[{ nome: 'Giacenza', colore: 'var(--accento)', punti: a.andamento.map(p => ({ x: f.giorno(p.data), y: p.valore })) }]" gradini/>
+      <Gruppo v-if="conGrafici && a.andamento.length > 1" titolo="Andamento giacenza"
+              :nota="Number(prodotto.scorta_minima) > 0 ? 'La linea tratteggiata è la scorta minima.' : ''">
+        <Grafico :serie="[{ nome: 'Giacenza', colore: 'var(--accento)', punti: a.andamento.map(p => ({ x: f.giorno(p.data), y: p.valore })) }]"
+                 :riferimento="Number(prodotto.scorta_minima) > 0 ? Number(prodotto.scorta_minima) : null" gradini/>
+      </Gruppo>
+      <Gruppo v-if="conGrafici && consumiMensili.length > 1" :titolo="nomeMovimento('consumo', prodotto.categoria) + ' per mese'">
+        <Grafico :serie="[{ nome: 'Consumo', colore: 'var(--arancione)', punti: consumiMensili }]"/>
       </Gruppo>
       <Gruppo :titolo="'Acquisti e ' + nomeMovimento('consumo', prodotto.categoria).toLowerCase()">
         <Riga v-if="!movimenti.length" titolo="Nessun movimento registrato" class="secondario"/>
@@ -503,7 +495,6 @@ export const SezioniScorta = {
           </template>
         </Riga>
       </Gruppo>
-      <SchedeTecniche :prodotto="prodotto"/>
       <MovimentoFoglio v-if="movimento" :prodotto="prodotto" :tipo="movimento.tipo" :movimento="movimento.voce" @chiudi="movimento = null"/>`,
     data() { return { movimento: null }; },
     computed: {
@@ -511,6 +502,22 @@ export const SezioniScorta = {
         basso() { return sottoScorta(this.prodotto); },
         previsioni() { return mostraPrevisioni(this.prodotto); },
         movimenti() { return movimentiDi(this.prodotto); },
+        /// Totale consumato in ogni mese (dal primo all'ultimo mese con movimenti).
+        consumiMensili() {
+            const perMese = {};
+            for (const m of this.movimenti) if (m.tipo === 'consumo' && m.data) {
+                const k = m.data.slice(0, 7);
+                perMese[k] = (perMese[k] ?? 0) + (Number(m.quantita) || 0);
+            }
+            const chiavi = Object.keys(perMese).sort();
+            if (!chiavi.length) return [];
+            const punti = [];
+            for (let d = f.giorno(chiavi[0] + '-01'); d <= f.giorno(chiavi.at(-1) + '-01'); d = new Date(d.getFullYear(), d.getMonth() + 1, 1)) {
+                const k = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+                punti.push({ x: d, y: perMese[k] ?? 0 });
+            }
+            return punti;
+        },
         azioni() {
             return [
                 { id: 'acquisto', nome: 'Acquisto', icona: 'carrello' },
@@ -520,7 +527,7 @@ export const SezioniScorta = {
         }
     },
     methods: {
-        puoModificare, nomeMovimento, nomeConfezione,
+        puoModificare, nomeMovimento, nomeConfezione, salva,
         maiuscola: t => t.charAt(0).toUpperCase() + t.slice(1),
         icona: t => ({ acquisto: 'carrello', consumo: 'meno', rettifica: 'lista' })[t],
         colore: t => ({ acquisto: 'var(--verde)', consumo: 'var(--arancione)', rettifica: 'var(--blu)' })[t],
@@ -676,7 +683,7 @@ export const ProdottoFoglio = {
           <CampoTesto v-model="b.nome" segnaposto="Nome prodotto"/>
           <CampoTesto v-model="b.codice" etichetta="Codice" segnaposto="es. CK120914S"/>
         </Gruppo>
-        <Gruppo nota="L'operazione in cui si usa: lì si registrano acquisti e consumi.">
+        <Gruppo nota="L'operazione in cui si usa: lì si registrano acquisti e consumi e si impostano gli avvisi di scorta.">
           <CampoScelta v-model="b.operazione_id" etichetta="Impianto e operazione" :opzioni="operazioni"/>
         </Gruppo>
         <Gruppo titolo="Prodotto" :nota="'Confezioni: formati in cui si compra, separati da virgola (5, 1 = taniche da 5 e da 1 ' + (b.unita || 'unità') + '). Negli acquisti e nei consumi si indica il numero di confezioni. Vuoto se è sfuso.'">
@@ -687,10 +694,6 @@ export const ProdottoFoglio = {
         <Gruppo titolo="Fornitore">
           <CampoTesto v-model="b.fornitore" segnaposto="Nome fornitore"/>
           <CampoTesto v-model="b.fornitore_link" segnaposto="Sito (es. https://www.gecostore.it)" tipo="url"/>
-        </Gruppo>
-        <Gruppo titolo="Scorta" nota="Sotto la scorta minima il prodotto viene segnalato. Il consumo mensile è facoltativo: senza, l'autonomia si calcola dai consumi registrati.">
-          <CampoNumero v-model="b.scorta_minima" etichetta="Scorta minima" :unita="b.unita"/>
-          <CampoNumero v-model="b.consumo_mensile" etichetta="Consumo mensile" :unita="b.unita + '/mese'"/>
         </Gruppo>
         <Gruppo titolo="Note"><CampoTesto v-model="b.note" multilinea segnaposto="Note (dosaggi, avvertenze…)"/></Gruppo>
         <Gruppo v-if="schede.length" titolo="Schede tecniche" nota="Tocca una scheda per eliminarla. Per aggiungerle usa “Allega scheda tecnica” nella pagina del prodotto.">
@@ -704,7 +707,7 @@ export const ProdottoFoglio = {
             nome: p.nome ?? '', codice: p.codice ?? '', stato: p.stato ?? '', unita: p.unita ?? 'kg',
             operazione_id: p.operazione_id ?? operazioneDiProdotto(p)?.id ?? this.operazioneId ?? null,
             fornitore: p.fornitore ?? '', fornitore_link: p.fornitore_link ?? '',
-            scorta_minima: p.scorta_minima || null, consumo_mensile: p.consumo_mensile ?? null, note: p.note ?? '',
+            note: p.note ?? '',
             formati: formatiDi(p).map(v => String(v).replace('.', ',')).join(', ')
         } };
     },
@@ -730,9 +733,8 @@ export const ProdottoFoglio = {
             const confezioni = [...new Set(formati.split(/[;\s]+|,\s+/).map(f.leggiNumero).filter(v => v > 0))];
             const operazione = db.operazioni.find(o => o.id === campi.operazione_id);
             await salva('prodotti', {
-                ...campi, confezioni, id: this.prodotto?.id, scorta_minima: this.b.scorta_minima ?? 0,
+                ...(this.prodotto ?? { scorta_minima: 0, consumo_mensile: null }), ...campi, confezioni, id: this.prodotto?.id,
                 categoria: categoriaPerOperazione(operazione),
-                consumo_mensile: this.b.consumo_mensile > 0 ? this.b.consumo_mensile : null,
                 fornitore_link: campi.fornitore_link.trim(),
                 ordine: this.prodotto?.ordine ?? db.prodotti.length
             });

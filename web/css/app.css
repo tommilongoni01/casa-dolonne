@@ -385,3 +385,7 @@ table.tabella { border-collapse: collapse; width: 100%; font-size: 14px; font-va
 .elenco-enter-active, .elenco-leave-active { transition: all .25s ease; }
 .elenco-enter-from, .elenco-leave-to { opacity: 0; transform: translateY(-6px); }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+
+/* Sezioni standard della pagina operazione (Prodotti, Gestione scorte, Altre operazioni, Avvisi, Manuale) */
+.sezione-operazione { margin: 34px 4px -14px; font-size: 22px; font-weight: 700; letter-spacing: -0.3px; }
+.sezione-operazione + .segmenti { margin-top: 22px; }

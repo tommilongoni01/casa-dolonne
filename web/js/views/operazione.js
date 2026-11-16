@@ -5,7 +5,7 @@ import * as f from '../format.js';
 import {
     TIPI_OPERAZIONE, allarmi, tipologieDi, interventiDi, ultimoInterventoDi, prossimaScadenza,
     statoScadenza, analisiProcesso, calcoliCarico, carichiOrdinati, svuotamentiOrdinati, consumoCenere,
-    prodottoDi, prodottiOperazione, operazioneDiProdotto, categoriaPerOperazione, sezioneDi
+    prodottoDi, prodottiOperazione, operazioneDiProdotto, categoriaPerOperazione, sezioneDi, nomeMovimento
 } from '../logic.js';
 
 // ---------------------------------------------------------------------
@@ -35,28 +35,43 @@ export const OperazionePagina = {
                 :titolo="a.stato === 'scaduta' ? a.titolo + ': da fare' : a.titolo + ': entro il ' + f.data(a.data)" :sottotitolo="a.dettaglio"/>
         </Gruppo>
 
-        <MisurePH v-if="o.tipo === 'ph'"/>
-        <!-- Stesso blocco di scorta per tutti i prodotti: ossigeno, pH-, pH+… -->
-        <template v-for="p in prodottiScorta" :key="p.id">
-          <SezioniScorta :prodotto="p"/>
-          <Gruppo><Riga :titolo="'Grafici e dettaglio · ' + p.nome" freccia @click="apri({ nome: 'prodotto', id: p.id })"/></Gruppo>
-        </template>
-        <!-- Prodotti del magazzino usati in questa operazione: acquisti e consumi si registrano qui sopra. -->
-        <Gruppo v-if="o.tipo !== 'storico' && puoModificare()" titolo="Prodotti dal magazzino"
-                nota="Collega un prodotto del magazzino per registrarne qui acquisti e consumi.">
-          <CampoScelta v-if="daCollegare.length" etichetta="Collega prodotto" :model-value="null"
-                       :opzioni="[{ valore: null, nome: 'Scegli' }, ...daCollegare]" @update:model-value="collega"/>
-          <Riga azione icona="piuCerchio" titolo="Nuovo prodotto" @click="nuovoProdotto = true"/>
-        </Gruppo>
-        <ProdottoFoglio v-if="nuovoProdotto" :operazione-id="o.id" @chiudi="nuovoProdotto = false"/>
-        <CambioAcqua v-if="o.tipo === 'cambioAcqua'"/>
-        <Pellet v-if="o.tipo === 'pellet'"/>
-        <Cenere v-if="o.tipo === 'cenere'"/>
-        <Storico v-if="o.tipo === 'storico'" :operazione="o"/>
+        <template v-if="o.tipo !== 'storico'">
+          <!-- Prodotti: quelli del magazzino usati in questa operazione -->
+          <h2 class="sezione-operazione">Prodotti</h2>
+          <Gruppo :nota="puoModificare() ? 'I dati dei prodotti (codice, fornitore, schede tecniche) stanno nel Magazzino.' : ''">
+            <Riga v-if="!prodottiScorta.length" titolo="Nessun prodotto collegato" class="secondario"/>
+            <RigaProdotto v-for="p in prodottiScorta" :key="p.id" :prodotto="p" @click="apri({ nome: 'prodotto', id: p.id })"/>
+            <CampoScelta v-if="puoModificare() && daCollegare.length" etichetta="Collega dal magazzino" :model-value="null"
+                         :opzioni="[{ valore: null, nome: 'Scegli' }, ...daCollegare]" @update:model-value="collega"/>
+            <Riga v-if="puoModificare()" azione icona="piuCerchio" titolo="Nuovo prodotto" @click="nuovoProdotto = true"/>
+          </Gruppo>
+          <ProdottoFoglio v-if="nuovoProdotto" :operazione-id="o.id" @chiudi="nuovoProdotto = false"/>
 
+          <!-- Gestione scorte: giacenza, acquisti, consumi e grafici -->
+          <template v-if="prodottoScelto">
+            <h2 class="sezione-operazione">Gestione scorte</h2>
+            <div v-if="prodottiScorta.length > 1" class="segmenti">
+              <button v-for="p in prodottiScorta" :key="p.id" :class="{ attivo: p.id === prodottoScelto.id }" @click="scelto = p.id">{{ p.nome }}</button>
+            </div>
+            <SezioniScorta :prodotto="prodottoScelto" :key="prodottoScelto.id" con-grafici/>
+          </template>
+
+          <!-- Altre operazioni specifiche (misure pH, cambio acqua, carichi pellet, cenere) -->
+          <template v-if="['ph', 'cambioAcqua', 'pellet', 'cenere'].includes(o.tipo)">
+            <h2 class="sezione-operazione">Altre operazioni</h2>
+            <MisurePH v-if="o.tipo === 'ph'"/>
+            <CambioAcqua v-if="o.tipo === 'cambioAcqua'"/>
+            <Pellet v-if="o.tipo === 'pellet'"/>
+            <Cenere v-if="o.tipo === 'cenere'"/>
+          </template>
+        </template>
+        <Storico v-else :operazione="o"/>
+
+        <h2 class="sezione-operazione">Avvisi</h2>
         <NotificheOperazione :operazione="o"/>
 
-        <Gruppo titolo="Manuale">
+        <h2 class="sezione-operazione">Manuale</h2>
+        <Gruppo>
           <Riga v-if="guida" icona="libro" :titolo="guida.titolo" freccia @click="apriGuida"/>
           <CampoScelta v-if="puoModificare()" :etichetta="guida ? 'Cambia guida' : 'Collega una guida'" :model-value="o.guida_id"
                        :opzioni="opzioniGuide" @update:model-value="v => salva('operazioni', { ...o, guida_id: v })"/>
@@ -66,10 +81,11 @@ export const OperazionePagina = {
         <DescrizioneFoglio v-if="descrizione" :operazione="o" @chiudi="descrizione = false"/>
       </Pagina>
       <PaginaMancante v-else/>`,
-    data() { return { descrizione: false, nuovoProdotto: false }; },
+    data() { return { descrizione: false, nuovoProdotto: false, scelto: null }; },
     computed: {
         o() { return db.operazioni.find(o => o.id === this.id); },
         prodottiScorta() { return prodottiOperazione(this.o); },
+        prodottoScelto() { return this.prodottiScorta.find(p => p.id === this.scelto) ?? this.prodottiScorta[0] ?? null; },
         daCollegare() {
             return db.prodotti.filter(p => !this.prodottiScorta.includes(p)).sort((a, b) => a.nome.localeCompare(b.nome))
                 .map(p => {
@@ -138,15 +154,15 @@ export const DescrizioneFoglio = {
 export const NotificheOperazione = {
     props: { operazione: Object },
     template: `
-      <Gruppo titolo="Notifiche" :nota="nota">
-        <template v-if="o.tipo === 'ossigeno' || prodotto">
-          <Interruttore etichetta="Allarme dopo l'ultimo riempimento" :model-value="o.giorni_allarme > 0" :disabilitato="!modifica"
+      <Gruppo :nota="nota">
+        <template v-if="prodotti.length">
+          <Interruttore :etichetta="etichettaPeriodico" :model-value="o.giorni_allarme > 0" :disabilitato="!modifica"
                         @update:model-value="v => aggiorna({ giorni_allarme: v ? 20 : 0 })"/>
           <Passo v-if="o.giorni_allarme > 0" :model-value="o.giorni_allarme" :min="1" :max="365" :disabilitato="!modifica"
                  @update:model-value="v => aggiorna({ giorni_allarme: v })">Dopo {{ o.giorni_allarme }} giorni</Passo>
         </template>
         <template v-for="p in prodotti" :key="p.id">
-          <Interruttore :etichetta="prodotti.length > 1 ? 'Scorta bassa · ' + p.nome : 'Avviso scorta bassa'" :model-value="p.scorta_minima > 0"
+          <Interruttore :etichetta="prodotti.length > 1 ? 'Scorta minima · ' + p.nome : 'Avviso di scorta minima'" :model-value="p.scorta_minima > 0"
                         :disabilitato="!modifica" @update:model-value="v => salva('prodotti', { ...p, scorta_minima: v ? sogliaPredefinita(p) : 0 })"/>
           <!-- Salva solo a fine modifica: salvando a ogni tasto l'aggiornamento in tempo reale riscriveva il campo. -->
           <CampoNumero v-if="p.scorta_minima > 0 && modifica" etichetta="Sotto" :unita="p.unita" :model-value="Number(p.scorta_minima)"
@@ -161,16 +177,19 @@ export const NotificheOperazione = {
           </Passo>
           <Riga v-if="modifica" azione icona="piu" titolo="Aggiungi tipologia" @click="aggiungiTipologia"/>
         </template>
-        <Riga v-if="!prodotti.length && o.tipo !== 'storico'" class="secondario" titolo="Nessuna notifica"/>
+        <Riga v-if="!prodotti.length && o.tipo !== 'storico'" class="secondario" titolo="Collega un prodotto per impostare gli avvisi di scorta"/>
       </Gruppo>`,
     computed: {
         o() { return this.operazione; },
         prodotto() { return prodottoDi(this.o.prodotto_id); },
         prodotti() { return prodottiOperazione(this.o); },
+        nomeConsumo() { return nomeMovimento('consumo', this.prodotti[0]?.categoria).toLowerCase(); },
+        etichettaPeriodico() { return `Avviso periodico dopo l'ultimo ${this.nomeConsumo}`; },
         tipologie() { return tipologieDi(this.o); },
         modifica() { return puoModificare(); },
         nota() {
             if (this.o.tipo === 'storico') return "Ogni tipologia ha la sua scadenza, calcolata dall'ultimo intervento dello stesso tipo. Tocca il nome per rinominarla. Con 0 mesi non c'è avviso.";
+            if (this.prodotti.length) return `Avviso periodico: ricorda di ripetere l'operazione N giorni dopo l'ultimo ${this.nomeConsumo}. Scorta minima: segnala quando la giacenza scende sotto la soglia.`;
             return '';
         }
     },
