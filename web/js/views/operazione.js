@@ -19,19 +19,13 @@ export const OperazionePagina = {
         <template #azioni>
           <button v-if="puoModificare()" class="pulsante-barra" @click="descrizione = true">Modifica</button>
         </template>
-        <Gruppo v-if="o.descrizione || o.passaggi?.length || puoModificare()">
-          <template #intestazione>
-            <span style="display:flex;justify-content:space-between">Descrizione
-              <button v-if="puoModificare()" class="pulsante-testo" style="padding:0;text-transform:none" @click="descrizione = true">Modifica</button>
-            </span>
-          </template>
-          <button class="riga toccabile" style="flex-direction:column;align-items:stretch;gap:10px" :disabled="!puoModificare()" @click="descrizione = true">
-            <span v-if="!o.descrizione && !o.passaggi?.length" class="secondario" style="display:flex;gap:8px;align-items:center">
-              <Icona nome="matita"/> {{ puoModificare() ? 'Tocca per aggiungere una breve descrizione e i passaggi' : 'Nessuna descrizione' }}
-            </span>
+        <!-- Descrizione in sola lettura: si modifica solo con "Modifica" in alto -->
+        <Gruppo v-if="o.descrizione || o.passaggi?.length || puoModificare()" titolo="Descrizione">
+          <div class="riga" style="flex-direction:column;align-items:stretch;gap:10px">
+            <span v-if="!o.descrizione && !o.passaggi?.length" class="secondario">Nessuna descrizione: tocca Modifica in alto per aggiungerla.</span>
             <span v-if="o.descrizione" class="testo-descrizione">{{ o.descrizione }}</span>
             <span v-for="(p, i) in o.passaggi" :key="i" class="passaggio"><span class="passaggio-numero">{{ i + 1 }}</span><span>{{ p }}</span></span>
-          </button>
+          </div>
         </Gruppo>
 
         <Gruppo v-if="allarmiAttivi.length">
