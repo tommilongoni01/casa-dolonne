@@ -8,3 +8,6 @@ Strumenti_conversione/*.docx
 *.xlsx
 .DS_Store
 xcuserdata/
+
+# Script con dati reali della famiglia (misure, registri): solo in locale
+supabase/aggiornamento-7-registri.sql
