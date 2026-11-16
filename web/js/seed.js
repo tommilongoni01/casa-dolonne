@@ -104,9 +104,15 @@ export async function inizializzaDati(avanzamento = () => {}) {
 
     avanzamento('Carichi pellet…');
     const pellet = await (await fetch('seed/carichi_pellet.json')).json();
-    await salvaMolti('carichi_pellet', pellet.carichi.map(c => ({
-        data: c.data, fornitore: c.fornitore, quintali: c.quintali, prezzo_quintale: c.prezzoQuintale,
-        iva_percentuale: c.ivaPercentuale, precarico: c.precarico ?? null, note: ''
+    // Il pellet è un prodotto del magazzino: ogni carico è un suo acquisto (€/q, IVA e pre carico nei dettagli).
+    const prodottoPellet = await salva('prodotti', {
+        nome: 'Pellet', categoria: 'pellet', stato: 'Granulare', unita: 'q', scorta_minima: 0, ordine: 3, operazione_id: create.pellet.id
+    });
+    await salvaMolti('movimenti', pellet.carichi.map(c => ({
+        prodotto_id: prodottoPellet.id, tipo: 'acquisto', data: c.data, quantita: c.quintali, fornitore: c.fornitore,
+        costo: Math.round(c.quintali * c.prezzoQuintale * (1 + c.ivaPercentuale / 100) * 100) / 100,
+        dettagli: { prezzo_unitario: c.prezzoQuintale, iva_percentuale: c.ivaPercentuale, precarico: c.precarico ?? null },
+        confezioni: [], descrizione_prodotto: '', note: ''
     })));
 
     await caricaTutto();

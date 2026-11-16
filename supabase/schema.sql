@@ -128,6 +128,8 @@ create table if not exists movimenti (
     descrizione_prodotto text not null default '',
     -- Confezioni del movimento, es. [{"litri": 5, "numero": 2, "prezzo": 30}].
     confezioni jsonb not null default '[]',
+    -- Acquisti: {"prezzo_unitario": 32.5, "iva_percentuale": 22, "precarico": 4} (precarico = giacenza prima del carico).
+    dettagli jsonb not null default '{}',
     note text not null default ''
 );
 

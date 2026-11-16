@@ -40,10 +40,19 @@ const ORDINE_STATI = { scaduta: 0, inScadenza: 1, ok: 2 };
 // ---------------------------------------------------------------------
 // Scorte
 // ---------------------------------------------------------------------
+// A parità di data (dal più recente): consumo, acquisto, rettifica. In ordine cronologico quindi
+// prima la rettifica (lettura della giacenza), poi l'acquisto, poi il consumo.
+const ORDINE_MOVIMENTI = { consumo: 0, acquisto: 1, rettifica: 2 };
 export function movimentiDi(prodotto) {
     return db.movimenti.filter(m => m.prodotto_id === prodotto.id)
-        .sort((a, b) => (b.data || '').localeCompare(a.data || ''));
+        .sort((a, b) => (b.data || '').localeCompare(a.data || '') || ORDINE_MOVIMENTI[a.tipo] - ORDINE_MOVIMENTI[b.tipo]);
 }
+
+/// Giacenza letta prima di un acquisto (es. pellet nel silo prima del carico), se indicata.
+export const giacenzaPrima = m => {
+    const v = m.dettagli?.precarico;
+    return v === null || v === undefined || v === '' ? null : Number(v);
+};
 
 // Confezioni (es. taniche da 5 l e da 1 l): il prodotto ne elenca i formati,
 // ogni movimento indica quante confezioni di ciascun formato.
@@ -71,7 +80,16 @@ export function analisiScorta(prodotto) {
     for (const m of ordinati) {
         const q = Number(m.quantita) || 0;
         const righe = (m.confezioni ?? []).filter(c => Number(c.litri) > 0);
-        if (m.tipo === 'acquisto') { giacenza += q; acquistato += q; costo += Number(m.costo) || 0; }
+        if (m.tipo === 'acquisto') {
+            // La giacenza letta prima dell'acquisto vale come una rettifica: il calo è stato consumato.
+            const prima = giacenzaPrima(m);
+            if (prima !== null) {
+                if (giacenza - prima > 0) { consumato += giacenza - prima; ultimaDataConsumo = m.data; }
+                giacenza = prima;
+                andamento.push({ data: m.data, valore: giacenza, lettura: true });
+            }
+            giacenza += q; acquistato += q; costo += Number(m.costo) || 0;
+        }
         else if (m.tipo === 'consumo') { giacenza -= q; consumato += q; ultimaDataConsumo = m.data; }
         else if (m.tipo === 'rettifica') {
             const differenza = giacenza - q;
@@ -85,8 +103,12 @@ export function analisiScorta(prodotto) {
             const segno = m.tipo === 'consumo' ? -1 : 1;
             confezioni[c.litri] = (m.tipo === 'rettifica' ? 0 : (confezioni[c.litri] ?? 0)) + segno * n;
         }
-        andamento.push({ data: m.data, valore: giacenza });
+        andamento.push({ data: m.data, valore: giacenza, lettura: m.tipo === 'rettifica' });
     }
+    // Se i consumi non si registrano (es. pellet) la giacenza è affidabile solo dalla prima lettura in poi.
+    const primaLettura = andamento.findIndex(p => p.lettura);
+    const senzaConsumi = !ordinati.some(m => m.tipo === 'consumo');
+    if (senzaConsumi && primaLettura > 0) andamento.splice(0, primaLettura);
     let consumoGiornaliero = null;
     const fisso = Number(prodotto.consumo_mensile) || 0;
     if (fisso > 0) consumoGiornaliero = fisso / 30.4;
@@ -169,16 +191,33 @@ export function ultimoRiempimento(operazione) {
         .map(m => m.data).sort().at(-1) ?? null;
 }
 
+/// Data dell'ultima volta che l'operazione è stata fatta (per l'avviso periodico).
+export function ultimaEsecuzione(operazione) {
+    if (operazione.tipo === 'cenere') return svuotamentiOrdinati()[0]?.data ?? null;
+    if (operazione.tipo === 'cambioAcqua') {
+        return db.processi_acqua.map(p => (p.fine ?? p.inizio)?.slice(0, 10)).filter(Boolean).sort().at(-1) ?? null;
+    }
+    return ultimoRiempimento(operazione);
+}
+
+/// "svuotamento", "cambio acqua", "riempimento", "consumo"…
+export function nomeEsecuzione(operazione) {
+    if (operazione.tipo === 'cenere') return 'svuotamento';
+    if (operazione.tipo === 'cambioAcqua') return 'cambio acqua';
+    return nomeMovimento('consumo', prodottiOperazione(operazione)[0]?.categoria).toLowerCase();
+}
+
 /// Allarmi di un'operazione: riempimento dopo N giorni e scadenze delle tipologie di manutenzione.
 export function allarmi(operazione) {
     const elenco = [];
-    const ultimo = ultimoRiempimento(operazione);
+    const ultimo = ultimaEsecuzione(operazione);
     if (operazione.giorni_allarme > 0 && ultimo) {
         const data = aggiungiGiorni(ultimo, operazione.giorni_allarme);
+        const nome = nomeEsecuzione(operazione);
         elenco.push({
-            id: 'riempimento', data, preavviso: 2,
-            titolo: `Riempimento ${operazione.titolo.toLowerCase()}`,
-            dettaglio: `Ultimo riempimento ${giorniTrascorsi(ultimo)} giorni fa`
+            id: 'periodico', data, preavviso: 2,
+            titolo: operazione.tipo === 'ossigeno' ? `Riempimento ${operazione.titolo.toLowerCase()}` : operazione.titolo,
+            dettaglio: `Ultimo ${nome} ${giorniTrascorsi(ultimo)} giorni fa`
         });
     }
     const tipologie = tipologieDi(operazione);
@@ -317,22 +356,30 @@ export function analisiProcesso(p) {
 // ---------------------------------------------------------------------
 // Pellet e cenere
 // ---------------------------------------------------------------------
-export function calcoliCarico(c) {
-    const imponibile = (Number(c.quintali) || 0) * (Number(c.prezzo_quintale) || 0);
-    const iva = imponibile * (Number(c.iva_percentuale) || 0) / 100;
-    const pre = c.precarico === null || c.precarico === undefined || c.precarico === '' ? null : Number(c.precarico);
-    return { imponibile, iva, totale: imponibile + iva, postcarico: pre === null ? null : pre + (Number(c.quintali) || 0) };
+/// Prezzo unitario (IVA esclusa), IVA e totale di un acquisto; per il pellet anche il deposito prima e dopo il carico.
+export function calcoliCarico(m) {
+    const q = Number(m.quantita) || 0;
+    const aliquota = Number(m.dettagli?.iva_percentuale) || 0;
+    const prezzo = m.dettagli?.prezzo_unitario ?? (q ? (Number(m.costo) || 0) / q / (1 + aliquota / 100) : 0);
+    const imponibile = q * (Number(prezzo) || 0);
+    const iva = imponibile * aliquota / 100;
+    const prima = giacenzaPrima(m);
+    return { prezzo: Number(prezzo) || 0, aliquota, imponibile, iva, totale: imponibile + iva, precarico: prima, postcarico: prima === null ? null : prima + q };
 }
 
-export const carichiOrdinati = () => db.carichi_pellet.slice().sort((a, b) => b.data.localeCompare(a.data));
+/// Carichi di pellet: gli acquisti dei prodotti della categoria pellet, dal più recente.
+export const carichiOrdinati = () => {
+    const ids = db.prodotti.filter(p => p.categoria === 'pellet').map(p => p.id);
+    return db.movimenti.filter(m => m.tipo === 'acquisto' && ids.includes(m.prodotto_id)).sort((a, b) => b.data.localeCompare(a.data));
+};
 export const svuotamentiOrdinati = () => db.svuotamenti_cenere.slice().sort((a, b) => b.data.localeCompare(a.data));
 
 /// Pellet bruciato tra due svuotamenti (kg), considerando i carichi nel frattempo (1 q = 100 kg).
 export function consumoCenere(precedente, attuale) {
     if (!precedente || precedente.scorta_kg == null || attuale.scorta_kg == null) return null;
-    const caricati = db.carichi_pellet
+    const caricati = carichiOrdinati()
         .filter(c => c.data > precedente.data && c.data <= attuale.data)
-        .reduce((s, c) => s + (Number(c.quintali) || 0) * 100, 0);
+        .reduce((s, c) => s + (Number(c.quantita) || 0) * 100, 0);
     const valore = Number(precedente.scorta_kg) + caricati - Number(attuale.scorta_kg);
     return valore >= 0 ? valore : null;
 }

@@ -5,7 +5,7 @@ import * as f from '../format.js';
 import {
     TIPI_OPERAZIONE, allarmi, tipologieDi, interventiDi, ultimoInterventoDi, prossimaScadenza,
     statoScadenza, analisiProcesso, calcoliCarico, carichiOrdinati, svuotamentiOrdinati, consumoCenere,
-    prodottoDi, prodottiOperazione, operazioneDiProdotto, categoriaPerOperazione, sezioneDi, nomeMovimento
+    prodottoDi, prodottiOperazione, operazioneDiProdotto, categoriaPerOperazione, sezioneDi, nomeMovimento, nomeEsecuzione
 } from '../logic.js';
 
 // ---------------------------------------------------------------------
@@ -61,7 +61,7 @@ export const OperazionePagina = {
             <h2 class="sezione-operazione">Altre operazioni</h2>
             <MisurePH v-if="o.tipo === 'ph'"/>
             <CambioAcqua v-if="o.tipo === 'cambioAcqua'"/>
-            <Pellet v-if="o.tipo === 'pellet'"/>
+            <Pellet v-if="o.tipo === 'pellet'" :operazione="o"/>
             <Cenere v-if="o.tipo === 'cenere'"/>
           </template>
         </template>
@@ -155,10 +155,10 @@ export const NotificheOperazione = {
     props: { operazione: Object },
     template: `
       <Gruppo :nota="nota">
-        <template v-if="prodotti.length">
+        <template v-if="periodico">
           <Interruttore :etichetta="etichettaPeriodico" :model-value="o.giorni_allarme > 0" :disabilitato="!modifica"
-                        @update:model-value="v => aggiorna({ giorni_allarme: v ? 20 : 0 })"/>
-          <Passo v-if="o.giorni_allarme > 0" :model-value="o.giorni_allarme" :min="1" :max="365" :disabilitato="!modifica"
+                        @update:model-value="v => aggiorna({ giorni_allarme: v ? giorniPredefiniti : 0 })"/>
+          <Passo v-if="o.giorni_allarme > 0" :model-value="o.giorni_allarme" :min="1" :max="730" :disabilitato="!modifica"
                  @update:model-value="v => aggiorna({ giorni_allarme: v })">Dopo {{ o.giorni_allarme }} giorni</Passo>
         </template>
         <template v-for="p in prodotti" :key="p.id">
@@ -177,19 +177,25 @@ export const NotificheOperazione = {
           </Passo>
           <Riga v-if="modifica" azione icona="piu" titolo="Aggiungi tipologia" @click="aggiungiTipologia"/>
         </template>
-        <Riga v-if="!prodotti.length && o.tipo !== 'storico'" class="secondario" titolo="Collega un prodotto per impostare gli avvisi di scorta"/>
+        <Riga v-if="!periodico && o.tipo !== 'storico'" class="secondario" titolo="Collega un prodotto per impostare gli avvisi di scorta"/>
       </Gruppo>`,
     computed: {
         o() { return this.operazione; },
         prodotto() { return prodottoDi(this.o.prodotto_id); },
         prodotti() { return prodottiOperazione(this.o); },
-        nomeConsumo() { return nomeMovimento('consumo', this.prodotti[0]?.categoria).toLowerCase(); },
+        /// Avviso periodico: per le operazioni con prodotti e per quelle che si ripetono (cenere, cambio acqua).
+        periodico() { return this.prodotti.length > 0 || ['cenere', 'cambioAcqua'].includes(this.o.tipo); },
+        nomeConsumo() { return nomeEsecuzione(this.o); },
         etichettaPeriodico() { return `Avviso periodico dopo l'ultimo ${this.nomeConsumo}`; },
+        giorniPredefiniti() { return { cenere: 14, cambioAcqua: 365 }[this.o.tipo] ?? 20; },
         tipologie() { return tipologieDi(this.o); },
         modifica() { return puoModificare(); },
         nota() {
             if (this.o.tipo === 'storico') return "Ogni tipologia ha la sua scadenza, calcolata dall'ultimo intervento dello stesso tipo. Tocca il nome per rinominarla. Con 0 mesi non c'è avviso.";
-            if (this.prodotti.length) return `Avviso periodico: ricorda di ripetere l'operazione N giorni dopo l'ultimo ${this.nomeConsumo}. Scorta minima: segnala quando la giacenza scende sotto la soglia.`;
+            if (this.periodico) {
+                const scorta = this.prodotti.length ? ' Scorta minima: segnala quando la giacenza scende sotto la soglia.' : '';
+                return `Avviso periodico: ricorda di ripetere l'operazione N giorni dopo l'ultimo ${this.nomeConsumo}.${scorta}`;
+            }
             return '';
         }
     },
@@ -471,91 +477,54 @@ export const ProcessoPagina = {
 // ---------------------------------------------------------------------
 // Pellet
 // ---------------------------------------------------------------------
+/// Registro carichi del pellet: gli acquisti del prodotto Pellet (si registrano con "Acquisto" in Gestione scorte).
 const Pellet = {
+    props: { operazione: Object },
     template: `
       <Gruppo titolo="Ultimo carico">
         <template v-if="ultimo">
           <Riga titolo="Data" :valore="f.data(ultimo.data)"/>
-          <Riga titolo="Quantità acquistata" :valore="f.quantita(ultimo.quintali, 'q')"/>
-          <Riga titolo="Costo al quintale" :valore="f.euro(ultimo.prezzo_quintale)"/>
-          <Riga titolo="Spesa (IVA incl.)" :valore="f.euro(calcoliCarico(ultimo).totale)"/>
-          <Riga v-if="calcoliCarico(ultimo).postcarico !== null" titolo="Deposito dopo il carico" :valore="f.quantita(calcoliCarico(ultimo).postcarico, 'q')"/>
+          <Riga titolo="Quantità acquistata" :valore="f.quantita(ultimo.quantita, unita)"/>
+          <Riga titolo="Costo al quintale" :valore="f.euro(calcoliCarico(ultimo).prezzo)"/>
+          <Riga titolo="Spesa (IVA incl.)" :valore="f.euro(ultimo.costo)"/>
+          <Riga v-if="calcoliCarico(ultimo).postcarico !== null" titolo="Deposito dopo il carico" :valore="f.quantita(calcoliCarico(ultimo).postcarico, unita)"/>
         </template>
         <Riga v-else titolo="Nessun carico registrato" class="secondario"/>
-        <Riga v-if="puoModificare()" azione icona="piuCerchio" titolo="Registra carico" @click="foglio = {}"/>
       </Gruppo>
+      <p v-if="!prodotto" class="gruppo-nota">Collega il prodotto Pellet dal magazzino (sezione Prodotti) per registrare i carichi con “Acquisto”.</p>
       <Gruppo v-if="carichi.length" titolo="Registro carichi" :nota="puoModificare() ? 'Scorri di lato per vedere tutte le colonne. Tocca una riga per modificarla.' : 'Scorri di lato per vedere tutte le colonne.'">
         <div class="tabella-scorri">
           <table class="tabella">
             <thead><tr><th>Data</th><th>Fornitore</th><th>Quantità</th><th>Costo al quintale</th><th>Aliquota IVA</th><th>IVA</th><th>Totale</th><th>Pre carico</th><th>Post carico</th></tr></thead>
             <tbody>
-              <tr v-for="c in carichi" :key="c.id" @click="puoModificare() && (foglio = { voce: c })">
-                <td>{{ f.dataTabella(c.data) }}</td><td>{{ c.fornitore || '–' }}</td><td>{{ f.quantita(c.quintali, 'q') }}</td>
-                <td>{{ f.euro(c.prezzo_quintale) }}</td><td>{{ f.numero(c.iva_percentuale) }}%</td><td>{{ f.euro(calcoliCarico(c).iva) }}</td>
-                <td><b>{{ f.euro(calcoliCarico(c).totale) }}</b></td>
-                <td>{{ c.precarico !== null && c.precarico !== undefined ? f.quantita(c.precarico, 'q') : '–' }}</td>
-                <td>{{ calcoliCarico(c).postcarico !== null ? f.quantita(calcoliCarico(c).postcarico, 'q') : '–' }}</td>
+              <tr v-for="c in carichi" :key="c.id" @click="puoModificare() && (foglio = c)">
+                <td>{{ f.dataTabella(c.data) }}</td><td>{{ c.fornitore || '–' }}</td><td>{{ f.quantita(c.quantita, unita) }}</td>
+                <td>{{ f.euro(calcoliCarico(c).prezzo) }}</td><td>{{ f.numero(calcoliCarico(c).aliquota) }}%</td><td>{{ f.euro(calcoliCarico(c).iva) }}</td>
+                <td><b>{{ f.euro(c.costo) }}</b></td>
+                <td>{{ calcoliCarico(c).precarico !== null ? f.quantita(calcoliCarico(c).precarico, unita) : '–' }}</td>
+                <td>{{ calcoliCarico(c).postcarico !== null ? f.quantita(calcoliCarico(c).postcarico, unita) : '–' }}</td>
               </tr>
             </tbody>
-            <tfoot><tr><td>Totale</td><td></td><td>{{ f.quantita(totaleQuintali, 'q') }}</td><td></td><td></td><td></td><td>{{ f.euro(totaleSpesa) }}</td><td></td><td></td></tr></tfoot>
+            <tfoot><tr><td>Totale</td><td></td><td>{{ f.quantita(totaleQuintali, unita) }}</td><td></td><td></td><td></td><td>{{ f.euro(totaleSpesa) }}</td><td></td><td></td></tr></tfoot>
           </table>
         </div>
       </Gruppo>
       <Gruppo v-if="carichi.length > 1" titolo="Costo al quintale nel tempo (IVA esclusa)">
-        <Grafico :serie="[{ nome: 'Costo al quintale', colore: 'var(--arancione)', punti: carichi.map(c => ({ x: f.giorno(c.data), y: Number(c.prezzo_quintale) })) }]"
+        <Grafico :serie="[{ nome: 'Costo al quintale', colore: 'var(--arancione)', punti: carichi.map(c => ({ x: f.giorno(c.data), y: calcoliCarico(c).prezzo })) }]"
                  :formato-y="v => f.numero(v) + ' €'"/>
       </Gruppo>
-      <CaricoFoglio v-if="foglio" :carico="foglio.voce" @chiudi="foglio = null"/>`,
+      <MovimentoFoglio v-if="foglio" :prodotto="prodottoDelCarico" tipo="acquisto" :movimento="foglio" @chiudi="foglio = null"/>`,
     data() { return { foglio: null }; },
     computed: {
+        prodotto() { return prodottiOperazione(this.operazione).find(p => p.categoria === 'pellet') ?? null; },
+        prodottoDelCarico() { return db.prodotti.find(p => p.id === this.foglio?.prodotto_id); },
+        unita() { return this.prodotto?.unita ?? 'q'; },
         carichi() { return carichiOrdinati(); },
         ultimo() { return this.carichi[0]; },
-        totaleQuintali() { return this.carichi.reduce((s, c) => s + (Number(c.quintali) || 0), 0); },
-        totaleSpesa() { return this.carichi.reduce((s, c) => s + calcoliCarico(c).totale, 0); }
+        totaleQuintali() { return this.carichi.reduce((s, c) => s + (Number(c.quantita) || 0), 0); },
+        totaleSpesa() { return this.carichi.reduce((s, c) => s + (Number(c.costo) || 0), 0); }
     },
     methods: { puoModificare, calcoliCarico },
-    setup() { return { f }; }
-};
-
-const CaricoFoglio = {
-    props: { carico: Object },
-    emits: ['chiudi'],
-    template: `
-      <Foglio :titolo="carico ? 'Modifica carico' : 'Nuovo carico'" :conferma-disabilitata="b.quintali === null" @annulla="$emit('chiudi')" @conferma="salvaCarico">
-        <Gruppo>
-          <CampoData v-model="b.data" etichetta="Data"/>
-          <CampoTesto v-model="b.fornitore" etichetta="Fornitore"/>
-          <CampoNumero v-model="b.quintali" etichetta="Quantità" unita="q"/>
-        </Gruppo>
-        <Gruppo titolo="Costi">
-          <CampoNumero v-model="b.prezzo_quintale" etichetta="Costo al quintale" unita="€"/>
-          <CampoNumero v-model="b.iva_percentuale" etichetta="IVA" unita="%"/>
-          <Riga titolo="IVA in euro" :valore="f.euro(c.iva)"/>
-          <Riga titolo="Totale (costo + IVA)" :valore="f.euro(c.totale)" style="font-weight:600"/>
-        </Gruppo>
-        <Gruppo titolo="Deposito" nota="Pre carico: pellet presente nel deposito prima del carico. Il post carico si calcola sommando la quantità acquistata.">
-          <CampoNumero v-model="b.precarico" etichetta="Pre carico" unita="q"/>
-          <Riga titolo="Post carico" :valore="c.postcarico !== null ? f.quantita(c.postcarico, 'q') : '–'"/>
-        </Gruppo>
-        <Gruppo titolo="Note"><CampoTesto v-model="b.note" multilinea segnaposto="Note"/></Gruppo>
-        <Gruppo v-if="carico"><Riga distruttiva titolo="Elimina carico" @click="eliminaCarico"/></Gruppo>
-      </Foglio>`,
-    data() {
-        const c = this.carico, ultimo = carichiOrdinati()[0];
-        return { b: {
-            data: c?.data ?? f.oggiISO(), fornitore: c?.fornitore ?? ultimo?.fornitore ?? '',
-            quintali: c?.quintali ?? null, prezzo_quintale: c?.prezzo_quintale ?? ultimo?.prezzo_quintale ?? null,
-            iva_percentuale: c?.iva_percentuale ?? ultimo?.iva_percentuale ?? 22, precarico: c?.precarico ?? null, note: c?.note ?? ''
-        } };
-    },
-    computed: { c() { return calcoliCarico(this.b); } },
-    methods: {
-        async salvaCarico() {
-            await salva('carichi_pellet', { ...this.b, id: this.carico?.id, prezzo_quintale: this.b.prezzo_quintale ?? 0, iva_percentuale: this.b.iva_percentuale ?? 0 });
-            this.$emit('chiudi');
-        },
-        async eliminaCarico() { if (confirm('Eliminare il carico?')) { await elimina('carichi_pellet', this.carico.id); this.$emit('chiudi'); } }
-    },
     setup() { return { f }; }
 };
 
@@ -697,5 +666,4 @@ const InterventoFoglio = {
 OperazionePagina.components = { MisurePH, CambioAcqua, Pellet, Cenere, Storico, NotificheOperazione, DescrizioneFoglio };
 CambioAcqua.components = { AvvioFoglio };
 MisurePH.components = { MisuraFoglio };
-Pellet.components = { CaricoFoglio };
 Storico.components = { InterventoFoglio };

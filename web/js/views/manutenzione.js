@@ -120,7 +120,7 @@ export function riepilogoOperazione(o) {
         }
         case 'pellet': {
             const ultimo = carichiOrdinati()[0];
-            if (ultimo) parti.push(`Ultimo carico il ${f.dataBreve(ultimo.data)} · ${f.quantita(ultimo.quintali, 'q')}`);
+            if (ultimo) parti.push(`Ultimo carico il ${f.dataBreve(ultimo.data)} · ${f.quantita(ultimo.quantita, 'q')}`);
             break;
         }
         case 'cenere': {
@@ -479,7 +479,8 @@ export const SezioniScorta = {
       <Gruppo v-if="conGrafici && a.andamento.length > 1" titolo="Andamento giacenza"
               :nota="Number(prodotto.scorta_minima) > 0 ? 'La linea tratteggiata è la scorta minima.' : ''">
         <Grafico :serie="[{ nome: 'Giacenza', colore: 'var(--accento)', punti: a.andamento.map(p => ({ x: f.giorno(p.data), y: p.valore })) }]"
-                 :riferimento="Number(prodotto.scorta_minima) > 0 ? Number(prodotto.scorta_minima) : null" gradini/>
+                 :riferimento="Number(prodotto.scorta_minima) > 0 ? Number(prodotto.scorta_minima) : null"
+                 :gradini="movimenti.some(m => m.tipo === 'consumo')"/>
       </Gruppo>
       <Gruppo v-if="conGrafici && consumiMensili.length > 1" :titolo="nomeMovimento('consumo', prodotto.categoria) + ' per mese'">
         <Grafico :serie="[{ nome: 'Consumo', colore: 'var(--arancione)', punti: consumiMensili }]"/>
@@ -598,11 +599,18 @@ export const MovimentoFoglio = {
             <CampoNumero v-for="litri in formatiUsati" :key="litri" v-model="b.prezzi[litri]"
                          :etichetta="'Costo ' + nomeConfezione(prodotto, 1) + ' da ' + f.quantita(litri, prodotto.unita)" unita="€"/>
           </template>
-          <CampoNumero v-else v-model="b.prezzo" :etichetta="'Costo al ' + prodotto.unita" unita="€"/>
+          <CampoNumero v-else v-model="b.prezzo" :etichetta="'Costo al ' + prodotto.unita + (b.iva ? ' (IVA esclusa)' : '')" unita="€"/>
+          <CampoNumero v-model="b.iva" etichetta="IVA" unita="%" segnaposto="inclusa"/>
+          <Riga v-if="b.iva" titolo="IVA in euro" :valore="f.euro(totale - imponibile)"/>
           <Riga titolo="Costo totale" :valore="f.euro(totale)" style="font-weight:600"/>
           <CampoTesto v-model="b.fornitore" segnaposto="Fornitore"/>
         </Gruppo>
-        <Gruppo titolo="Note"><CampoTesto v-model="b.note" multilinea :segnaposto="tipo === 'acquisto' ? 'Note (es. liquido o polvere)' : 'Note'"/></Gruppo>
+        <Gruppo v-if="tipo === 'acquisto' && prodotto.categoria === 'pellet'" titolo="Deposito"
+                nota="Facoltativo: pellet presente nel silo prima del carico (lo indica il pannello della caldaia). Serve a calcolare consumo e autonomia.">
+          <CampoNumero v-model="b.precarico" etichetta="Prima del carico" :unita="prodotto.unita"/>
+          <Riga v-if="b.precarico !== null" titolo="Dopo il carico" :valore="f.quantita(b.precarico + (quantitaFinale || 0), prodotto.unita)"/>
+        </Gruppo>
+        <Gruppo titolo="Note"><CampoTesto v-model="b.note" multilinea segnaposto="Note"/></Gruppo>
         <Gruppo v-if="movimento"><Riga distruttiva titolo="Elimina" @click="eliminaMovimento"/></Gruppo>
       </Foglio>`,
     data() {
@@ -614,10 +622,15 @@ export const MovimentoFoglio = {
             prezzi[litri] = c?.prezzo ?? null;
         }
         const conConfezioni = Object.values(numeri).some(n => n > 0);
+        // IVA: quella del movimento, altrimenti quella dell'ultimo acquisto dello stesso prodotto.
+        const precedente = movimentiDi(this.prodotto).find(x => x.tipo === 'acquisto' && x.dettagli?.iva_percentuale != null);
+        const iva = m.id ? (m.dettagli?.iva_percentuale ?? null) : (precedente?.dettagli.iva_percentuale ?? null);
         return { b: {
+            iva, precarico: m.dettagli?.precarico ?? null,
             data: m.data ?? f.oggiISO(), quantita: m.quantita ?? null, fornitore: m.fornitore ?? (this.prodotto.fornitore || ''),
             descrizione_prodotto: m.descrizione_prodotto ?? '', note: m.note ?? '', numeri, prezzi,
-            prezzo: !conConfezioni && m.costo && m.quantita ? m.costo / m.quantita : null
+            prezzo: !conConfezioni && m.costo && m.quantita
+                ? (m.dettagli?.prezzo_unitario ?? m.costo / m.quantita / (1 + (Number(iva) || 0) / 100)) : null
         } };
     },
     computed: {
@@ -628,10 +641,12 @@ export const MovimentoFoglio = {
         quantitaFinale() {
             return this.conConfezioni ? this.formati.reduce((t, l) => t + l * this.b.numeri[l], 0) : this.b.quantita;
         },
-        totale() {
+        /// Costo IVA esclusa (se l'IVA è vuota i prezzi si intendono IVA inclusa).
+        imponibile() {
             if (this.conConfezioni) return this.formatiUsati.reduce((t, l) => t + this.b.numeri[l] * (this.b.prezzi[l] || 0), 0);
             return (this.b.quantita || 0) * (this.b.prezzo || 0);
         },
+        totale() { return this.imponibile * (1 + (Number(this.b.iva) || 0) / 100); },
         etichettaQuantita() { return this.tipo === 'rettifica' ? 'Quantità presente' : 'Quantità'; },
         notaConfezioni() {
             const nome = nomeConfezione(this.prodotto, 2);
@@ -660,7 +675,11 @@ export const MovimentoFoglio = {
             await salva('movimenti', {
                 id: this.movimento?.id, prodotto_id: this.prodotto.id, tipo: this.tipo, data: this.b.data,
                 quantita: this.quantitaFinale, costo: acquisto ? this.totale : 0, fornitore: acquisto ? this.b.fornitore : '',
-                descrizione_prodotto: acquisto ? this.b.descrizione_prodotto : '', note: this.b.note, confezioni
+                descrizione_prodotto: acquisto ? this.b.descrizione_prodotto : '', note: this.b.note, confezioni,
+                dettagli: acquisto ? {
+                    ...(this.movimento?.dettagli ?? {}),
+                    prezzo_unitario: this.conConfezioni ? null : this.b.prezzo, iva_percentuale: this.b.iva, precarico: this.b.precarico
+                } : {}
             });
             this.$emit('chiudi');
         },
