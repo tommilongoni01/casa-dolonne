@@ -7,7 +7,7 @@ import {
     avvisi, prossime, operazioniDi, statoOperazione, TIPI_OPERAZIONE, analisiScorta, sottoScorta,
     mostraPrevisioni, movimentiDi, nomeMovimento, CATEGORIE, statoScadenza, nomeContatto, sezioneDi,
     ultimoRiempimento, interventiDi, carichiOrdinati, svuotamentiOrdinati, formatiDi, nomeConfezione, descriviConfezioni,
-    prodottiOperazione, operazioneDiProdotto, categoriaPerOperazione, STATI_PRODOTTO, allarmi
+    prodottiOperazione, operazioneDiProdotto, categoriaPerOperazione, STATI_PRODOTTO, allarmi, coloreImpianto
 } from '../logic.js';
 import { COLORE_SEZIONE } from '../icone.js';
 import { backend } from '../backend.js';
@@ -366,8 +366,9 @@ export const ContrattoFoglio = {
 /// Riga di catalogo: nome, codice, stato e confezioni (le scorte si gestiscono nelle operazioni).
 export const RigaProdotto = {
     props: { prodotto: Object, conOperazione: Boolean },
-    template: `<Riga icona="scatola" :titolo="prodotto.nome" :sottotitolo="sottotitolo" freccia/>`,
+    template: `<Riga :icona="prodotto.icona || 'scatola'" quadrata :colore="colore" :titolo="prodotto.nome" :sottotitolo="sottotitolo" freccia/>`,
     computed: {
+        colore() { return coloreImpianto(operazioneDiProdotto(this.prodotto)?.sezione_id); },
         sottotitolo() {
             const p = this.prodotto;
             return [p.codice, this.conOperazione && operazioneDiProdotto(p)?.titolo, p.stato, descriviFormati(p)].filter(Boolean).join(' · ');
@@ -708,6 +709,9 @@ export const ProdottoFoglio = {
         <Gruppo nota="L'operazione in cui si usa: lì si registrano acquisti e consumi e si impostano gli avvisi di scorta.">
           <CampoScelta v-model="b.operazione_id" etichetta="Impianto e operazione" :opzioni="operazioni"/>
         </Gruppo>
+        <Gruppo titolo="Simbolo" nota="Il colore è quello dell'impianto collegato.">
+          <SceltaIcona v-model="b.icona" :colore="coloreScelto" predefinita="scatola"/>
+        </Gruppo>
         <Gruppo titolo="Prodotto" :nota="'Confezioni: formati in cui si compra, separati da virgola (5, 1 = taniche da 5 e da 1 ' + (b.unita || 'unità') + '). Negli acquisti e nei consumi si indica il numero di confezioni. Vuoto se è sfuso.'">
           <CampoScelta v-model="b.stato" etichetta="Stato" :opzioni="stati"/>
           <CampoTesto v-model="b.unita" etichetta="Unità di misura" segnaposto="kg, l, pz…"/>
@@ -726,7 +730,7 @@ export const ProdottoFoglio = {
     data() {
         const p = this.prodotto ?? {};
         return { b: {
-            nome: p.nome ?? '', codice: p.codice ?? '', stato: p.stato ?? '', unita: p.unita ?? 'kg',
+            nome: p.nome ?? '', codice: p.codice ?? '', stato: p.stato ?? '', unita: p.unita ?? 'kg', icona: p.icona || '',
             operazione_id: p.operazione_id ?? operazioneDiProdotto(p)?.id ?? this.operazioneId ?? null,
             fornitore: p.fornitore ?? '', fornitore_link: p.fornitore_link ?? '',
             note: p.note ?? '',
@@ -742,6 +746,7 @@ export const ProdottoFoglio = {
             return opzioni;
         },
         stati() { return [{ valore: '', nome: '–' }, ...STATI_PRODOTTO.map(v => ({ valore: v, nome: v }))]; },
+        coloreScelto() { return coloreImpianto(db.operazioni.find(o => o.id === this.b.operazione_id)?.sezione_id); },
         schede() { return this.prodotto ? schedeDi(this.prodotto) : []; }
     },
     methods: {
@@ -756,7 +761,7 @@ export const ProdottoFoglio = {
             const operazione = db.operazioni.find(o => o.id === campi.operazione_id);
             await salva('prodotti', {
                 ...(this.prodotto ?? { scorta_minima: 0, consumo_mensile: null }), ...campi, confezioni, id: this.prodotto?.id,
-                categoria: categoriaPerOperazione(operazione),
+                categoria: categoriaPerOperazione(operazione), icona: campi.icona === 'scatola' ? '' : campi.icona,
                 fornitore_link: campi.fornitore_link.trim(),
                 ordine: this.prodotto?.ordine ?? db.prodotti.length
             });

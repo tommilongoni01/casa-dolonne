@@ -6,7 +6,8 @@ import { nav, pila, apri, apriDaElenco, stessaPagina } from '../nav.js';
 import * as f from '../format.js';
 import { COLORE_SEZIONE, ICONE_SEZIONE } from '../icone.js';
 import {
-    avvisi, prossime, operazioniDi, statoOperazione, TIPI_OPERAZIONE, sezioneDi, nomeContatto, sottotitoloContatto, calendarioScadenze
+    avvisi, prossime, operazioniDi, statoOperazione, TIPI_OPERAZIONE, sezioneDi, nomeContatto, sottotitoloContatto, calendarioScadenze,
+    iconaOperazione, coloreImpianto
 } from '../logic.js';
 import { riassuntoImpianto, riepilogoOperazione, TesseraImpianto, RigaAvviso } from './manutenzione.js';
 import { ContattoFoglio } from './contatti.js';
@@ -210,7 +211,7 @@ export const CasaHome = {
                     @click="apriDaElenco({ nome: 'impianto', id: s.id })"/>
             </Gruppo>
             <Gruppo v-if="risultati.operazioni.length" titolo="Operazioni">
-              <Riga v-for="o in risultati.operazioni" :key="o.id" :icona="tipo(o).icona" :titolo="o.titolo" :sottotitolo="nomeImpianto(o.sezione_id)" freccia
+              <Riga v-for="o in risultati.operazioni" :key="o.id" :icona="iconaOperazione(o)" :titolo="o.titolo" :sottotitolo="nomeImpianto(o.sezione_id)" freccia
                     @click="apriOperazione(o)"/>
             </Gruppo>
             <Gruppo v-if="risultati.guide.length" titolo="Guide">
@@ -306,7 +307,7 @@ export const CasaHome = {
         }
     },
     methods: {
-        puoModificare, apriDaElenco,
+        puoModificare, apriDaElenco, iconaOperazione,
         tipo: o => TIPI_OPERAZIONE[o.tipo] ?? TIPI_OPERAZIONE.generica,
         nomeImpianto: id => sezioneDi(id)?.nome ?? '',
         selezionata(p) { return nav.largo && stessaPagina(pila()[0], p); },
@@ -378,9 +379,9 @@ export const ImpiantoPagina = {
         <template v-if="schedaAttiva === 'operazioni'">
           <Gruppo>
             <Riga v-if="!operazioni.length" titolo="Nessuna operazione per questo impianto" class="secondario"/>
-            <Riga v-for="o in operazioni" :key="o.id" :icona="tipo(o).icona" quadrata :colore="coloreOperazione(o)"
+            <Riga v-for="o in operazioni" :key="o.id" :icona="iconaOperazione(o)" quadrata :colore="coloreOperazione(o)"
                   :titolo="o.titolo" :sottotitolo="riepilogoOperazione(o)" freccia @click="apri({ nome: 'operazione', id: o.id })"/>
-            <Riga v-if="puoModificare()" azione icona="piuCerchio" titolo="Nuova operazione" @click="nuova = { titolo: '' }"/>
+            <Riga v-if="puoModificare()" azione icona="piuCerchio" titolo="Nuova operazione" @click="nuova = { titolo: '', icona: '' }"/>
           </Gruppo>
         </template>
 
@@ -428,6 +429,9 @@ export const ImpiantoPagina = {
           <Gruppo nota="Un'operazione con descrizione, prodotti, gestione scorte, avvisi e collegamento al manuale.">
             <CampoTesto v-model="nuova.titolo" segnaposto="Titolo (es. Controllo filtri)"/>
           </Gruppo>
+          <Gruppo titolo="Simbolo">
+            <SceltaIcona v-model="nuova.icona" :colore="coloreImpianto(sezione.id)" predefinita="lista"/>
+          </Gruppo>
         </Foglio>
         <ContrattoFoglio v-if="nuovoContratto" :sezione-id="sezione.id" @chiudi="nuovoContratto = false"/>
         <ContattoFoglio v-if="nuovoContatto" :sezione-id="sezione.id" @chiudi="nuovoContatto = false"/>
@@ -462,7 +466,7 @@ export const ImpiantoPagina = {
         schedaAttiva() { return this.schede.some(s => s.id === this.scheda) ? this.scheda : this.schede[0]?.id; }
     },
     methods: {
-        apri, puoModificare, riepilogoOperazione, nomeContatto, sottotitoloContatto,
+        apri, puoModificare, riepilogoOperazione, nomeContatto, sottotitoloContatto, iconaOperazione, coloreImpianto,
         scegli(id) { this.scheda = schedaScelta[this.id] = id; },
         async collega(id) {
             const c = db.contatti.find(c => c.id === id);
@@ -482,7 +486,8 @@ export const ImpiantoPagina = {
         },
         async creaOperazione() {
             const ordine = Math.max(-1, ...this.operazioni.map(o => o.ordine)) + 1;
-            const o = await salva('operazioni', { sezione_id: this.id, titolo: this.nuova.titolo.trim(), tipo: 'generica', ordine, passaggi: [] });
+            const icona = this.nuova.icona && this.nuova.icona !== 'lista' ? this.nuova.icona : '';
+            const o = await salva('operazioni', { sezione_id: this.id, titolo: this.nuova.titolo.trim(), tipo: 'generica', ordine, passaggi: [], icona });
             this.nuova = null;
             apri({ nome: 'operazione', id: o.id });
         },

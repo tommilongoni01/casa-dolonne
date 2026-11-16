@@ -101,6 +101,8 @@ create table if not exists prodotti (
     nome text not null default '',
     codice text not null default '',
     categoria text not null default 'altro',
+    -- Simbolo scelto (vuoto = scatola).
+    icona text not null default '',
     -- Liquido, Polvere, Granulare…
     stato text not null default '',
     unita text not null default 'pz',
@@ -143,6 +145,8 @@ create table if not exists operazioni (
     note text not null default '',
     ordine int not null default 0,
     giorni_allarme int not null default 0,
+    -- Simbolo scelto (vuoto = quello del tipo di operazione).
+    icona text not null default '',
     prodotto_id uuid references prodotti(id) on delete set null,
     guida_id uuid references guide(id) on delete set null
 );

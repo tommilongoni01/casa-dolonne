@@ -5,7 +5,8 @@ import * as f from '../format.js';
 import {
     TIPI_OPERAZIONE, allarmi, tipologieDi, interventiDi, ultimoInterventoDi, prossimaScadenza,
     statoScadenza, analisiProcesso, calcoliCarico, carichiOrdinati, svuotamentiOrdinati, consumoCenere,
-    prodottoDi, prodottiOperazione, operazioneDiProdotto, categoriaPerOperazione, sezioneDi, nomeMovimento, nomeEsecuzione
+    prodottoDi, prodottiOperazione, operazioneDiProdotto, categoriaPerOperazione, sezioneDi, nomeMovimento, nomeEsecuzione,
+    coloreImpianto
 } from '../logic.js';
 
 // ---------------------------------------------------------------------
@@ -15,6 +16,9 @@ export const OperazionePagina = {
     props: { id: String },
     template: `
       <Pagina v-if="o" :titolo="o.titolo">
+        <template #azioni>
+          <button v-if="puoModificare()" class="pulsante-barra" @click="descrizione = true">Modifica</button>
+        </template>
         <Gruppo v-if="o.descrizione || o.passaggi?.length || puoModificare()">
           <template #intestazione>
             <span style="display:flex;justify-content:space-between">Descrizione
@@ -116,7 +120,11 @@ export const DescrizioneFoglio = {
     props: { operazione: Object },
     emits: ['chiudi'],
     template: `
-      <Foglio :titolo="operazione.titolo" @annulla="$emit('chiudi')" @conferma="salvaDescrizione">
+      <Foglio titolo="Modifica operazione" :conferma-disabilitata="!titolo.trim()" @annulla="$emit('chiudi')" @conferma="salvaDescrizione">
+        <Gruppo><CampoTesto v-model="titolo" etichetta="Titolo" segnaposto="Nome dell'operazione"/></Gruppo>
+        <Gruppo titolo="Simbolo">
+          <SceltaIcona v-model="icona" :colore="coloreImpianto(operazione.sezione_id)" :predefinita="iconaTipo"/>
+        </Gruppo>
         <Gruppo titolo="Descrizione breve"><CampoTesto v-model="descrizione" multilinea segnaposto="A cosa serve, quando va fatta…"/></Gruppo>
         <Gruppo titolo="Passaggi" nota="Svuota un passaggio per eliminarlo.">
           <label v-for="(p, i) in passaggi" :key="i" class="campo">
@@ -129,13 +137,17 @@ export const DescrizioneFoglio = {
         <Gruppo titolo="Note"><CampoTesto v-model="note" multilinea segnaposto="Note sull'impianto, codici, riferimenti…"/></Gruppo>
       </Foglio>`,
     data() {
-        return { descrizione: this.operazione.descrizione ?? '', passaggi: [...(this.operazione.passaggi ?? [])], note: this.operazione.note ?? '' };
+        return { titolo: this.operazione.titolo ?? '', icona: this.operazione.icona || '', descrizione: this.operazione.descrizione ?? '',
+                 passaggi: [...(this.operazione.passaggi ?? [])], note: this.operazione.note ?? '' };
     },
+    computed: { iconaTipo() { return TIPI_OPERAZIONE[this.operazione.tipo]?.icona ?? 'lista'; } },
     methods: {
+        coloreImpianto,
         sposta(i, d) { const [p] = this.passaggi.splice(i, 1); this.passaggi.splice(i + d, 0, p); },
         async salvaDescrizione() {
             await salva('operazioni', {
-                ...this.operazione, descrizione: this.descrizione.trim(), note: this.note.trim(),
+                ...this.operazione, titolo: this.titolo.trim(), icona: this.icona === this.iconaTipo ? '' : this.icona,
+                descrizione: this.descrizione.trim(), note: this.note.trim(),
                 passaggi: this.passaggi.map(p => p.trim()).filter(Boolean)
             });
             this.$emit('chiudi');

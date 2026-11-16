@@ -1,5 +1,6 @@
 // Logica dell'app (calcoli su scorte, allarmi, stato della casa), indipendente dall'interfaccia.
 import { db } from './store.js';
+import { COLORE_SEZIONE } from './icone.js';
 import { giorno, aggiungiGiorni, aggiungiMesi, giorniTra, giorniTrascorsi, dataBreve, quantita } from './format.js';
 
 // ---------------------------------------------------------------------
@@ -14,6 +15,12 @@ export const TIPI_OPERAZIONE = {
     storico: { nome: 'Storico manutenzioni', icona: 'chiave' },
     generica: { nome: 'Operazione', icona: 'lista' }
 };
+
+/// Simbolo di un'operazione: quello scelto, altrimenti quello del suo tipo.
+export const iconaOperazione = o => o?.icona || TIPI_OPERAZIONE[o?.tipo]?.icona || 'lista';
+
+/// Colore di un impianto (quello della sua icona), usato per i simboli di operazioni e prodotti.
+export const coloreImpianto = sezioneId => COLORE_SEZIONE[db.sezioni.find(s => s.id === sezioneId)?.icona] ?? 'var(--accento)';
 
 export const CATEGORIE = {
     ossigeno: 'Ossigeno', ph: 'Correttore pH', flocculante: 'Flocculante', pellet: 'Pellet', altro: 'Altro'
@@ -266,7 +273,7 @@ export function avvisi({ sezione = null } = {}) {
             if (a.stato === 'ok') continue;
             elenco.push({
                 id: `op-${o.id}-${a.id}`, gravita: a.stato === 'scaduta' ? 'scaduto' : 'inScadenza',
-                icona: TIPI_OPERAZIONE[o.tipo]?.icona ?? 'lista', titolo: a.titolo, dettaglio: a.dettaglio,
+                icona: iconaOperazione(o), titolo: a.titolo, dettaglio: a.dettaglio,
                 data: a.data, sezione_id: o.sezione_id, pagina: { nome: 'operazione', id: o.id }
             });
         }
@@ -304,7 +311,7 @@ export function prossime(giorniAvanti = 30) {
         for (const a of allarmi(o)) {
             if (a.stato !== 'ok' || a.data > limite) continue;
             elenco.push({
-                id: `op-${o.id}-${a.id}`, gravita: 'info', icona: TIPI_OPERAZIONE[o.tipo]?.icona ?? 'lista',
+                id: `op-${o.id}-${a.id}`, gravita: 'info', icona: iconaOperazione(o),
                 titolo: a.titolo, dettaglio: a.dettaglio, data: a.data, pagina: { nome: 'operazione', id: o.id }
             });
         }
@@ -327,7 +334,7 @@ export function calendarioScadenze() {
         for (const a of allarmi(o)) {
             if (!a.data) continue;
             elenco.push({
-                id: `op-${o.id}-${a.id}`, gravita: gravita(a.stato), icona: TIPI_OPERAZIONE[o.tipo]?.icona ?? 'lista',
+                id: `op-${o.id}-${a.id}`, gravita: gravita(a.stato), icona: iconaOperazione(o),
                 titolo: a.titolo, dettaglio: a.dettaglio, data: giorno(a.data), sezione_id: o.sezione_id,
                 pagina: { nome: 'operazione', id: o.id }
             });

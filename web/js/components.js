@@ -1,6 +1,6 @@
 // Componenti dell'interfaccia in stile iOS (liste raggruppate, pannelli, campi, grafici).
 import { computed, ref, watch, onMounted, onUnmounted, nextTick } from 'vue';
-import { svg, COLORE_SEZIONE } from './icone.js';
+import { svg, COLORE_SEZIONE, ICONE_SIMBOLI } from './icone.js';
 import { leggiNumero, numeroCampo, dataBreve } from './format.js';
 import { indietro, nav, pila, diviso } from './nav.js';
 import { puoModificare } from './store.js';
@@ -58,6 +58,23 @@ export const RigaEspandi = {
     template: `
       <Riga v-if="totale > 1" azione :icona="aperto ? 'frecciaSu' : 'frecciaGiu'"
             :titolo="aperto ? 'Mostra solo il più recente' : 'Mostra tutti (' + totale + ')'" @click="$emit('update:aperto', !aperto)"/>`
+};
+
+/// Griglia di simboli tra cui scegliere, tutti nel colore dell'impianto (v-model = nome del simbolo).
+export const SceltaIcona = {
+    props: { modelValue: String, colore: String, predefinita: String },
+    emits: ['update:modelValue'],
+    template: `
+      <div class="scelta-icona">
+        <button v-for="i in simboli" :key="i" type="button" :class="{ scelta: i === attuale }" :aria-label="i"
+                @click="$emit('update:modelValue', i)">
+          <IconaQuadrata :nome="i" :colore="colore" :dimensione="38"/>
+        </button>
+      </div>`,
+    computed: {
+        attuale() { return this.modelValue || this.predefinita; },
+        simboli() { return ICONE_SIMBOLI.includes(this.predefinita) || !this.predefinita ? ICONE_SIMBOLI : [this.predefinita, ...ICONE_SIMBOLI]; }
+    }
 };
 
 export const Gruppo = {
@@ -482,5 +499,5 @@ export const ImmagineFile = {
 
 export const componenti = {
     Icona, IconaQuadrata, Pagina, Gruppo, Riga, BadgeScadenza, Vuoto, Foglio, CampoTesto, CampoNumero,
-    CampoData, CampoScelta, Interruttore, Passo, Azioni, Cronometro, Grafico, ImmagineFile, RigaEspandi
+    CampoData, CampoScelta, Interruttore, Passo, Azioni, Cronometro, Grafico, ImmagineFile, RigaEspandi, SceltaIcona
 };

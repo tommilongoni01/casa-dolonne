@@ -10,6 +10,15 @@ const P = {
     ascensore: '<rect x="4" y="3" width="16" height="18" rx="3"/><path d="m9 10 3-3 3 3M9 14l3 3 3-3"/>',
     scudo: '<path d="M12 2.5 4.5 5.5v6c0 4.6 3.2 8.6 7.5 10 4.3-1.4 7.5-5.4 7.5-10v-6z"/><circle cx="12" cy="10.5" r="2"/><path d="M12 12.5v3.5"/>',
     germoglio: '<path d="M12 21v-8.5"/><path d="M12 12.5c0-4.6 3-8 8.5-8.5-.5 5.4-4 8.5-8.5 8.5z"/><path d="M12 15.5c0-3.6-2.4-6.1-7-6.5.4 4.2 3 6.5 7 6.5z"/>',
+    termometro: '<path d="M10 4a2 2 0 1 1 4 0v10.3a4 4 0 1 1-4 0z"/><path d="M12 9v7"/>',
+    filtro: '<path d="M4 5h16l-6 7.5V19l-4 2v-8.5z"/>',
+    tanica: '<rect x="5" y="7" width="14" height="14" rx="2"/><path d="M9 7V4h4l2 3M9 13h6"/>',
+    sacco: '<path d="M8 6c-1.5 2-3 5-3 9a5 5 0 0 0 5 5h4a5 5 0 0 0 5-5c0-4-1.5-7-3-9"/><path d="M8 6h8M9 3l3 3 3-3"/>',
+    lampadina: '<path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/>',
+    batteria: '<rect x="3" y="7" width="16" height="10" rx="2"/><path d="M21 11v2M7 10v4M11 10v4"/>',
+    forbici: '<circle cx="6" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M8.5 7.5 20 18M8.5 16.5 20 6"/>',
+    scopa: '<path d="M15 3l-3 8"/><path d="M7 11h9l2 10H5z"/><path d="M9 15v6M13 15v6"/>',
+    occhio: '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
     ventola: '<circle cx="12" cy="12" r="1.5"/><path d="M12 10.5c0-4 1-7 4-7 2 0 2.5 3-1 5.5M13.5 12c4 0 7 1 7 4 0 2-3 2.5-5.5-1M12 13.5c0 4-1 7-4 7-2 0-2.5-3 1-5.5M10.5 12c-4 0-7-1-7-4 0-2 3-2.5 5.5 1"/>',
     vento: '<path d="M3 8h11a3 3 0 1 0-3-3M3 12h15a3 3 0 1 1-3 3M3 16h8"/>',
     casa: '<path d="M3 11 12 4l9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',
@@ -68,6 +77,11 @@ const P = {
 
 export const ICONE_SEZIONE = ['goccia', 'fulmine', 'fiamma', 'libro', 'sole', 'piscina', 'ascensore', 'ventola',
     'vento', 'scudo', 'germoglio', 'casa', 'chiave'];
+
+/// Simboli tra cui scegliere per operazioni e prodotti (lo sfondo prende il colore dell'impianto).
+export const ICONE_SIMBOLI = ['lista', 'chiave', 'occhio', 'spunta', 'provetta', 'bolle', 'goccia', 'ciclo', 'filtro',
+    'termometro', 'fiamma', 'cestino', 'scopa', 'tanica', 'sacco', 'scatola', 'righello', 'lampadina', 'batteria', 'fulmine',
+    'sole', 'ventola', 'vento', 'scudo', 'germoglio', 'forbici', 'calendario'];
 
 /// Colore dell'icona di ogni sistema, come nell'app Impostazioni di iOS.
 export const COLORE_SEZIONE = {

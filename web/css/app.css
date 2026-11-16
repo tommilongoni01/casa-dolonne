@@ -553,3 +553,7 @@ table.tabella { border-collapse: collapse; width: 100%; font-size: 14px; font-va
 .calendario-agenda-titolo .pulsante-testo { font-size: 14px; font-weight: 500; padding: 0; }
 .agenda-giorno { padding: 10px 16px 4px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .3px; color: var(--secondario); }
 .agenda-giorno + .riga::before { display: none; }
+.scelta-icona { display: flex; flex-wrap: wrap; gap: 10px; padding: 12px 14px; background: var(--cella); }
+.scelta-icona button { border-radius: 11px; outline-offset: 2px; transition: transform .1s; }
+.scelta-icona button.scelta { outline: 3px solid var(--accento); }
+.scelta-icona button:active { transform: scale(0.92); }
