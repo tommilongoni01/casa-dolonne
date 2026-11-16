@@ -57,6 +57,7 @@ const P = {
     testo: '<path d="M4 6h16M4 12h16M4 18h10"/>',
     frecciaSu: '<path d="M12 19V5M6 11l6-6 6 6"/>',
     frecciaGiu: '<path d="M12 5v14M6 13l6 6 6-6"/>',
+    frecciaGiu: '<path d="M12 5v14M6 13l6 6 6-6"/>',
     esci: '<path d="M14 4h5v16h-5M10 8l-4 4 4 4M6 12h10"/>',
     luna: '<path d="M20 14A8 8 0 1 1 10 4a6.5 6.5 0 0 0 10 10z"/>',
     barraLaterale: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/>',

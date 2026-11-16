@@ -48,6 +48,15 @@ export const Pagina = {
     methods: { vaiIndietro() { indietro(); } }
 };
 
+/// Riga in fondo agli elenchi lunghi: di norma si vede solo la voce più recente (v-model:aperto).
+export const RigaEspandi = {
+    props: { totale: Number, aperto: Boolean },
+    emits: ['update:aperto'],
+    template: `
+      <Riga v-if="totale > 1" azione :icona="aperto ? 'frecciaSu' : 'frecciaGiu'"
+            :titolo="aperto ? 'Mostra solo il più recente' : 'Mostra tutti (' + totale + ')'" @click="$emit('update:aperto', !aperto)"/>`
+};
+
 export const Gruppo = {
     props: { titolo: String, nota: String },
     template: `
@@ -363,5 +372,5 @@ export const ImmagineFile = {
 
 export const componenti = {
     Icona, IconaQuadrata, Pagina, Gruppo, Riga, BadgeScadenza, Vuoto, Foglio, CampoTesto, CampoNumero,
-    CampoData, CampoScelta, Interruttore, Passo, Azioni, Cronometro, Grafico, ImmagineFile
+    CampoData, CampoScelta, Interruttore, Passo, Azioni, Cronometro, Grafico, ImmagineFile, RigaEspandi
 };

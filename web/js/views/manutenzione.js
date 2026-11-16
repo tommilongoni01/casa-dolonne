@@ -63,8 +63,7 @@ function datoChiave(o) {
     const prodotti = prodottiOperazione(o);
     if (prodotti.length === 1) {
         const p = prodotti[0], a = analisiScorta(p);
-        const autonomia = mostraPrevisioni(p) && a.autonomia !== null ? ` · ${a.autonomia} gg` : '';
-        return `${o.titolo} ${f.quantita(a.giacenza, p.unita)}${autonomia}`;
+        return `${o.titolo} ${f.quantita(a.giacenza, p.unita)}`;
     }
     return null;
 }
@@ -473,18 +472,10 @@ export const SezioniScorta = {
         <Riga v-for="c in a.confezioni" :key="c.litri" :titolo="maiuscola(nomeConfezione(prodotto, 2)) + ' da ' + f.quantita(c.litri, prodotto.unita)"
               :valore="String(c.numero)"/>
         <Riga v-if="a.ultimoMovimento" titolo="Ultimo movimento" :valore="f.data(a.ultimoMovimento)"/>
-        <template v-if="previsioni">
-          <Riga v-if="a.consumoMensile" titolo="Consumo medio" :sottotitolo="a.consumoImpostato ? 'impostato' : 'calcolato dai riempimenti'"
-                :valore="f.quantita(a.consumoMensile, prodotto.unita) + ' al mese'"/>
-          <Riga v-if="a.autonomia !== null" titolo="Autonomia" :valore="a.autonomia + ' giorni (fino al ' + f.dataBreve(a.esaurimento) + ')'"/>
-        </template>
         <Riga titolo="Totale acquistato" :valore="f.quantita(a.acquistato, prodotto.unita)"/>
         <Riga titolo="Totale consumato" :valore="f.quantita(a.consumato, prodotto.unita)"/>
         <Riga v-if="a.costo" titolo="Spesa totale" :valore="f.euro(a.costo)"/>
         <Riga v-if="a.costoMedio" titolo="Costo medio" :valore="f.euro(a.costoMedio) + ' / ' + prodotto.unita"/>
-        <CampoNumero v-if="previsioni && puoModificare()" etichetta="Consumo previsto" :unita="prodotto.unita + '/mese'"
-                     :model-value="prodotto.consumo_mensile ?? null" segnaposto="dai consumi"
-                     @fine="v => salva('prodotti', { ...prodotto, consumo_mensile: v > 0 ? v : null })"/>
       </Gruppo>
       <Azioni v-if="puoModificare()" :voci="azioni" @scegli="t => movimento = { tipo: t }"/>
       <Gruppo v-if="conGrafici && a.andamento.length > 1" titolo="Andamento giacenza"
@@ -498,7 +489,7 @@ export const SezioniScorta = {
       </Gruppo>
       <Gruppo :titolo="'Acquisti e ' + nomeMovimento('consumo', prodotto.categoria).toLowerCase()">
         <Riga v-if="!movimenti.length" titolo="Nessun movimento registrato" class="secondario"/>
-        <Riga v-for="m in movimenti" :key="m.id" :icona="icona(m.tipo)" :colore="colore(m.tipo)"
+        <Riga v-for="m in (tutti ? movimenti : movimenti.slice(0, 1))" :key="m.id" :icona="icona(m.tipo)" :colore="colore(m.tipo)"
               :titolo="nomeMovimento(m.tipo, prodotto.categoria)" :sottotitolo="sottotitolo(m)"
               @click="puoModificare() && (movimento = { tipo: m.tipo, voce: m })">
           <template #fine>
@@ -506,9 +497,10 @@ export const SezioniScorta = {
               <small v-if="m.costo" class="secondario">{{ f.euro(m.costo) }}</small></span>
           </template>
         </Riga>
+        <RigaEspandi :totale="movimenti.length" v-model:aperto="tutti"/>
       </Gruppo>
       <MovimentoFoglio v-if="movimento" :prodotto="prodotto" :tipo="movimento.tipo" :movimento="movimento.voce" @chiudi="movimento = null"/>`,
-    data() { return { movimento: null }; },
+    data() { return { movimento: null, tutti: false }; },
     computed: {
         a() { return analisiScorta(this.prodotto); },
         basso() { return sottoScorta(this.prodotto); },

@@ -36,19 +36,17 @@ export const OperazionePagina = {
         </Gruppo>
 
         <template v-if="o.tipo !== 'storico'">
-          <!-- Prodotti: quelli del magazzino usati in questa operazione -->
-          <h2 class="sezione-operazione">Prodotti</h2>
-          <Gruppo :nota="puoModificare() ? 'I dati dei prodotti (codice, fornitore, schede tecniche) stanno nel Magazzino.' : ''">
-            <Riga v-if="!prodottiScorta.length" titolo="Nessun prodotto collegato" class="secondario"/>
-            <RigaProdotto v-for="p in prodottiScorta" :key="p.id" :prodotto="p" @click="apri({ nome: 'prodotto', id: p.id })"/>
-            <CampoScelta v-if="puoModificare() && daCollegare.length" etichetta="Collega dal magazzino" :model-value="null"
-                         :opzioni="[{ valore: null, nome: 'Scegli' }, ...daCollegare]" @update:model-value="collega"/>
-            <Riga v-if="puoModificare()" azione icona="piuCerchio" titolo="Nuovo prodotto" @click="nuovoProdotto = true"/>
-          </Gruppo>
-          <ProdottoFoglio v-if="nuovoProdotto" :operazione-id="o.id" @chiudi="nuovoProdotto = false"/>
+          <!-- Prodotti: quelli del magazzino usati in questa operazione (si collegano dal Magazzino) -->
+          <template v-if="usaProdotti">
+            <h2 class="sezione-operazione">Prodotti</h2>
+            <Gruppo :nota="prodottiScorta.length ? '' : 'Per collegare un prodotto aprilo nel Magazzino e scegli questa operazione in “Impianto e operazione”.'">
+              <Riga v-if="!prodottiScorta.length" titolo="Nessun prodotto collegato" class="secondario"/>
+              <RigaProdotto v-for="p in prodottiScorta" :key="p.id" :prodotto="p" @click="apri({ nome: 'prodotto', id: p.id })"/>
+            </Gruppo>
+          </template>
 
           <!-- Gestione scorte: giacenza, acquisti, consumi e grafici -->
-          <template v-if="prodottoScelto">
+          <template v-if="usaProdotti && prodottoScelto">
             <h2 class="sezione-operazione">Gestione scorte</h2>
             <div v-if="prodottiScorta.length > 1" class="segmenti">
               <button v-for="p in prodottiScorta" :key="p.id" :class="{ attivo: p.id === prodottoScelto.id }" @click="scelto = p.id">{{ p.nome }}</button>
@@ -58,7 +56,7 @@ export const OperazionePagina = {
 
           <!-- Altre operazioni specifiche (misure pH, cambio acqua, carichi pellet, cenere) -->
           <template v-if="['ph', 'cambioAcqua', 'pellet', 'cenere'].includes(o.tipo)">
-            <h2 class="sezione-operazione">Altre operazioni</h2>
+            <h2 class="sezione-operazione">{{ usaProdotti ? 'Altre operazioni' : 'Registro' }}</h2>
             <MisurePH v-if="o.tipo === 'ph'"/>
             <CambioAcqua v-if="o.tipo === 'cambioAcqua'"/>
             <Pellet v-if="o.tipo === 'pellet'" :operazione="o"/>
@@ -81,18 +79,13 @@ export const OperazionePagina = {
         <DescrizioneFoglio v-if="descrizione" :operazione="o" @chiudi="descrizione = false"/>
       </Pagina>
       <PaginaMancante v-else/>`,
-    data() { return { descrizione: false, nuovoProdotto: false, scelto: null }; },
+    data() { return { descrizione: false, scelto: null }; },
     computed: {
         o() { return db.operazioni.find(o => o.id === this.id); },
+        /// Cambio acqua e svuotamento cenere sono operazioni manuali, senza prodotti.
+        usaProdotti() { return !['storico', 'cambioAcqua', 'cenere'].includes(this.o.tipo); },
         prodottiScorta() { return prodottiOperazione(this.o); },
         prodottoScelto() { return this.prodottiScorta.find(p => p.id === this.scelto) ?? this.prodottiScorta[0] ?? null; },
-        daCollegare() {
-            return db.prodotti.filter(p => !this.prodottiScorta.includes(p)).sort((a, b) => a.nome.localeCompare(b.nome))
-                .map(p => {
-                    const altra = operazioneDiProdotto(p);
-                    return { valore: p.id, nome: altra ? `${p.nome} (ora in ${altra.titolo})` : p.nome };
-                });
-        },
         guida() { return db.guide.find(g => g.id === this.o?.guida_id); },
         allarmiAttivi() { return allarmi(this.o).filter(a => a.stato !== 'ok'); },
         opzioniGuide() {
@@ -107,13 +100,6 @@ export const OperazionePagina = {
     },
     methods: {
         puoModificare, apri, salva,
-        async collega(id) {
-            const p = db.prodotti.find(p => p.id === id);
-            if (!p) return;
-            const vecchia = db.operazioni.find(o => o.prodotto_id === p.id && o.id !== this.o.id);
-            await salva('prodotti', { ...p, operazione_id: this.o.id, categoria: categoriaPerOperazione(this.o) });
-            if (vecchia) await salva('operazioni', { ...vecchia, prodotto_id: null });
-        },
         apriGuida() { apri({ nome: 'guida', id: this.guida.id }); }
     },
     setup() { return { f }; }
@@ -243,12 +229,13 @@ const MisurePH = {
         <Grafico :serie="serie" :fascia="{ min: 7.2, max: 7.6 }"/>
       </Gruppo>
       <Gruppo v-if="misure.length" titolo="Storico misure">
-        <Riga v-for="m in misure" :key="m.id" :titolo="f.data(m.data)" :sottotitolo="m.note"
+        <Riga v-for="m in (tutti ? misure : misure.slice(0, 1))" :key="m.id" :titolo="f.data(m.data)" :sottotitolo="m.note"
               :valore="'Dosimetro ' + f.ph(m.dosimetro) + ' · Scuba ' + f.ph(m.scuba)"
               @click="puoModificare() && (foglio = { voce: m })"/>
+        <RigaEspandi :totale="misure.length" v-model:aperto="tutti"/>
       </Gruppo>
       <MisuraFoglio v-if="foglio" :misura="foglio.voce" @chiudi="foglio = null"/>`,
-    data() { return { foglio: null }; },
+    data() { return { foglio: null, tutti: false }; },
     computed: {
         misure() { return db.misure_ph.slice().sort((a, b) => b.data.localeCompare(a.data)); },
         ultima() { return this.misure[0]; },
@@ -310,13 +297,14 @@ const CambioAcqua = {
               @scegli="t => avvio = t"/>
       <Gruppo titolo="Storico">
         <Riga v-if="!conclusi.length" titolo="Nessun processo registrato" class="secondario"/>
-        <Riga v-for="p in conclusi" :key="p.id" :icona="p.tipo === 'svuotamento' ? 'giu' : 'su'"
+        <Riga v-for="p in (tutti ? conclusi : conclusi.slice(0, 1))" :key="p.id" :icona="p.tipo === 'svuotamento' ? 'giu' : 'su'"
               :titolo="p.tipo === 'svuotamento' ? 'Svuotamento' : 'Riempimento'" :sottotitolo="f.data(p.inizio)"
               :valore="f.numero(analisiProcesso(p).variazione) + ' cm · ' + f.durata(analisiProcesso(p).durata)"
               freccia @click="apri({ nome: 'processo', id: p.id })"/>
+        <RigaEspandi :totale="conclusi.length" v-model:aperto="tutti"/>
       </Gruppo>
       <AvvioFoglio v-if="avvio" :tipo="avvio" :ultimo-livello="ultimoLivello" @chiudi="avvio = null"/>`,
-    data() { return { avvio: null }; },
+    data() { return { avvio: null, tutti: false }; },
     computed: {
         processi() { return db.processi_acqua.slice().sort((a, b) => b.inizio.localeCompare(a.inizio)); },
         inCorso() { return this.processi.filter(p => !p.fine); },
@@ -497,7 +485,7 @@ const Pellet = {
           <table class="tabella">
             <thead><tr><th>Data</th><th>Fornitore</th><th>Quantità</th><th>Costo al quintale</th><th>Aliquota IVA</th><th>IVA</th><th>Totale</th><th>Pre carico</th><th>Post carico</th></tr></thead>
             <tbody>
-              <tr v-for="c in carichi" :key="c.id" @click="puoModificare() && (foglio = c)">
+              <tr v-for="c in (tutti ? carichi : carichi.slice(0, 1))" :key="c.id" @click="puoModificare() && (foglio = c)">
                 <td>{{ f.dataTabella(c.data) }}</td><td>{{ c.fornitore || '–' }}</td><td>{{ f.quantita(c.quantita, unita) }}</td>
                 <td>{{ f.euro(calcoliCarico(c).prezzo) }}</td><td>{{ f.numero(calcoliCarico(c).aliquota) }}%</td><td>{{ f.euro(calcoliCarico(c).iva) }}</td>
                 <td><b>{{ f.euro(c.costo) }}</b></td>
@@ -508,13 +496,14 @@ const Pellet = {
             <tfoot><tr><td>Totale</td><td></td><td>{{ f.quantita(totaleQuintali, unita) }}</td><td></td><td></td><td></td><td>{{ f.euro(totaleSpesa) }}</td><td></td><td></td></tr></tfoot>
           </table>
         </div>
+        <RigaEspandi :totale="carichi.length" v-model:aperto="tutti"/>
       </Gruppo>
       <Gruppo v-if="carichi.length > 1" titolo="Costo al quintale nel tempo (IVA esclusa)">
         <Grafico :serie="[{ nome: 'Costo al quintale', colore: 'var(--arancione)', punti: carichi.map(c => ({ x: f.giorno(c.data), y: calcoliCarico(c).prezzo })) }]"
                  :formato-y="v => f.numero(v) + ' €'"/>
       </Gruppo>
       <MovimentoFoglio v-if="foglio" :prodotto="prodottoDelCarico" tipo="acquisto" :movimento="foglio" @chiudi="foglio = null"/>`,
-    data() { return { foglio: null }; },
+    data() { return { foglio: null, tutti: false }; },
     computed: {
         prodotto() { return prodottiOperazione(this.operazione).find(p => p.categoria === 'pellet') ?? null; },
         prodottoDelCarico() { return db.prodotti.find(p => p.id === this.foglio?.prodotto_id); },
@@ -542,13 +531,14 @@ const Cenere = {
         <Riga v-if="puoModificare()" azione icona="piuCerchio" titolo="Registra svuotamento" @click="foglio = {}"/>
       </Gruppo>
       <Gruppo v-if="svuotamenti.length" titolo="Storico" nota="Il consumo è calcolato dalla scorta dello svuotamento precedente, più i carichi di pellet registrati nel frattempo.">
-        <Riga v-for="(s, i) in svuotamenti" :key="s.id" :titolo="f.data(s.data)" :sottotitolo="s.note"
+        <Riga v-for="(s, i) in (tutti ? svuotamenti : svuotamenti.slice(0, 1))" :key="s.id" :titolo="f.data(s.data)" :sottotitolo="s.note"
               @click="puoModificare() && (foglio = { voce: s })">
           <template #fine>
             <span class="riga-valore">{{ s.scorta_kg !== null ? f.quantita(s.scorta_kg, 'kg') : '–' }}
               <br v-if="consumo(i) !== null"><small v-if="consumo(i) !== null">consumati {{ f.quantita(consumo(i), 'kg') }}</small></span>
           </template>
         </Riga>
+        <RigaEspandi :totale="svuotamenti.length" v-model:aperto="tutti"/>
       </Gruppo>
       <Foglio v-if="foglio" :titolo="foglio.voce ? 'Modifica svuotamento' : 'Svuotamento cenere'" @annulla="foglio = null" @conferma="salvaSvuotamento">
         <Gruppo nota="Il carico in kg indicato dal pannello della caldaia (Deposito) al momento dello svuotamento.">
@@ -558,7 +548,7 @@ const Cenere = {
         <Gruppo titolo="Note"><CampoTesto v-model="b.note" multilinea segnaposto="Note"/></Gruppo>
         <Gruppo v-if="foglio.voce"><Riga distruttiva titolo="Elimina" @click="eliminaSvuotamento"/></Gruppo>
       </Foglio>`,
-    data() { return { foglio: null, b: {} }; },
+    data() { return { foglio: null, b: {}, tutti: false }; },
     computed: { svuotamenti() { return svuotamentiOrdinati(); } },
     watch: {
         foglio(v) { if (v) { const s = v.voce ?? {}; this.b = { data: s.data ?? f.oggiISO(), scorta_kg: s.scorta_kg ?? null, note: s.note ?? '' }; } }
@@ -586,10 +576,11 @@ const Storico = {
         <Riga v-if="puoModificare() && tipologie.length" azione icona="piuCerchio" titolo="Registra manutenzione" @click="foglio = {}"/>
       </Gruppo>
       <Gruppo v-if="interventi.length" titolo="Interventi">
-        <Riga v-for="i in interventi" :key="i.id" :titolo="f.data(i.data)" :sottotitolo="i.note"
+        <Riga v-for="i in (tutti ? interventi : interventi.slice(0, 1))" :key="i.id" :titolo="f.data(i.data)" :sottotitolo="i.note"
               @click="puoModificare() && (foglio = { voce: i })">
           <template #fine><span v-if="tipologie.length > 1" class="badge ok" style="color:var(--accento);background:var(--riempimento)">{{ nomeTipologia(i) }}</span></template>
         </Riga>
+        <RigaEspandi :totale="interventi.length" v-model:aperto="tutti"/>
       </Gruppo>
       <Gruppo titolo="Contratto di manutenzione" nota="Con una data di scadenza ricevi l'avviso prima che il contratto scada.">
         <Riga v-if="!contratti.length" titolo="Nessun contratto" class="secondario"/>
@@ -607,7 +598,7 @@ const Storico = {
       <Gruppo v-if="operazione.note" titolo="Note"><div class="riga testo-descrizione">{{ operazione.note }}</div></Gruppo>
       <InterventoFoglio v-if="foglio" :operazione="operazione" :intervento="foglio.voce" @chiudi="foglio = null"/>
       <ContrattoFoglio v-if="nuovoContratto" :sezione-id="operazione.sezione_id" @chiudi="nuovoContratto = false"/>`,
-    data() { return { foglio: null, nuovoContratto: false, caricamento: false }; },
+    data() { return { foglio: null, nuovoContratto: false, caricamento: false, tutti: false }; },
     computed: {
         tipologie() { return tipologieDi(this.operazione); },
         interventi() { return interventiDi(this.operazione); },
