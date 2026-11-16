@@ -8,6 +8,8 @@ const P = {
     sole: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
     piscina: '<path d="M3 17c1.5 0 1.5 1 3 1s1.5-1 3-1 1.5 1 3 1 1.5-1 3-1 1.5 1 3 1 1.5-1 3-1"/><path d="M3 13c1.5 0 1.5 1 3 1s1.5-1 3-1 1.5 1 3 1 1.5-1 3-1 1.5 1 3 1 1.5-1 3-1"/><circle cx="15" cy="6" r="2"/><path d="m6 11 4-4 3 3"/>',
     ascensore: '<rect x="4" y="3" width="16" height="18" rx="3"/><path d="m9 10 3-3 3 3M9 14l3 3 3-3"/>',
+    scudo: '<path d="M12 2.5 4.5 5.5v6c0 4.6 3.2 8.6 7.5 10 4.3-1.4 7.5-5.4 7.5-10v-6z"/><circle cx="12" cy="10.5" r="2"/><path d="M12 12.5v3.5"/>',
+    germoglio: '<path d="M12 21v-8.5"/><path d="M12 12.5c0-4.6 3-8 8.5-8.5-.5 5.4-4 8.5-8.5 8.5z"/><path d="M12 15.5c0-3.6-2.4-6.1-7-6.5.4 4.2 3 6.5 7 6.5z"/>',
     ventola: '<circle cx="12" cy="12" r="1.5"/><path d="M12 10.5c0-4 1-7 4-7 2 0 2.5 3-1 5.5M13.5 12c4 0 7 1 7 4 0 2-3 2.5-5.5-1M12 13.5c0 4-1 7-4 7-2 0-2.5-3 1-5.5M10.5 12c-4 0-7-1-7-4 0-2 3-2.5 5.5 1"/>',
     vento: '<path d="M3 8h11a3 3 0 1 0-3-3M3 12h15a3 3 0 1 1-3 3M3 16h8"/>',
     casa: '<path d="M3 11 12 4l9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',
@@ -65,12 +67,13 @@ const P = {
 };
 
 export const ICONE_SEZIONE = ['goccia', 'fulmine', 'fiamma', 'libro', 'sole', 'piscina', 'ascensore', 'ventola',
-    'vento', 'casa', 'chiave'];
+    'vento', 'scudo', 'germoglio', 'casa', 'chiave'];
 
 /// Colore dell'icona di ogni sistema, come nell'app Impostazioni di iOS.
 export const COLORE_SEZIONE = {
     goccia: '#0A84FF', fulmine: '#FFB800', fiamma: '#FF9500', libro: '#8E8E93', sole: '#34C759',
     piscina: '#32ADE6', ascensore: '#5856D6', ventola: '#30B0C7', vento: '#00C7BE', casa: '#A2845E',
+    scudo: '#FF3B30', germoglio: '#30A14E',
     chiave: 'var(--accento)'
 };
 

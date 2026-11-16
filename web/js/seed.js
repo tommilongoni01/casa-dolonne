@@ -6,7 +6,7 @@ import { db, salva, salvaMolti, caricaTutto } from './store.js';
 const SEZIONI = [
     ['Impianto idraulico', 'goccia'], ['Impianto elettrico', 'fulmine'], ['Caldaia', 'fiamma'],
     ['Impianto fotovoltaico', 'sole'], ['Piscina', 'piscina'],
-    ['Ascensore', 'ascensore'], ['UTA', 'ventola'], ['VMC', 'vento']
+    ['Ascensore', 'ascensore'], ['UTA', 'ventola'], ['VMC', 'vento'], ['Antifurto', 'scudo'], ['Giardino', 'germoglio']
 ];
 
 const PRINCIPALE_CLIENTE = [['Principale', 12], ['Cliente', 0]];
@@ -59,7 +59,9 @@ export async function inizializzaDati(avanzamento = () => {}) {
         ['Ascensore', 'Storico manutenzioni', 'storico', {}, [['Manutenzione impianto', 6], ['Verifica periodica', 24]]],
         ['Impianto fotovoltaico', 'Storico manutenzioni', 'storico', {}, PRINCIPALE_CLIENTE],
         ['Impianto idraulico', 'Storico manutenzioni', 'storico', {}, PRINCIPALE_CLIENTE],
-        ['Impianto elettrico', 'Storico manutenzioni', 'storico', {}, PRINCIPALE_CLIENTE]
+        ['Impianto elettrico', 'Storico manutenzioni', 'storico', {}, PRINCIPALE_CLIENTE],
+        ['Antifurto', 'Storico manutenzioni', 'storico', {}, PRINCIPALE_CLIENTE],
+        ['Giardino', 'Storico manutenzioni', 'storico', {}, PRINCIPALE_CLIENTE]
     ];
     const ordini = {}, create = {};
     for (const [sezione, titolo, tipo, extra, tipologie] of operazioni) {
