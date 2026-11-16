@@ -71,10 +71,6 @@ export const ManutenzioneHome = {
           </Riga>
         </Gruppo>
 
-        <Gruppo titolo="Archivio">
-          <Riga icona="documento" titolo="Contratti" :valore="db.contratti.length" freccia
-                :selezionata="selezionata({ nome: 'contratti' })" @click="apriDaElenco({ nome: 'contratti' })"/>
-        </Gruppo>
       </Pagina>`,
     setup() {
         const elencoAvvisi = computed(() => avvisi());
