@@ -477,5 +477,10 @@ table.tabella { border-collapse: collapse; width: 100%; font-size: 14px; font-va
 .barra-titolo.nascosto { opacity: 0; }
 .pillola.verde { color: var(--verde); background: color-mix(in srgb, var(--verde) 10%, var(--cella)); }
 .campo-data-ora { display: inline-flex; gap: 8px; justify-content: flex-end; flex: 1; min-width: 0; }
-.campo-data-ora input { flex: 0 1 auto; width: auto; min-width: 0; text-align: right; }
+.campo-data-ora { align-items: center; }
+.campo .campo-data-ora input.data { flex: none; width: 7.4em; text-align: right; color: var(--testo); font-variant-numeric: tabular-nums; }
+.campo .campo-data-ora input.data.ora { width: 3.6em; }
+.campo .campo-data-ora input.data.errata { color: var(--rosso); }
+.adesso { flex: none; font-size: 13px; font-weight: 600; color: var(--accento); background: color-mix(in srgb, var(--accento) 12%, transparent);
+    border-radius: 999px; padding: 4px 10px; }
 .grafico-valore { font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; paint-order: stroke; stroke: var(--cella); stroke-width: 3px; }

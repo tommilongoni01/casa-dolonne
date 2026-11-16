@@ -193,47 +193,93 @@ export const CampoNumero = {
     }
 };
 
+/// Data (e ora) scritte a mano, senza calendari: "GG/MM/AAAA" e "HH:MM".
+/// Barre e due punti si aggiungono da soli (16112026 → 16/11/2026). Valore: "AAAA-MM-GG" oppure, con l'ora, un istante ISO.
 export const CampoData = {
     props: { etichetta: String, modelValue: String, conOra: Boolean },
     emits: ['update:modelValue'],
-    // Con l'ora: due campi separati (giorno e ora), più affidabili del campo unico su iPhone, iPad e Mac.
     template: `
       <label class="campo">
         <span class="campo-etichetta">{{ etichetta }}</span>
         <span class="campo-data-ora">
-          <input type="date" class="data" :value="giorno" @input="cambiaGiorno($event.target.value)" @change="cambiaGiorno($event.target.value)">
-          <input v-if="conOra" type="time" class="data" :value="orario" @input="cambiaOra($event.target.value)" @change="cambiaOra($event.target.value)">
+          <input class="data" :class="{ errata: giornoErrato }" type="text" inputmode="numeric" placeholder="GG/MM/AAAA" maxlength="10"
+                 :value="testoGiorno" @input="scriviGiorno($event)" @blur="normalizza" autocomplete="off">
+          <input v-if="conOra" class="data ora" :class="{ errata: oraErrata }" type="text" inputmode="numeric" placeholder="HH:MM" maxlength="5"
+                 :value="testoOra" @input="scriviOra($event)" @blur="normalizza" autocomplete="off">
+          <button type="button" class="adesso" @click="adesso">{{ conOra ? 'Adesso' : 'Oggi' }}</button>
         </span>
       </label>`,
+    data() { return { testoGiorno: '', testoOra: '' }; },
+    created() { this.normalizza(); },
+    watch: { modelValue() { if (!this.$el?.contains(document.activeElement)) this.normalizza(); } },
     computed: {
-        locale() { return this.modelValue ? new Date(this.modelValue) : null; },
-        giorno() {
-            if (!this.modelValue) return '';
-            if (!this.conOra) return this.modelValue.slice(0, 10);
-            const d = this.locale, due = n => String(n).padStart(2, '0');
-            return `${d.getFullYear()}-${due(d.getMonth() + 1)}-${due(d.getDate())}`;
-        },
-        orario() {
-            if (!this.locale) return '';
-            const due = n => String(n).padStart(2, '0');
-            return `${due(this.locale.getHours())}:${due(this.locale.getMinutes())}`;
-        }
+        giorno() { return leggiGiorno(this.testoGiorno); },
+        orario() { return leggiOra(this.testoOra); },
+        giornoErrato() { return this.testoGiorno.length > 0 && !this.giorno; },
+        oraErrata() { return this.conOra && this.testoOra.length > 0 && !this.orario; }
     },
     methods: {
-        cambiaGiorno(v) {
-            if (!v) return;
-            if (!this.conOra) { if (v !== this.modelValue) this.$emit('update:modelValue', v); return; }
-            this.emetti(v, this.orario || '12:00');
+        /// Testi dei campi a partire dal valore salvato.
+        normalizza() {
+            const due = n => String(n).padStart(2, '0');
+            if (!this.modelValue) { this.testoGiorno = ''; this.testoOra = ''; return; }
+            if (!this.conOra) {
+                const [a, m, g] = this.modelValue.slice(0, 10).split('-');
+                this.testoGiorno = `${g}/${m}/${a}`;
+                return;
+            }
+            const d = new Date(this.modelValue);
+            this.testoGiorno = `${due(d.getDate())}/${due(d.getMonth() + 1)}/${d.getFullYear()}`;
+            this.testoOra = `${due(d.getHours())}:${due(d.getMinutes())}`;
         },
-        cambiaOra(v) { if (v) this.emetti(this.giorno || new Date().toISOString().slice(0, 10), v); },
-        /// Giorno e ora locali → istante ISO.
-        emetti(giorno, ora) {
-            const [a, m, g] = giorno.split('-').map(Number), [h, min] = ora.split(':').map(Number);
-            const iso = new Date(a, m - 1, g, h, min).toISOString();
+        scriviGiorno(e) {
+            const c = e.target.value.replace(/\D/g, '').slice(0, 8);
+            this.testoGiorno = [c.slice(0, 2), c.slice(2, 4), c.slice(4)].filter(Boolean).join('/');
+            e.target.value = this.testoGiorno;
+            this.emetti();
+        },
+        scriviOra(e) {
+            const c = e.target.value.replace(/\D/g, '').slice(0, 4);
+            this.testoOra = c.length > 2 ? `${c.slice(0, 2)}:${c.slice(2)}` : c;
+            e.target.value = this.testoOra;
+            this.emetti();
+        },
+        emetti() {
+            const g = this.giorno;
+            if (!g) return;
+            if (!this.conOra) { const v = `${g.a}-${String(g.m).padStart(2, '0')}-${String(g.g).padStart(2, '0')}`; if (v !== this.modelValue) this.$emit('update:modelValue', v); return; }
+            const o = this.orario;
+            if (!o) return;
+            const iso = new Date(g.a, g.m - 1, g.g, o.h, o.min).toISOString();
             if (iso !== this.modelValue) this.$emit('update:modelValue', iso);
+        },
+        adesso() {
+            const ora = new Date();
+            if (this.conOra) this.$emit('update:modelValue', new Date(ora.getFullYear(), ora.getMonth(), ora.getDate(), ora.getHours(), ora.getMinutes()).toISOString());
+            else this.$emit('update:modelValue', `${ora.getFullYear()}-${String(ora.getMonth() + 1).padStart(2, '0')}-${String(ora.getDate()).padStart(2, '0')}`);
+            this.$nextTick(this.normalizza);
         }
     }
 };
+
+/// "16/11/2026" (anche 16/11/26) → { g, m, a } se il giorno esiste, altrimenti null.
+function leggiGiorno(testo) {
+    const parti = testo.split('/');
+    if (parti.length !== 3 || !parti[2]) return null;
+    let [g, m, a] = parti.map(Number);
+    if (parti[2].length === 2) a += 2000;
+    else if (parti[2].length !== 4) return null;
+    const d = new Date(a, m - 1, g);
+    return d.getFullYear() === a && d.getMonth() === m - 1 && d.getDate() === g ? { g, m, a } : null;
+}
+
+/// "08:30" (anche "8:30") → { h, min } se valida, altrimenti null.
+function leggiOra(testo) {
+    const r = /^(\d{1,2}):(\d{2})$/.exec(testo);
+    if (!r) return null;
+    const h = Number(r[1]), min = Number(r[2]);
+    return h < 24 && min < 60 ? { h, min } : null;
+}
 
 export const CampoScelta = {
     props: { etichetta: String, modelValue: [String, Number, null], opzioni: Array },
