@@ -5,7 +5,7 @@ import { db, salva, salvaMolti, caricaTutto } from './store.js';
 
 const SEZIONI = [
     ['Impianto idraulico', 'goccia'], ['Impianto elettrico', 'fulmine'], ['Caldaia', 'fiamma'],
-    ['Istruzioni generali', 'libro'], ['Impianto fotovoltaico', 'sole'], ['Piscina', 'piscina'],
+    ['Impianto fotovoltaico', 'sole'], ['Piscina', 'piscina'],
     ['Ascensore', 'ascensore'], ['UTA', 'ventola'], ['VMC', 'vento']
 ];
 

@@ -2,7 +2,7 @@
 import { createApp, computed } from 'vue';
 import { componenti } from './components.js';
 import { db, stato, avvia, puoModificare } from './store.js';
-import { nav, pila, cambiaScheda, SCHEDE } from './nav.js';
+import { nav, pila, cambiaScheda, SCHEDE, diviso } from './nav.js';
 import { avvisi } from './logic.js';
 import { Accesso, NonAutorizzato } from './views/accesso.js';
 import * as manutenzione from './views/manutenzione.js';
@@ -65,7 +65,7 @@ const App = {
       <div v-if="!stato.pronto" class="caricamento">Caricamento…</div>
       <Accesso v-else-if="!stato.utente"/>
       <NonAutorizzato v-else-if="!stato.membro"/>
-      <div v-else class="app" :class="{ largo: nav.largo }">
+      <div v-else class="app" :class="{ largo: nav.largo, diviso: diviso(), pieno: nav.largo && !diviso() }">
         <div v-if="stato.modo === 'prova'" class="striscia-prova">Modalità prova · i dati restano solo su questo dispositivo</div>
         <div class="colonne">
           <!-- Schermo largo: barra laterale come nelle app Apple per Mac e iCloud.com -->
@@ -89,11 +89,11 @@ const App = {
           </aside>
           <div class="colonna-elenco">
             <component :is="radice" :key="nav.scheda"/>
-            <div v-if="!nav.largo && cima" class="sovrapposta" :key="chiaveCima">
+            <div v-if="!diviso() && cima" class="sovrapposta" :key="chiaveCima">
               <PaginaDellaPila :pagina="cima"/>
             </div>
           </div>
-          <div v-if="nav.largo" class="colonna-dettaglio">
+          <div v-if="diviso()" class="colonna-dettaglio">
             <PaginaDellaPila v-if="cima" :pagina="cima" :key="chiaveCima"/>
             <div v-else class="pagina"><Vuoto :icona="etichette[nav.scheda].icona" :titolo="segnaposto"/></div>
           </div>
@@ -113,7 +113,7 @@ const App = {
             contatti: 'Nessun contatto selezionato', impostazioni: ''
         };
         return {
-            stato, nav, cima, cambiaScheda, schede: SCHEDE, etichette: ETICHETTE, puoModificare,
+            stato, nav, cima, cambiaScheda, diviso, schede: SCHEDE, etichette: ETICHETTE, puoModificare,
             radice: computed(() => RADICI[nav.scheda]),
             chiaveCima: computed(() => `${nav.scheda}-${pila().length}-${cima.value?.nome}-${cima.value?.id ?? ''}`),
             segnaposto: computed(() => segnaposti[nav.scheda]),

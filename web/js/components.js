@@ -2,7 +2,7 @@
 import { computed, ref, watch, onMounted, onUnmounted, nextTick } from 'vue';
 import { svg, COLORE_SEZIONE } from './icone.js';
 import { leggiNumero, numeroCampo, dataBreve } from './format.js';
-import { indietro, nav, pila } from './nav.js';
+import { indietro, nav, pila, diviso } from './nav.js';
 
 export const Icona = {
     props: { nome: String, dimensione: { type: Number, default: 22 } },
@@ -43,7 +43,7 @@ export const Pagina = {
       </div>`,
     computed: {
         // Su iPad la prima pagina di dettaglio è quella scelta nell'elenco a sinistra: niente "Indietro".
-        mostraIndietro() { return this.conIndietro && !this.grande && (!nav.largo || pila().length > 1); }
+        mostraIndietro() { return this.conIndietro && !this.grande && (!diviso() || pila().length > 1); }
     },
     methods: { vaiIndietro() { indietro(); } }
 };

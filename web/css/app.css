@@ -62,8 +62,8 @@ a { color: var(--accento); text-decoration: none; }
 .colonna-elenco, .colonna-dettaglio { position: relative; min-height: 0; overflow: hidden; }
 .colonna-elenco { flex: 1; }
 .colonna-dettaglio { flex: 1; display: none; }
-.largo .colonna-elenco { flex: 0 0 var(--colonna); border-right: 0.5px solid var(--separatore); }
-.largo .colonna-dettaglio { display: block; }
+.diviso .colonna-elenco { flex: 0 0 var(--colonna); border-right: 0.5px solid var(--separatore); }
+.diviso .colonna-dettaglio { display: block; }
 .largo .colonna-elenco .pagina { background: var(--sfondo); }
 .sovrapposta { position: absolute; inset: 0; z-index: 10; background: var(--sfondo); animation: entra 0.28s cubic-bezier(.2,.8,.2,1); }
 @keyframes entra { from { transform: translateX(30%); opacity: 0; } to { transform: none; opacity: 1; } }
@@ -340,7 +340,7 @@ table.tabella { border-collapse: collapse; width: 100%; font-size: 14px; font-va
 
 /* Colonne: elenco con sfondo leggermente diverso, dettaglio centrato e leggibile */
 .largo .colonna-elenco { background: var(--sfondo); }
-.largo .colonna-elenco .contenuto { padding-left: 16px; padding-right: 16px; }
+.diviso .colonna-elenco .contenuto { padding-left: 16px; padding-right: 16px; }
 .largo .colonna-dettaglio .contenuto { padding: 20px 32px 48px; }
 .largo .colonna-dettaglio .contenuto > * { max-width: 820px; }
 .largo .colonna-dettaglio .barra { background: color-mix(in srgb, var(--sfondo) 80%, transparent); }
@@ -460,3 +460,16 @@ table.tabella { border-collapse: collapse; width: 100%; font-size: 14px; font-va
 .segmento-numero { font-size: 12px; font-weight: 600; color: var(--secondario); background: var(--riempimento); border-radius: 999px; padding: 0 7px; line-height: 18px; }
 .segmenti-impianto button.attivo .segmento-numero { background: color-mix(in srgb, var(--accento) 15%, transparent); color: var(--accento); }
 .segmenti-impianto + .gruppo { margin-top: 12px; }
+
+/* Casa a tutta larghezza (schermo largo): home centrata, impianti che si aprono sopra */
+.pieno .colonna-elenco .contenuto { padding: 8px 40px 48px; }
+.pieno .colonna-elenco .contenuto > * { max-width: 1180px; margin-left: auto; margin-right: auto; }
+.pieno .barra.grande .barra-riga, .pieno .titolo-grande { max-width: 1260px; margin-left: auto; margin-right: auto; }
+.pieno .titolo-grande { padding-left: 40px; padding-right: 40px; }
+.pieno .griglia-impianti { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; }
+.pieno .tessera-impianto { min-height: 150px; padding: 16px; }
+.pieno .sovrapposta .contenuto { padding: 20px 32px 48px; }
+.pieno .sovrapposta .contenuto > * { max-width: 860px; margin-left: auto; margin-right: auto; }
+.pieno .sovrapposta .barra-riga { min-height: 52px; padding: 0 20px; }
+.scollega { width: 26px; height: 26px; border-radius: 50%; background: color-mix(in srgb, var(--rosso) 12%, transparent); color: var(--rosso);
+    font-size: 18px; font-weight: 600; line-height: 1; display: inline-flex; align-items: center; justify-content: center; flex: none; }

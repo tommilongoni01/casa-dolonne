@@ -9,6 +9,7 @@ import {
     avvisi, prossime, operazioniDi, statoOperazione, TIPI_OPERAZIONE, sezioneDi, nomeContatto, sottotitoloContatto
 } from '../logic.js';
 import { riassuntoImpianto, riepilogoOperazione, TesseraImpianto, RigaAvviso } from './manutenzione.js';
+import { ContattoFoglio } from './contatti.js';
 
 const ordinaTitoli = (a, b) => a.titolo.localeCompare(b.titolo, 'it', { numeric: true });
 const testoDaHtml = html => new DOMParser().parseFromString(html ?? '', 'text/html').body.textContent ?? '';
@@ -164,7 +165,7 @@ export const CasaHome = {
 const schedaScelta = {};
 
 export const ImpiantoPagina = {
-    components: { RigaAvviso },
+    components: { RigaAvviso, ContattoFoglio },
     props: { id: String },
     template: `
       <Pagina v-if="sezione" :titolo="sezione.nome">
@@ -225,10 +226,17 @@ export const ImpiantoPagina = {
 
         <!-- Contatti e contratti -->
         <template v-if="scheda === 'contatti'">
-          <Gruppo titolo="Contatti" :nota="puoModificare() ? 'Per collegare un contatto a questo impianto aprilo in Contatti e scegli i suoi sistemi.' : ''">
+          <Gruppo titolo="Contatti" :nota="puoModificare() && contatti.length ? 'Con − il contatto resta in rubrica ma non è più collegato a questo impianto.' : ''">
             <Riga v-if="!contatti.length" titolo="Nessun contatto" class="secondario"/>
             <Riga v-for="c in contatti" :key="c.id" icona="persona" :titolo="nomeContatto(c)" :sottotitolo="sottotitoloContatto(c)" freccia
-                  @click="apri({ nome: 'contatto', id: c.id })"/>
+                  @click="apri({ nome: 'contatto', id: c.id })">
+              <template v-if="puoModificare()" #fine>
+                <button type="button" class="scollega" @click.stop="scollega(c)" :aria-label="'Scollega ' + nomeContatto(c)">−</button>
+              </template>
+            </Riga>
+            <CampoScelta v-if="puoModificare() && daCollegare.length" etichetta="Collega dalla rubrica" :model-value="null"
+                         :opzioni="[{ valore: null, nome: 'Scegli' }, ...daCollegare]" @update:model-value="collega"/>
+            <Riga v-if="puoModificare()" azione icona="piuCerchio" titolo="Nuovo contatto" @click="nuovoContatto = true"/>
           </Gruppo>
           <Gruppo titolo="Contratti">
             <Riga v-if="!contratti.length" titolo="Nessun contratto" class="secondario"/>
@@ -244,9 +252,10 @@ export const ImpiantoPagina = {
           </Gruppo>
         </Foglio>
         <ContrattoFoglio v-if="nuovoContratto" :sezione-id="sezione.id" @chiudi="nuovoContratto = false"/>
+        <ContattoFoglio v-if="nuovoContatto" :sezione-id="sezione.id" @chiudi="nuovoContatto = false"/>
       </Pagina>
       <PaginaMancante v-else/>`,
-    data() { return { nuova: null, nuovoContratto: false, caricamento: false, scheda: null }; },
+    data() { return { nuova: null, nuovoContratto: false, nuovoContatto: false, caricamento: false, scheda: null }; },
     created() { this.scheda = schedaScelta[this.id] ?? (this.operazioni.length ? 'operazioni' : 'manuale'); },
     computed: {
         sezione() { return sezioneDi(this.id); },
@@ -257,6 +266,11 @@ export const ImpiantoPagina = {
         documenti() { return db.documenti.filter(d => d.sezione_id === this.id).sort(ordinaTitoli); },
         contatti() { return db.contatti.filter(c => (c.sezioni ?? []).includes(this.id)).sort((a, b) => nomeContatto(a).localeCompare(nomeContatto(b))); },
         contratti() { return db.contratti.filter(c => c.sezione_id === this.id); },
+        daCollegare() {
+            return db.contatti.filter(c => !(c.sezioni ?? []).includes(this.id))
+                .sort((a, b) => nomeContatto(a).localeCompare(nomeContatto(b)))
+                .map(c => ({ valore: c.id, nome: [nomeContatto(c), c.azienda && nomeContatto(c) !== c.azienda ? c.azienda : ''].filter(Boolean).join(' · ') }));
+        },
         schede() {
             return [
                 { id: 'operazioni', nome: 'Operazioni', numero: this.operazioni.length },
@@ -268,6 +282,14 @@ export const ImpiantoPagina = {
     methods: {
         apri, puoModificare, riepilogoOperazione, nomeContatto, sottotitoloContatto,
         scegli(id) { this.scheda = schedaScelta[this.id] = id; },
+        async collega(id) {
+            const c = db.contatti.find(c => c.id === id);
+            if (c) await salva('contatti', { ...c, sezioni: [...(c.sezioni ?? []), this.id] });
+        },
+        async scollega(c) {
+            if (!confirm(`Scollegare ${nomeContatto(c)} da ${this.sezione.nome}? Il contatto resta in rubrica.`)) return;
+            await salva('contatti', { ...c, sezioni: (c.sezioni ?? []).filter(id => id !== this.id) });
+        },
         tipo: o => TIPI_OPERAZIONE[o.tipo] ?? TIPI_OPERAZIONE.generica,
         coloreOperazione(o) {
             const s = statoOperazione(o);

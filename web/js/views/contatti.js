@@ -164,7 +164,8 @@ export const ContattoPagina = {
 };
 
 export const ContattoFoglio = {
-    props: { contatto: Object },
+    // sezioneId: impianto già selezionato per un contatto nuovo (dalla pagina dell'impianto).
+    props: { contatto: Object, sezioneId: String },
     emits: ['chiudi'],
     template: `
       <Foglio :titolo="contatto ? 'Modifica contatto' : 'Nuovo contatto'" :conferma-disabilitata="!(b.nome || b.cognome || b.azienda).trim()"
@@ -192,7 +193,8 @@ export const ContattoFoglio = {
     data() {
         const c = this.contatto ?? {};
         const campi = ['nome', 'cognome', 'azienda', 'ruolo', 'cellulare', 'telefono', 'email', 'sito_web', 'indirizzo', 'note'];
-        return { b: { ...Object.fromEntries(campi.map(k => [k, c[k] ?? ''])), sezioni: [...(c.sezioni ?? [])] } };
+        const sezioni = c.sezioni ?? (this.sezioneId ? [this.sezioneId] : []);
+        return { b: { ...Object.fromEntries(campi.map(k => [k, c[k] ?? ''])), sezioni: [...sezioni] } };
     },
     computed: { sezioni() { return db.sezioni.slice().sort((a, b) => a.ordine - b.ordine); } },
     methods: {

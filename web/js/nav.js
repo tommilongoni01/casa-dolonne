@@ -14,6 +14,10 @@ window.matchMedia('(min-width: 860px)').addEventListener('change', e => { nav.la
 
 export const pila = () => nav.pile[nav.scheda];
 
+/// Elenco e dettaglio affiancati (schermo largo). La Casa usa invece tutta la larghezza,
+/// come l'app Casa di Apple: le pagine degli impianti si aprono sopra la home.
+export const diviso = () => nav.largo && nav.scheda !== 'casa';
+
 /// Apre una pagina sopra quella attuale.
 export function apri(pagina) {
     pila().push(pagina);
