@@ -484,3 +484,72 @@ table.tabella { border-collapse: collapse; width: 100%; font-size: 14px; font-va
 .adesso { flex: none; font-size: 13px; font-weight: 600; color: var(--accento); background: color-mix(in srgb, var(--accento) 12%, transparent);
     border-radius: 999px; padding: 4px 10px; }
 .grafico-valore { font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; paint-order: stroke; stroke: var(--cella); stroke-width: 3px; }
+
+/* =====================================================================
+   Cruscotto della Casa: stato, avvisi, impianti e calendario
+   ===================================================================== */
+.cruscotto { display: grid; gap: 22px; margin-top: 4px; }
+.cruscotto-stato { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.cruscotto .calendario-casa { margin-top: 0; }
+.pieno .cruscotto { grid-template-columns: minmax(0, 1fr) 360px; grid-template-areas: "stato stato" "impianti calendario"; align-items: start; gap: 26px; }
+.pieno .cruscotto-stato { grid-area: stato; }
+.pieno .cruscotto-impianti { grid-area: impianti; }
+.pieno .cruscotto-calendario { grid-area: calendario; position: sticky; top: 8px; }
+.pieno .cruscotto .griglia-impianti { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+.pieno .cruscotto .tessera-impianto { min-height: 128px; padding: 14px; }
+
+/* Stato della casa */
+.scheda-stato {
+    display: flex; align-items: center; gap: 16px; padding: 18px 20px; border-radius: 20px; color: #fff;
+    background: linear-gradient(135deg, var(--c1), var(--c2)); box-shadow: 0 10px 28px color-mix(in srgb, var(--c2) 35%, transparent);
+}
+.scheda-stato.stato-ok { --c1: #34C759; --c2: #1E9E48; }
+.scheda-stato.stato-inScadenza { --c1: #FFAE2B; --c2: #F07C00; }
+.scheda-stato.stato-scaduto { --c1: #FF5A4E; --c2: #D92D20; }
+.scheda-stato-icona { width: 52px; height: 52px; border-radius: 16px; background: rgba(255,255,255,.22); display: inline-flex; align-items: center; justify-content: center; flex: none; }
+.scheda-stato-testi { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.scheda-stato-titolo { font-size: 24px; font-weight: 700; letter-spacing: -0.4px; }
+.scheda-stato-dettaglio { font-size: 14px; opacity: .92; }
+
+/* Avvisi come schede */
+.schede-avvisi { display: flex; gap: 12px; overflow-x: auto; scroll-snap-type: x mandatory; padding: 2px 2px 6px; margin: 0 -2px; scrollbar-width: none; }
+.schede-avvisi::-webkit-scrollbar { display: none; }
+.pieno .schede-avvisi { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); overflow: visible; }
+.scheda-avviso {
+    flex: 0 0 78%; max-width: 320px; scroll-snap-align: start; display: flex; flex-direction: column; gap: 4px; text-align: left;
+    padding: 14px 16px; border-radius: var(--raggio); background: var(--cella); box-shadow: var(--ombra); position: relative; overflow: hidden;
+    transition: transform .15s, box-shadow .15s;
+}
+.pieno .scheda-avviso { max-width: none; }
+.scheda-avviso::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--colore-avviso, var(--secondario)); }
+.scheda-avviso.gravita-scaduto { --colore-avviso: var(--rosso); }
+.scheda-avviso.gravita-inScadenza { --colore-avviso: var(--arancione); }
+.scheda-avviso.gravita-inCorso { --colore-avviso: var(--blu); }
+.scheda-avviso:active { transform: scale(0.98); }
+.scheda-avviso-testa { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.scheda-avviso-sistema { flex: 1; min-width: 0; font-size: 13px; font-weight: 600; color: var(--secondario); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.scheda-avviso-quando { font-size: 12px; font-weight: 600; color: var(--colore-avviso); white-space: nowrap; }
+.scheda-avviso-titolo { font-size: 16px; font-weight: 600; letter-spacing: -0.2px; }
+.scheda-avviso-dettaglio { font-size: 13px; color: var(--secondario); }
+@media (hover: hover) and (pointer: fine) { .scheda-avviso:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(0,0,0,.08), var(--ombra); } }
+
+/* Calendario */
+.calendario-testa { display: flex; align-items: center; justify-content: space-between; margin: 0 4px 8px; }
+.calendario-frecce { display: inline-flex; align-items: center; gap: 2px; }
+.calendario-corpo { padding: 10px 8px 8px; }
+.calendario-griglia { display: grid; grid-template-columns: repeat(7, 1fr); row-gap: 2px; }
+.calendario-settimana { text-align: center; font-size: 11px; font-weight: 600; color: var(--secondario); padding-bottom: 6px; }
+.calendario-giorno { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 4px 0; border-radius: 10px; }
+.calendario-numero { width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; font-size: 15px; font-variant-numeric: tabular-nums; }
+.calendario-giorno.fuori .calendario-numero { color: var(--terziario); }
+.calendario-giorno.oggi .calendario-numero { color: var(--accento); font-weight: 700; }
+.calendario-giorno.scelto .calendario-numero { background: var(--accento); color: #fff; font-weight: 600; }
+.calendario-pallini { display: flex; gap: 3px; height: 5px; }
+.calendario-pallini i { width: 5px; height: 5px; border-radius: 50%; background: var(--blu); }
+.calendario-pallini i.gravita-scaduto { background: var(--rosso); }
+.calendario-pallini i.gravita-inScadenza { background: var(--arancione); }
+@media (hover: hover) and (pointer: fine) { .calendario-giorno:not(.scelto):hover .calendario-numero { background: var(--cella-sopra); } }
+.calendario-agenda-titolo { display: flex; justify-content: space-between; align-items: baseline; margin-top: 18px; }
+.calendario-agenda-titolo .pulsante-testo { font-size: 14px; font-weight: 500; padding: 0; }
+.agenda-giorno { padding: 10px 16px 4px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .3px; color: var(--secondario); }
+.agenda-giorno + .riga::before { display: none; }

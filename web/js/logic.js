@@ -319,6 +319,30 @@ export function prossime(giorniAvanti = 30) {
     return elenco.sort((a, b) => a.data - b.data);
 }
 
+/// Tutte le scadenze con una data (passate in ritardo, imminenti e future), per il calendario della casa.
+export function calendarioScadenze() {
+    const elenco = [];
+    const gravita = stato => stato === 'scaduta' ? 'scaduto' : stato === 'inScadenza' ? 'inScadenza' : 'info';
+    for (const o of db.operazioni) {
+        for (const a of allarmi(o)) {
+            if (!a.data) continue;
+            elenco.push({
+                id: `op-${o.id}-${a.id}`, gravita: gravita(a.stato), icona: TIPI_OPERAZIONE[o.tipo]?.icona ?? 'lista',
+                titolo: a.titolo, dettaglio: a.dettaglio, data: giorno(a.data), sezione_id: o.sezione_id,
+                pagina: { nome: 'operazione', id: o.id }
+            });
+        }
+    }
+    for (const c of db.contratti) {
+        if (!c.scadenza) continue;
+        const d = giorno(c.scadenza);
+        elenco.push({ id: `contratto-${c.id}`, gravita: gravita(statoScadenza(d, c.preavviso_giorni)), icona: 'documento',
+                      titolo: c.titolo, dettaglio: 'Scadenza contratto', data: d, sezione_id: c.sezione_id,
+                      pagina: { nome: 'contratto', id: c.id } });
+    }
+    return elenco.sort((a, b) => a.data - b.data);
+}
+
 // ---------------------------------------------------------------------
 // Cambio acqua
 // ---------------------------------------------------------------------
