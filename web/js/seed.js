@@ -48,14 +48,9 @@ export async function inizializzaDati(avanzamento = () => {}) {
     const sezioni = await salvaMolti('sezioni', SEZIONI.map(([nome, icona], ordine) => ({ nome, icona, ordine })));
     const id = nome => sezioni.find(s => s.nome === nome).id;
 
-    avanzamento('Prodotti…');
-    const ossigeno = await salva('prodotti', { nome: 'Ossigeno attivo', categoria: 'ossigeno', unita: 'l', scorta_minima: 50, confezioni: [5, 1], ordine: 0 });
-    await salva('prodotti', { nome: 'pH-', categoria: 'ph', unita: 'kg', scorta_minima: 0, ordine: 1 });
-    await salva('prodotti', { nome: 'pH+', categoria: 'ph', unita: 'kg', scorta_minima: 0, ordine: 2 });
-
     avanzamento('Operazioni…');
     const operazioni = [
-        ['Piscina', 'pH', 'ph', {}], ['Piscina', 'Ossigeno', 'ossigeno', { prodotto_id: ossigeno.id, giorni_allarme: 20 }],
+        ['Piscina', 'pH', 'ph', {}], ['Piscina', 'Ossigeno', 'ossigeno', { giorni_allarme: 20 }],
         ['Piscina', 'Cambio acqua', 'cambioAcqua', {}], ['Piscina', 'Storico manutenzioni', 'storico', {}, [['Manutenzione fornitore', 0]]],
         ['Caldaia', 'Pellet', 'pellet', {}], ['Caldaia', 'Svuotamento cenere', 'cenere', {}],
         ['Caldaia', 'Storico manutenzioni', 'storico', {}, PRINCIPALE_CLIENTE],
@@ -66,13 +61,25 @@ export async function inizializzaDati(avanzamento = () => {}) {
         ['Impianto idraulico', 'Storico manutenzioni', 'storico', {}, PRINCIPALE_CLIENTE],
         ['Impianto elettrico', 'Storico manutenzioni', 'storico', {}, PRINCIPALE_CLIENTE]
     ];
-    const ordini = {};
+    const ordini = {}, create = {};
     for (const [sezione, titolo, tipo, extra, tipologie] of operazioni) {
         ordini[sezione] = (ordini[sezione] ?? -1) + 1;
         const o = await salva('operazioni', { sezione_id: id(sezione), titolo, tipo, ordine: ordini[sezione], passaggi: [], ...extra });
+        create[tipo] ??= o;
         if (tipologie) {
             await salvaMolti('tipologie', tipologie.map(([nome, mesi_avviso], ordine) => ({ operazione_id: o.id, nome, mesi_avviso, ordine })));
         }
+    }
+
+    avanzamento('Magazzino…');
+    const unioxy = await salva('prodotti', {
+        nome: 'UNIOXY POOL', codice: 'CK120914S', categoria: 'ossigeno', stato: 'Liquido', unita: 'l', confezioni: [5, 1],
+        fornitore: 'Gecostore', fornitore_link: 'https://www.gecostore.it', scorta_minima: 50, ordine: 0, operazione_id: create.ossigeno.id
+    });
+    await salva('documenti', { prodotto_id: unioxy.id, sezione_id: null, titolo: 'Scheda tecnica UNIOXY POOL',
+                               nome_file: 'unioxypool_t_it_1_0.pdf', percorso: 'statico/schede/unioxypool_t_it_1_0.pdf', dimensione: 225148 });
+    for (const [nome, ordine] of [['pH-', 1], ['pH+', 2]]) {
+        await salva('prodotti', { nome, categoria: 'ph', stato: 'Polvere', unita: 'kg', scorta_minima: 0, ordine, operazione_id: create.ph.id });
     }
 
     avanzamento('Guide e documenti della Caldaia…');

@@ -5,7 +5,7 @@ import * as f from '../format.js';
 import {
     TIPI_OPERAZIONE, allarmi, tipologieDi, interventiDi, ultimoInterventoDi, prossimaScadenza,
     statoScadenza, analisiProcesso, calcoliCarico, carichiOrdinati, svuotamentiOrdinati, consumoCenere,
-    prodottoDi, prodottiOperazione, sezioneDi
+    prodottoDi, prodottiOperazione, operazioneDiProdotto, categoriaPerOperazione, sezioneDi
 } from '../logic.js';
 
 // ---------------------------------------------------------------------
@@ -41,10 +41,14 @@ export const OperazionePagina = {
           <SezioniScorta :prodotto="p"/>
           <Gruppo><Riga :titolo="'Grafici e dettaglio · ' + p.nome" freccia @click="apri({ nome: 'prodotto', id: p.id })"/></Gruppo>
         </template>
-        <Gruppo v-if="o.tipo === 'ph' && puoModificare()">
-          <Riga azione icona="piuCerchio" titolo="Aggiungi prodotto pH" @click="nuovoProdotto = true"/>
+        <!-- Prodotti del magazzino usati in questa operazione: acquisti e consumi si registrano qui sopra. -->
+        <Gruppo v-if="o.tipo !== 'storico' && puoModificare()" titolo="Prodotti dal magazzino"
+                nota="Collega un prodotto del magazzino per registrarne qui acquisti e consumi.">
+          <CampoScelta v-if="daCollegare.length" etichetta="Collega prodotto" :model-value="null"
+                       :opzioni="[{ valore: null, nome: 'Scegli' }, ...daCollegare]" @update:model-value="collega"/>
+          <Riga azione icona="piuCerchio" titolo="Nuovo prodotto" @click="nuovoProdotto = true"/>
         </Gruppo>
-        <ProdottoFoglio v-if="nuovoProdotto" categoria="ph" @chiudi="nuovoProdotto = false"/>
+        <ProdottoFoglio v-if="nuovoProdotto" :operazione-id="o.id" @chiudi="nuovoProdotto = false"/>
         <CambioAcqua v-if="o.tipo === 'cambioAcqua'"/>
         <Pellet v-if="o.tipo === 'pellet'"/>
         <Cenere v-if="o.tipo === 'cenere'"/>
@@ -66,6 +70,13 @@ export const OperazionePagina = {
     computed: {
         o() { return db.operazioni.find(o => o.id === this.id); },
         prodottiScorta() { return prodottiOperazione(this.o); },
+        daCollegare() {
+            return db.prodotti.filter(p => !this.prodottiScorta.includes(p)).sort((a, b) => a.nome.localeCompare(b.nome))
+                .map(p => {
+                    const altra = operazioneDiProdotto(p);
+                    return { valore: p.id, nome: altra ? `${p.nome} (ora in ${altra.titolo})` : p.nome };
+                });
+        },
         guida() { return db.guide.find(g => g.id === this.o?.guida_id); },
         allarmiAttivi() { return allarmi(this.o).filter(a => a.stato !== 'ok'); },
         opzioniGuide() {
@@ -80,6 +91,13 @@ export const OperazionePagina = {
     },
     methods: {
         puoModificare, apri, salva,
+        async collega(id) {
+            const p = db.prodotti.find(p => p.id === id);
+            if (!p) return;
+            const vecchia = db.operazioni.find(o => o.prodotto_id === p.id && o.id !== this.o.id);
+            await salva('prodotti', { ...p, operazione_id: this.o.id, categoria: categoriaPerOperazione(this.o) });
+            if (vecchia) await salva('operazioni', { ...vecchia, prodotto_id: null });
+        },
         apriGuida() { nav.scheda = 'manuale'; apriDaElenco({ nome: 'guida', id: this.guida.id }); }
     },
     setup() { return { f }; }
@@ -121,7 +139,7 @@ export const NotificheOperazione = {
     props: { operazione: Object },
     template: `
       <Gruppo titolo="Notifiche" :nota="nota">
-        <template v-if="prodotto">
+        <template v-if="o.tipo === 'ossigeno' || prodotto">
           <Interruttore etichetta="Allarme dopo l'ultimo riempimento" :model-value="o.giorni_allarme > 0" :disabilitato="!modifica"
                         @update:model-value="v => aggiorna({ giorni_allarme: v ? 20 : 0 })"/>
           <Passo v-if="o.giorni_allarme > 0" :model-value="o.giorni_allarme" :min="1" :max="365" :disabilitato="!modifica"

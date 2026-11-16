@@ -74,7 +74,8 @@ export async function caricaFile(file, cartella) {
     return backend.carica(file, `${cartella}/${nuovoId()}-${pulito}`);
 }
 
-export const urlFile = percorso => backend.url(percorso);
+/// "statico/…" = file pubblicato con il sito (es. schede tecniche dei produttori), il resto sta nello spazio file privato.
+export const urlFile = percorso => percorso?.startsWith('statico/') ? Promise.resolve(percorso.slice('statico/'.length)) : backend.url(percorso);
 
 export async function inviaCodice(email) {
     await backend.inviaCodice(email.trim().toLowerCase());

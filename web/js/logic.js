@@ -110,15 +110,24 @@ export function analisiScorta(prodotto) {
     };
 }
 
-/// Prodotti a scorta gestiti da un'operazione: tutti i prodotti pH per l'operazione pH, altrimenti quello collegato.
+export const STATI_PRODOTTO = ['Liquido', 'Polvere', 'Granulare', 'Pastiglie', 'Solido', 'Gas'];
+
+/// Prodotti del magazzino collegati a un'operazione (es. Ossigeno → UNIOXY POOL; pH → pH-, pH+).
 export function prodottiOperazione(operazione) {
     if (!operazione) return [];
-    if (operazione.tipo === 'ph') {
-        return db.prodotti.filter(p => p.categoria === 'ph').sort((a, b) => a.ordine - b.ordine || a.nome.localeCompare(b.nome));
-    }
-    const p = db.prodotti.find(p => p.id === operazione.prodotto_id);
-    return p ? [p] : [];
+    const collegati = db.prodotti.filter(p => p.operazione_id === operazione.id);
+    // Dati precedenti al magazzino: l'operazione puntava a un solo prodotto.
+    const vecchio = !collegati.length && db.prodotti.find(p => p.id === operazione.prodotto_id);
+    return (vecchio ? [vecchio] : collegati).sort((a, b) => a.ordine - b.ordine || a.nome.localeCompare(b.nome));
 }
+
+/// Operazione a cui è collegato un prodotto.
+export const operazioneDiProdotto = p => !p?.id ? null
+    : db.operazioni.find(o => p.operazione_id && o.id === p.operazione_id)
+      ?? db.operazioni.find(o => o.prodotto_id === p.id) ?? null;
+
+/// Categoria del prodotto ricavata dall'operazione (serve per i nomi dei movimenti e le previsioni).
+export const categoriaPerOperazione = o => ({ ossigeno: 'ossigeno', ph: 'ph', pellet: 'pellet' })[o?.tipo] ?? 'altro';
 
 export const sottoScorta = p => (Number(p.scorta_minima) || 0) > 0 && analisiScorta(p).giacenza <= Number(p.scorta_minima);
 export const mostraPrevisioni = p => p.categoria !== 'ph';
@@ -154,8 +163,9 @@ export function prossimaScadenza(tipologia) {
 }
 
 export function ultimoRiempimento(operazione) {
-    if (!operazione.prodotto_id) return null;
-    return db.movimenti.filter(m => m.prodotto_id === operazione.prodotto_id && m.tipo === 'consumo')
+    const ids = prodottiOperazione(operazione).map(p => p.id);
+    if (!ids.length) return null;
+    return db.movimenti.filter(m => ids.includes(m.prodotto_id) && m.tipo === 'consumo')
         .map(m => m.data).sort().at(-1) ?? null;
 }
 
@@ -232,16 +242,13 @@ export function avvisi({ sezione = null } = {}) {
             pagina: { nome: 'contratto', id: c.id }
         });
     }
-    const prodotti = sezione
-        ? db.prodotti.filter(p => operazioni.some(o => o.prodotto_id === p.id || (o.tipo === 'ph' && p.categoria === 'ph')))
-        : db.prodotti;
+    const prodotti = sezione ? db.prodotti.filter(p => operazioni.includes(operazioneDiProdotto(p))) : db.prodotti;
     for (const p of prodotti.filter(sottoScorta)) {
         elenco.push({
             id: `scorta-${p.id}`, gravita: 'inScadenza', icona: 'scatola',
             titolo: `Scorta bassa: ${p.nome}`, dettaglio: `Restano ${quantita(analisiScorta(p).giacenza, p.unita)}`,
             data: null, pagina: { nome: 'prodotto', id: p.id },
-            sezione_id: db.operazioni.find(o => o.prodotto_id === p.id)?.sezione_id
-                ?? (p.categoria === 'ph' ? db.operazioni.find(o => o.tipo === 'ph')?.sezione_id : null)
+            sezione_id: operazioneDiProdotto(p)?.sezione_id ?? null
         });
     }
     const peso = { scaduto: 0, inScadenza: 1, inCorso: 2, info: 3 };

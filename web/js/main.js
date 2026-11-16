@@ -23,6 +23,7 @@ window.addEventListener('unhandledrejection', e => mostraErrore(e.reason?.messag
 
 const RADICI = {
     manutenzione: manutenzione.ManutenzioneHome,
+    magazzino: manutenzione.Magazzino,
     manuale: manuale.ManualeHome,
     contatti: contatti.ContattiLista,
     impostazioni: impostazioni.Impostazioni
@@ -33,7 +34,7 @@ const PAGINE = {
     sistema: manutenzione.Sistema,
     contratti: manutenzione.Contratti,
     contratto: manutenzione.ContrattoPagina,
-    prodotti: manutenzione.Prodotti,
+    prodotti: manutenzione.Magazzino,
     prodotto: manutenzione.ProdottoPagina,
     operazione: operazione.OperazionePagina,
     processo: operazione.ProcessoPagina,
@@ -45,6 +46,7 @@ const PAGINE = {
 
 const ETICHETTE = {
     manutenzione: { nome: 'Manutenzione', icona: 'chiave' },
+    magazzino: { nome: 'Magazzino', icona: 'scatola' },
     manuale: { nome: 'Manuale', icona: 'libro' },
     contatti: { nome: 'Contatti', icona: 'persone' },
     impostazioni: { nome: 'Impostazioni', icona: 'ingranaggio' }
@@ -87,7 +89,7 @@ const App = {
     setup() {
         const cima = computed(() => pila().at(-1));
         const segnaposti = {
-            manutenzione: 'Scegli un sistema o un avviso', manuale: 'Scegli un sistema',
+            manutenzione: 'Scegli un sistema o un avviso', magazzino: 'Scegli un prodotto', manuale: 'Scegli un sistema',
             contatti: 'Nessun contatto selezionato', impostazioni: ''
         };
         return {

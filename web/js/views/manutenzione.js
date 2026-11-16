@@ -6,7 +6,8 @@ import * as f from '../format.js';
 import {
     avvisi, prossime, operazioniDi, statoOperazione, TIPI_OPERAZIONE, analisiScorta, sottoScorta,
     mostraPrevisioni, movimentiDi, nomeMovimento, CATEGORIE, statoScadenza, nomeContatto, sezioneDi,
-    ultimoRiempimento, interventiDi, carichiOrdinati, svuotamentiOrdinati, formatiDi, nomeConfezione, descriviConfezioni
+    ultimoRiempimento, interventiDi, carichiOrdinati, svuotamentiOrdinati, formatiDi, nomeConfezione, descriviConfezioni,
+    prodottiOperazione, operazioneDiProdotto, categoriaPerOperazione, STATI_PRODOTTO
 } from '../logic.js';
 import { COLORE_SEZIONE } from '../icone.js';
 import { backend } from '../backend.js';
@@ -73,8 +74,6 @@ export const ManutenzioneHome = {
         <Gruppo titolo="Archivio">
           <Riga icona="documento" titolo="Contratti" :valore="db.contratti.length" freccia
                 :selezionata="selezionata({ nome: 'contratti' })" @click="apriDaElenco({ nome: 'contratti' })"/>
-          <Riga icona="scatola" titolo="Prodotti a scorta" :valore="db.prodotti.length" freccia
-                :selezionata="selezionata({ nome: 'prodotti' })" @click="apriDaElenco({ nome: 'prodotti' })"/>
         </Gruppo>
       </Pagina>`,
     setup() {
@@ -107,7 +106,7 @@ export function riepilogoOperazione(o) {
         case 'ph': {
             const ultima = db.misure_ph.slice().sort((a, b) => b.data.localeCompare(a.data))[0];
             if (ultima) parti.push(`pH ${f.ph(ultima.dosimetro ?? ultima.scuba)}`);
-            const n = db.prodotti.filter(p => p.categoria === 'ph').length;
+            const n = prodottiOperazione(o).length;
             if (n) parti.push(n === 1 ? '1 prodotto' : `${n} prodotti`);
             break;
         }
@@ -141,8 +140,8 @@ export function riepilogoOperazione(o) {
         default:
             if (o.passaggi?.length) parti.push(`${o.passaggi.length} passaggi`);
     }
-    const prodotto = db.prodotti.find(p => p.id === o.prodotto_id);
-    if (prodotto) parti.push(`scorta ${f.quantita(analisiScorta(prodotto).giacenza, prodotto.unita)}`);
+    const prodotti = prodottiOperazione(o);
+    if (prodotti.length === 1 && o.tipo !== 'ph') parti.push(`scorta ${f.quantita(analisiScorta(prodotti[0]).giacenza, prodotti[0].unita)}`);
     return parti.join(' · ');
 }
 
@@ -359,9 +358,9 @@ export const ContrattoFoglio = {
 // Prodotti a scorta
 // ---------------------------------------------------------------------
 export const RigaProdotto = {
-    props: { prodotto: Object },
+    props: { prodotto: Object, conOperazione: Boolean },
     template: `
-      <Riga icona="scatola" :titolo="prodotto.nome" :sottotitolo="autonomia" freccia>
+      <Riga icona="scatola" :titolo="prodotto.nome" :sottotitolo="sottotitolo" freccia>
         <template #fine>
           <span class="riga-valore" :class="{ 'rosso-t': basso }">{{ f.quantita(analisi.giacenza, prodotto.unita) }}</span>
         </template>
@@ -369,29 +368,54 @@ export const RigaProdotto = {
     computed: {
         analisi() { return analisiScorta(this.prodotto); },
         basso() { return sottoScorta(this.prodotto); },
-        autonomia() {
-            if (this.basso) return `Sotto la scorta minima (${f.quantita(this.prodotto.scorta_minima, this.prodotto.unita)})`;
-            return mostraPrevisioni(this.prodotto) && this.analisi.autonomia !== null ? `Autonomia ${this.analisi.autonomia} giorni` : '';
+        sottotitolo() {
+            const parti = [this.prodotto.codice];
+            if (this.conOperazione) parti.push(operazioneDiProdotto(this.prodotto)?.titolo);
+            const confezioni = this.analisi.confezioni.filter(c => c.numero > 0);
+            if (confezioni.length) parti.push(confezioni.map(c => `${c.numero} × ${f.quantita(c.litri, this.prodotto.unita)}`).join(' + '));
+            if (this.basso) parti.push(`sotto la scorta minima (${f.quantita(this.prodotto.scorta_minima, this.prodotto.unita)})`);
+            else if (mostraPrevisioni(this.prodotto) && this.analisi.autonomia !== null) parti.push(`autonomia ${this.analisi.autonomia} giorni`);
+            return parti.filter(Boolean).join(' · ');
         }
     },
     setup() { return { f }; }
 };
 
-export const Prodotti = {
-    components: { RigaProdotto },
+/// Magazzino: tutti i prodotti a scorta, divisi per impianto.
+export const Magazzino = {
     template: `
-      <Pagina titolo="Prodotti a scorta">
+      <Pagina titolo="Magazzino" grande :con-indietro="false">
         <template #azioni>
           <button v-if="puoModificare()" class="pulsante-barra" @click="nuovo = true" aria-label="Nuovo prodotto"><Icona nome="piu"/></button>
         </template>
-        <Gruppo>
-          <RigaProdotto v-for="p in prodotti" :key="p.id" :prodotto="p" @click="apri({ nome: 'prodotto', id: p.id })"/>
+        <label v-if="db.prodotti.length > 4" class="campo-ricerca"><Icona nome="ricerca" :dimensione="18"/>
+          <input v-model="ricerca" placeholder="Cerca nome, codice, fornitore" type="search"></label>
+        <Vuoto v-if="!db.prodotti.length" icona="scatola" titolo="Magazzino vuoto"
+               testo="Aggiungi i prodotti a scorta (ossigeno, correttori pH…) e collegali all'operazione in cui si usano."/>
+        <Gruppo v-for="g in gruppi" :key="g.id" :titolo="g.nome">
+          <RigaProdotto v-for="p in g.prodotti" :key="p.id" :prodotto="p" con-operazione
+                        :selezionata="selezionata(p)" @click="apriDaElenco({ nome: 'prodotto', id: p.id })"/>
         </Gruppo>
         <ProdottoFoglio v-if="nuovo" @chiudi="nuovo = false"/>
       </Pagina>`,
-    data() { return { nuovo: false }; },
-    computed: { prodotti() { return db.prodotti.slice().sort((a, b) => a.ordine - b.ordine || a.nome.localeCompare(b.nome)); } },
-    methods: { apri, puoModificare }
+    data() { return { nuovo: false, ricerca: '' }; },
+    computed: {
+        db() { return db; },
+        gruppi() {
+            const testo = this.ricerca.trim().toLowerCase();
+            const prodotti = db.prodotti.filter(p => !testo || [p.nome, p.codice, p.fornitore].some(v => (v ?? '').toLowerCase().includes(testo)))
+                .sort((a, b) => a.ordine - b.ordine || a.nome.localeCompare(b.nome));
+            const gruppi = db.sezioni.slice().sort((a, b) => a.ordine - b.ordine).map(s => ({
+                id: s.id, nome: s.nome, prodotti: prodotti.filter(p => operazioneDiProdotto(p)?.sezione_id === s.id)
+            }));
+            gruppi.push({ id: 'nessuno', nome: 'Da collegare a un impianto', prodotti: prodotti.filter(p => !operazioneDiProdotto(p)) });
+            return gruppi.filter(g => g.prodotti.length);
+        }
+    },
+    methods: {
+        apriDaElenco, puoModificare,
+        selezionata(p) { return nav.largo && stessaPagina(pila()[0], { nome: 'prodotto', id: p.id }); }
+    }
 };
 
 export const ProdottoPagina = {
@@ -399,16 +423,51 @@ export const ProdottoPagina = {
     template: `
       <Pagina v-if="prodotto" :titolo="prodotto.nome">
         <template #azioni>
-          <button v-if="puoModificare()" class="pulsante-barra" @click="impostazioni = true">Impostazioni</button>
+          <button v-if="puoModificare()" class="pulsante-barra" @click="impostazioni = true">Modifica</button>
         </template>
+        <Gruppo titolo="Scheda prodotto">
+          <Riga titolo="Codice" :valore="prodotto.codice || '–'"/>
+          <Riga titolo="Impianto" :valore="impianto || 'Non collegato'" :freccia="!!operazione" @click="operazione && apriOperazione()"/>
+          <Riga titolo="Stato" :valore="prodotto.stato || '–'"/>
+          <Riga titolo="Confezioni" :valore="confezioni"/>
+          <Riga titolo="Fornitore" :valore="prodotto.fornitore || '–'" :sottotitolo="prodotto.fornitore_link"
+                :freccia="!!prodotto.fornitore_link" @click="prodotto.fornitore_link && apriSito()"/>
+          <div v-if="prodotto.note" class="riga testo-descrizione">{{ prodotto.note }}</div>
+        </Gruppo>
         <SezioniScorta :prodotto="prodotto" con-grafici/>
         <ProdottoFoglio v-if="impostazioni" :prodotto="prodotto" @chiudi="impostazioni = false"/>
       </Pagina>
       <PaginaMancante v-else/>`,
     data() { return { impostazioni: false }; },
-    computed: { prodotto() { return db.prodotti.find(p => p.id === this.id); } },
-    methods: { puoModificare }
+    computed: {
+        prodotto() { return db.prodotti.find(p => p.id === this.id); },
+        operazione() { return operazioneDiProdotto(this.prodotto); },
+        impianto() {
+            if (!this.operazione) return '';
+            return [sezioneDi(this.operazione.sezione_id)?.nome, this.operazione.titolo].filter(Boolean).join(' · ');
+        },
+        confezioni() { return descriviFormati(this.prodotto); }
+    },
+    methods: {
+        puoModificare,
+        apriOperazione() {
+            nav.scheda = 'manutenzione';
+            nav.pile.manutenzione = [{ nome: 'sistema', id: this.operazione.sezione_id }, { nome: 'operazione', id: this.operazione.id }];
+        },
+        apriSito() {
+            const link = this.prodotto.fornitore_link;
+            window.open(/^https?:\/\//i.test(link) ? link : 'https://' + link, '_blank', 'noopener');
+        }
+    }
 };
+
+/// "Taniche da 5 l e 1 l", oppure solo l'unità di misura.
+export function descriviFormati(p) {
+    const formati = formatiDi(p);
+    if (!formati.length) return `Sfuso · ${p.unita}`;
+    const nome = nomeConfezione(p, 2);
+    return `${nome.charAt(0).toUpperCase() + nome.slice(1)} da ${formati.map(l => f.quantita(l, p.unita)).join(' e ')}`;
+}
 
 /// Giacenza, pulsanti movimento, grafico e storico di un prodotto.
 export const SezioniScorta = {
@@ -483,7 +542,7 @@ export const SchedeTecniche = {
     props: { prodotto: Object },
     template: `
       <Gruppo v-if="documenti.length || puoModificare()" :titolo="'Schede tecniche · ' + prodotto.nome"
-              :nota="documenti.length && puoModificare() ? 'Per eliminare una scheda apri le impostazioni del prodotto.' : ''">
+              :nota="documenti.length && puoModificare() ? 'Per eliminare una scheda tocca Modifica nella pagina del prodotto.' : ''">
         <RigaDocumento v-for="d in documenti" :key="d.id" :documento="d"/>
         <label v-if="puoModificare()" class="riga toccabile azione"><span class="riga-icona"><Icona nome="graffetta"/></span>
           <span class="riga-testi">{{ caricamento ? 'Caricamento…' : 'Allega scheda tecnica' }}</span>
@@ -553,7 +612,7 @@ export const MovimentoFoglio = {
         }
         const conConfezioni = Object.values(numeri).some(n => n > 0);
         return { b: {
-            data: m.data ?? f.oggiISO(), quantita: m.quantita ?? null, fornitore: m.fornitore ?? '',
+            data: m.data ?? f.oggiISO(), quantita: m.quantita ?? null, fornitore: m.fornitore ?? (this.prodotto.fornitore || ''),
             descrizione_prodotto: m.descrizione_prodotto ?? '', note: m.note ?? '', numeri, prezzi,
             prezzo: !conConfezioni && m.costo && m.quantita ? m.costo / m.quantita : null
         } };
@@ -612,27 +671,33 @@ export const MovimentoFoglio = {
 };
 
 export const ProdottoFoglio = {
-    props: { prodotto: Object, categoria: String },
+    props: { prodotto: Object, operazioneId: String },
     emits: ['chiudi'],
     template: `
       <Foglio :titolo="prodotto ? 'Modifica prodotto' : 'Nuovo prodotto'" :conferma-disabilitata="!b.nome.trim()"
               @annulla="$emit('chiudi')" @conferma="salvaProdotto">
         <Gruppo>
-          <CampoTesto v-model="b.nome" segnaposto="Nome"/>
-          <CampoScelta v-model="b.categoria" etichetta="Categoria" :opzioni="categorie"/>
-          <CampoTesto v-model="b.unita" etichetta="Unità di misura" segnaposto="kg, l, sacchi…"/>
+          <CampoTesto v-model="b.nome" segnaposto="Nome prodotto"/>
+          <CampoTesto v-model="b.codice" etichetta="Codice" segnaposto="es. CK120914S"/>
         </Gruppo>
-        <Gruppo nota="Facoltativo. Formati in cui si compra, separati da virgola (es. 5, 1 per taniche da 5 l e da 1 l): negli acquisti e nei consumi si indica il numero di confezioni e l'app tiene il conto anche di quelle.">
+        <Gruppo nota="L'operazione in cui si usa: lì si registrano acquisti e consumi.">
+          <CampoScelta v-model="b.operazione_id" etichetta="Impianto e operazione" :opzioni="operazioni"/>
+        </Gruppo>
+        <Gruppo titolo="Prodotto" :nota="'Confezioni: formati in cui si compra, separati da virgola (5, 1 = taniche da 5 e da 1 ' + (b.unita || 'unità') + '). Negli acquisti e nei consumi si indica il numero di confezioni. Vuoto se è sfuso.'">
+          <CampoScelta v-model="b.stato" etichetta="Stato" :opzioni="stati"/>
+          <CampoTesto v-model="b.unita" etichetta="Unità di misura" segnaposto="kg, l, pz…"/>
           <CampoTesto v-model="b.formati" etichetta="Confezioni da" :segnaposto="'es. 5, 1 (' + (b.unita || 'unità') + ')'"/>
         </Gruppo>
-        <Gruppo nota="Sotto questa quantità il prodotto viene segnalato.">
-          <CampoNumero v-model="b.scorta_minima" etichetta="Scorta minima" :unita="b.unita"/>
+        <Gruppo titolo="Fornitore">
+          <CampoTesto v-model="b.fornitore" segnaposto="Nome fornitore"/>
+          <CampoTesto v-model="b.fornitore_link" segnaposto="Sito (es. https://www.gecostore.it)" tipo="url"/>
         </Gruppo>
-        <Gruppo v-if="b.categoria !== 'ph'" nota="Facoltativo. Se lo indichi, l'autonomia è la giacenza diviso questo consumo; altrimenti si usa il consumo medio dei riempimenti.">
+        <Gruppo titolo="Scorta" nota="Sotto la scorta minima il prodotto viene segnalato. Il consumo mensile è facoltativo: senza, l'autonomia si calcola dai consumi registrati.">
+          <CampoNumero v-model="b.scorta_minima" etichetta="Scorta minima" :unita="b.unita"/>
           <CampoNumero v-model="b.consumo_mensile" etichetta="Consumo mensile" :unita="b.unita + '/mese'"/>
         </Gruppo>
-        <Gruppo titolo="Note"><CampoTesto v-model="b.note" multilinea segnaposto="Note"/></Gruppo>
-        <Gruppo v-if="schede.length" titolo="Schede tecniche" nota="Tocca una scheda per eliminarla.">
+        <Gruppo titolo="Note"><CampoTesto v-model="b.note" multilinea segnaposto="Note (dosaggi, avvertenze…)"/></Gruppo>
+        <Gruppo v-if="schede.length" titolo="Schede tecniche" nota="Tocca una scheda per eliminarla. Per aggiungerle usa “Allega scheda tecnica” nella pagina del prodotto.">
           <Riga v-for="d in schede" :key="d.id" icona="cestino" colore="var(--rosso)" :titolo="d.titolo" @click="eliminaScheda(d)"/>
         </Gruppo>
         <Gruppo v-if="prodotto"><Riga distruttiva titolo="Elimina prodotto e movimenti" @click="eliminaProdotto"/></Gruppo>
@@ -640,30 +705,44 @@ export const ProdottoFoglio = {
     data() {
         const p = this.prodotto ?? {};
         return { b: {
-            nome: p.nome ?? '', categoria: p.categoria ?? this.categoria ?? 'altro',
-            unita: p.unita ?? (this.categoria === 'ph' ? 'kg' : 'pz'),
+            nome: p.nome ?? '', codice: p.codice ?? '', stato: p.stato ?? '', unita: p.unita ?? 'kg',
+            operazione_id: p.operazione_id ?? operazioneDiProdotto(p)?.id ?? this.operazioneId ?? null,
+            fornitore: p.fornitore ?? '', fornitore_link: p.fornitore_link ?? '',
             scorta_minima: p.scorta_minima || null, consumo_mensile: p.consumo_mensile ?? null, note: p.note ?? '',
             formati: formatiDi(p).map(v => String(v).replace('.', ',')).join(', ')
         } };
     },
     computed: {
-        categorie() { return Object.entries(CATEGORIE).map(([valore, nome]) => ({ valore, nome })); },
+        operazioni() {
+            const opzioni = [{ valore: null, nome: 'Nessuna' }];
+            for (const s of db.sezioni.slice().sort((a, b) => a.ordine - b.ordine)) {
+                for (const o of operazioniDi(s).filter(o => o.tipo !== 'storico')) opzioni.push({ valore: o.id, nome: `${s.nome} · ${o.titolo}` });
+            }
+            return opzioni;
+        },
+        stati() { return [{ valore: '', nome: '–' }, ...STATI_PRODOTTO.map(v => ({ valore: v, nome: v }))]; },
         schede() { return this.prodotto ? schedeDi(this.prodotto) : []; }
     },
     methods: {
         async eliminaScheda(d) {
             if (!confirm(`Eliminare la scheda "${d.titolo}"?`)) return;
             await elimina('documenti', d.id);
-            backend.rimuoviFile(d.percorso).catch(() => {});
+            if (!d.percorso.startsWith('statico/')) backend.rimuoviFile(d.percorso).catch(() => {});
         },
         async salvaProdotto() {
             const { formati, ...campi } = this.b;
             const confezioni = [...new Set(formati.split(/[;\s]+|,\s+/).map(f.leggiNumero).filter(v => v > 0))];
+            const operazione = db.operazioni.find(o => o.id === campi.operazione_id);
             await salva('prodotti', {
                 ...campi, confezioni, id: this.prodotto?.id, scorta_minima: this.b.scorta_minima ?? 0,
+                categoria: categoriaPerOperazione(operazione),
                 consumo_mensile: this.b.consumo_mensile > 0 ? this.b.consumo_mensile : null,
+                fornitore_link: campi.fornitore_link.trim(),
                 ordine: this.prodotto?.ordine ?? db.prodotti.length
             });
+            // L'operazione non punta più al prodotto: il collegamento ora sta nel prodotto.
+            const vecchia = db.operazioni.find(o => o.prodotto_id && o.prodotto_id === this.prodotto?.id && o.id !== campi.operazione_id);
+            if (vecchia) await salva('operazioni', { ...vecchia, prodotto_id: null });
             this.$emit('chiudi');
         },
         async eliminaProdotto() {

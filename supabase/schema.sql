@@ -99,12 +99,17 @@ create table if not exists contratti (
 create table if not exists prodotti (
     id uuid primary key default gen_random_uuid(),
     nome text not null default '',
+    codice text not null default '',
     categoria text not null default 'altro',
+    -- Liquido, Polvere, Granulare…
+    stato text not null default '',
     unita text not null default 'pz',
     scorta_minima numeric not null default 0,
     consumo_mensile numeric,
     -- Formati di confezione in unità del prodotto, es. [5, 1] = taniche da 5 l e da 1 l.
     confezioni jsonb not null default '[]',
+    fornitore text not null default '',
+    fornitore_link text not null default '',
     note text not null default '',
     ordine int not null default 0
 );
@@ -139,6 +144,9 @@ create table if not exists operazioni (
     prodotto_id uuid references prodotti(id) on delete set null,
     guida_id uuid references guide(id) on delete set null
 );
+
+-- Operazione (e quindi impianto) a cui è collegato un prodotto del magazzino.
+alter table prodotti add column if not exists operazione_id uuid references operazioni(id) on delete set null;
 
 create table if not exists tipologie (
     id uuid primary key default gen_random_uuid(),
