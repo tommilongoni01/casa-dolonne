@@ -2,10 +2,10 @@
 // Su iPad la prima pagina della pila va nella colonna di destra; su iPhone la pila si sovrappone all'elenco.
 import { reactive, watch } from 'vue';
 
-export const SCHEDE = ['manutenzione', 'magazzino', 'manuale', 'contatti', 'impostazioni'];
+export const SCHEDE = ['casa', 'magazzino', 'contatti', 'impostazioni'];
 
 export const nav = reactive({
-    scheda: 'manutenzione',
+    scheda: 'casa',
     pile: Object.fromEntries(SCHEDE.map(s => [s, []])),
     largo: window.matchMedia('(min-width: 860px)').matches
 });
@@ -41,12 +41,19 @@ function codifica() {
     return '#' + [nav.scheda, ...pagine].join('/');
 }
 
+// Indirizzi della versione precedente (schede Manutenzione e Manuale, pagine sistema/sezione),
+// ad esempio nei codici QR già stampati: portano alla scheda Casa e alla pagina dell'impianto.
+const VECCHIE_SCHEDE = { manutenzione: 'casa', manuale: 'casa' };
+const VECCHIE_PAGINE = { sistema: 'impianto', sezione: 'impianto' };
+
 function decodifica(hash) {
-    const [scheda, ...pagine] = hash.replace(/^#/, '').split('/').filter(Boolean);
+    let [scheda, ...pagine] = hash.replace(/^#/, '').split('/').filter(Boolean);
+    scheda = VECCHIE_SCHEDE[scheda] ?? scheda;
     if (!SCHEDE.includes(scheda)) return;
     nav.scheda = scheda;
     nav.pile[scheda] = pagine.map(p => {
-        const [nome, id] = p.split(':');
+        const [vecchio, id] = p.split(':');
+        const nome = VECCHIE_PAGINE[vecchio] ?? vecchio;
         return id ? { nome, id } : { nome };
     });
 }

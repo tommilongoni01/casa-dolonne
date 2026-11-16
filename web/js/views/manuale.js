@@ -1,4 +1,4 @@
-// Manuale: sistemi, guide scritte da noi (testo formattato e foto) e documenti del fornitore.
+// Manuale degli impianti: guide scritte da noi (testo formattato e foto) e documenti del fornitore.
 import { nextTick } from 'vue';
 import { db, salva, elimina, caricaFile, urlFile, puoModificare } from '../store.js';
 import { nav, pila, apri, apriDaElenco, indietro, stessaPagina } from '../nav.js';
@@ -29,96 +29,6 @@ export function pulisciHtml(html) {
 const testoDaHtml = html => new DOMParser().parseFromString(html ?? '', 'text/html').body.textContent ?? '';
 
 // ---------------------------------------------------------------------
-// Elenco dei sistemi
-// ---------------------------------------------------------------------
-export const ManualeHome = {
-    template: `
-      <Pagina titolo="Manuale" grande :con-indietro="false">
-        <template #azioni>
-          <button v-if="puoModificare()" class="pulsante-barra" @click="modificaSezioni = !modificaSezioni">{{ modificaSezioni ? 'Fine' : 'Modifica' }}</button>
-          <button v-if="puoModificare()" class="pulsante-barra" @click="nuova = { nome: '', icona: 'chiave' }" aria-label="Nuova sezione"><Icona nome="piu"/></button>
-        </template>
-        <label class="campo-ricerca"><Icona nome="ricerca" :dimensione="18"/><input v-model="ricerca" placeholder="Cerca guide e documenti" type="search"></label>
-        <template v-if="!ricerca.trim()">
-          <Gruppo :nota="modificaSezioni ? 'Tocca una sezione per rinominarla, cambiarne l\\'icona o spostarla.' : ''">
-            <Riga v-for="(s, i) in sezioni" :key="s.id" :icona="s.icona" quadrata :titolo="s.nome" :sottotitolo="riepilogo(s)"
-                  :freccia="!modificaSezioni" :selezionata="!modificaSezioni && selezionata({ nome: 'sezione', id: s.id })"
-                  @click="modificaSezioni ? (modifica = { ...s }) : apriDaElenco({ nome: 'sezione', id: s.id })">
-              <template v-if="modificaSezioni" #fine>
-                <span class="strumenti" style="margin:0">
-                  <button type="button" :disabled="i === 0" @click.stop="sposta(i, -1)">↑</button>
-                  <button type="button" :disabled="i === sezioni.length - 1" @click.stop="sposta(i, 1)">↓</button>
-                </span>
-              </template>
-            </Riga>
-          </Gruppo>
-        </template>
-        <template v-else>
-          <Vuoto v-if="!guideTrovate.length && !documentiTrovati.length" icona="ricerca" :titolo="'Nessun risultato per “' + ricerca + '”'"/>
-          <Gruppo v-if="guideTrovate.length" titolo="Guide">
-            <Riga v-for="g in guideTrovate" :key="g.id" icona="libro" :titolo="g.titolo" :sottotitolo="nomeSezione(g.sezione_id)" freccia
-                  :selezionata="selezionata({ nome: 'guida', id: g.id })" @click="apriDaElenco({ nome: 'guida', id: g.id })"/>
-          </Gruppo>
-          <Gruppo v-if="documentiTrovati.length" titolo="Documenti">
-            <RigaDocumento v-for="d in documentiTrovati" :key="d.id" :documento="d"/>
-          </Gruppo>
-        </template>
-
-        <Foglio v-if="nuova || modifica" :titolo="nuova ? 'Nuova sezione' : 'Modifica sezione'"
-                :conferma-disabilitata="!(nuova || modifica).nome.trim()" @annulla="nuova = modifica = null" @conferma="salvaSezione">
-          <Gruppo><CampoTesto v-model="(nuova || modifica).nome" segnaposto="Nome sezione"/></Gruppo>
-          <Gruppo titolo="Icona">
-            <div class="riga" style="flex-wrap:wrap;gap:10px">
-              <button v-for="i in icone" :key="i" type="button" @click="(nuova || modifica).icona = i"
-                      :style="{ outline: (nuova || modifica).icona === i ? '3px solid var(--accento)' : 'none', borderRadius: '9px', outlineOffset: '2px' }">
-                <IconaQuadrata :nome="i" :dimensione="40"/>
-              </button>
-            </div>
-          </Gruppo>
-          <Gruppo v-if="modifica"><Riga distruttiva titolo="Elimina sezione" @click="eliminaSezione"/></Gruppo>
-        </Foglio>
-      </Pagina>`,
-    data() { return { ricerca: '', nuova: null, modifica: null, modificaSezioni: false, icone: ICONE_SEZIONE }; },
-    computed: {
-        sezioni() { return db.sezioni.slice().sort((a, b) => a.ordine - b.ordine); },
-        guideTrovate() {
-            const q = this.ricerca.trim().toLowerCase();
-            return db.guide.filter(g => g.titolo.toLowerCase().includes(q)
-                || (g.blocchi ?? []).some(b => b.tipo === 'testo' && testoDaHtml(b.html).toLowerCase().includes(q))).sort(ordinaTitoli);
-        },
-        documentiTrovati() {
-            const q = this.ricerca.trim().toLowerCase();
-            return db.documenti.filter(d => d.titolo.toLowerCase().includes(q) || d.nome_file.toLowerCase().includes(q));
-        }
-    },
-    methods: {
-        puoModificare, apriDaElenco,
-        selezionata(p) { return nav.largo && stessaPagina(pila()[0], p); },
-        nomeSezione(id) { return db.sezioni.find(s => s.id === id)?.nome ?? ''; },
-        riepilogo(s) {
-            const g = db.guide.filter(x => x.sezione_id === s.id).length, d = db.documenti.filter(x => x.sezione_id === s.id).length;
-            return `${g === 1 ? '1 guida' : g + ' guide'} · ${d === 1 ? '1 documento' : d + ' documenti'}`;
-        },
-        async sposta(i, d) {
-            const elenco = [...this.sezioni];
-            const [s] = elenco.splice(i, 1);
-            elenco.splice(i + d, 0, s);
-            await Promise.all(elenco.map((voce, ordine) => voce.ordine !== ordine ? salva('sezioni', { ...voce, ordine }) : null));
-        },
-        async salvaSezione() {
-            if (this.nuova) await salva('sezioni', { ...this.nuova, nome: this.nuova.nome.trim(), ordine: this.sezioni.length });
-            else await salva('sezioni', { ...this.modifica, nome: this.modifica.nome.trim() });
-            this.nuova = this.modifica = null;
-        },
-        async eliminaSezione() {
-            if (!confirm(`Eliminare "${this.modifica.nome}" con tutte le sue guide, documenti e operazioni?`)) return;
-            await elimina('sezioni', this.modifica.id);
-            this.modifica = null;
-        }
-    }
-};
-
-// ---------------------------------------------------------------------
 // Documenti
 // ---------------------------------------------------------------------
 export const RigaDocumento = {
@@ -137,62 +47,6 @@ export const RigaDocumento = {
             if (finestra) finestra.location = url; else location.href = url;
         }
     }
-};
-
-// ---------------------------------------------------------------------
-// Pagina di una sezione
-// ---------------------------------------------------------------------
-export const SezionePagina = {
-    props: { id: String },
-    template: `
-      <Pagina v-if="sezione" :titolo="sezione.nome">
-        <template #azioni>
-          <button v-if="puoModificare()" class="pulsante-barra" @click="nuovaGuida" aria-label="Nuova guida"><Icona nome="piu"/></button>
-        </template>
-        <Gruppo titolo="Guide">
-          <Riga v-if="!guide.length" titolo="Nessuna guida" class="secondario"/>
-          <Riga v-for="g in guide" :key="g.id" icona="libro" :titolo="g.titolo || 'Senza titolo'"
-                :sottotitolo="'Aggiornata il ' + f.dataBreve(g.aggiornata)" freccia @click="apri({ nome: 'guida', id: g.id })"/>
-        </Gruppo>
-        <Gruppo titolo="Documenti del fornitore">
-          <Riga v-if="!documenti.length" titolo="Nessun documento" class="secondario"/>
-          <RigaDocumento v-for="d in documenti" :key="d.id" :documento="d"/>
-          <label v-if="puoModificare()" class="riga toccabile azione"><span class="riga-icona"><Icona nome="importa"/></span>
-            <span class="riga-testi">{{ caricamento ? 'Caricamento…' : 'Importa documento (PDF o foto)' }}</span>
-            <input type="file" multiple accept="application/pdf,image/*,.doc,.docx,.xls,.xlsx" hidden @change="importa">
-          </label>
-        </Gruppo>
-        <Gruppo v-if="contatti.length" titolo="Contatti">
-          <Riga v-for="c in contatti" :key="c.id" icona="persona" :titolo="nomeContatto(c)" :sottotitolo="sottotitoloContatto(c)" freccia
-                @click="apri({ nome: 'contatto', id: c.id })"/>
-        </Gruppo>
-      </Pagina>
-      <PaginaMancante v-else/>`,
-    data() { return { caricamento: false }; },
-    computed: {
-        sezione() { return db.sezioni.find(s => s.id === this.id); },
-        guide() { return db.guide.filter(g => g.sezione_id === this.id).sort(ordinaTitoli); },
-        documenti() { return db.documenti.filter(d => d.sezione_id === this.id).sort(ordinaTitoli); },
-        contatti() { return db.contatti.filter(c => (c.sezioni ?? []).includes(this.id)).sort((a, b) => nomeContatto(a).localeCompare(nomeContatto(b))); }
-    },
-    methods: {
-        puoModificare, apri, nomeContatto, sottotitoloContatto,
-        async nuovaGuida() {
-            const g = await salva('guide', { sezione_id: this.id, titolo: '', blocchi: [{ tipo: 'testo', html: '' }], aggiornata: new Date().toISOString() });
-            apri({ nome: 'guida', id: g.id, modifica: true });
-        },
-        async importa(e) {
-            this.caricamento = true;
-            try {
-                for (const file of e.target.files) {
-                    const percorso = await caricaFile(file, 'documenti');
-                    await salva('documenti', { sezione_id: this.id, titolo: file.name.replace(/\.[^.]+$/, ''), nome_file: file.name, percorso, dimensione: file.size });
-                }
-            } catch (err) { alert(`Importazione non riuscita: ${err.message}`); }
-            finally { this.caricamento = false; e.target.value = ''; }
-        }
-    },
-    setup() { return { f }; }
 };
 
 // ---------------------------------------------------------------------

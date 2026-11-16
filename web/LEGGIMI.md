@@ -103,7 +103,7 @@ web/
 │   ├── store.js         dati condivisi, aggiornamento in tempo reale
 │   ├── logic.js         scorte, allarmi, stato della casa, pellet, cenere, cambio acqua
 │   ├── seed.js          contenuti iniziali
-│   └── views/           schermate (manutenzione, operazioni, manuale, contatti, impostazioni)
+│   └── views/           schermate (casa e impianti, operazioni, magazzino, guide, contatti, impostazioni)
 ├── seed/                guide, foto e PDF iniziali, carichi pellet
 └── vendor/              Vue 3 e Supabase JS (copie locali)
 ```

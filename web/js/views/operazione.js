@@ -114,7 +114,7 @@ export const OperazionePagina = {
             await salva('prodotti', { ...p, operazione_id: this.o.id, categoria: categoriaPerOperazione(this.o) });
             if (vecchia) await salva('operazioni', { ...vecchia, prodotto_id: null });
         },
-        apriGuida() { nav.scheda = 'manuale'; apriDaElenco({ nome: 'guida', id: this.guida.id }); }
+        apriGuida() { apri({ nome: 'guida', id: this.guida.id }); }
     },
     setup() { return { f }; }
 };

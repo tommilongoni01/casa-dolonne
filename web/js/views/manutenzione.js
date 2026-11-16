@@ -107,7 +107,7 @@ export const TesseraImpianto = {
 // Codici QR da stampare e attaccare sugli impianti
 // ---------------------------------------------------------------------
 /// Indirizzo che apre direttamente un impianto (anche da fotocamera).
-export const indirizzoImpianto = sezione => `${location.origin}${location.pathname}#manutenzione/sistema:${sezione.id}`;
+export const indirizzoImpianto = sezione => `${location.origin}${location.pathname}#casa/impianto:${sezione.id}`;
 
 /// SVG del codice QR (libreria qrcode-generator, in vendor/qrcode.js).
 function svgQR(testo) {
@@ -158,66 +158,7 @@ export const CodiciQR = {
 };
 
 // ---------------------------------------------------------------------
-// Home
-// ---------------------------------------------------------------------
-export const ManutenzioneHome = {
-    components: { RigaAvviso, TesseraImpianto },
-    template: `
-      <Pagina titolo="Manutenzione" grande :con-indietro="false">
-        <Vuoto v-if="!sezioni.length" icona="casa" titolo="Ancora nessun dato"
-               testo="Chi può modificare apre Impostazioni → Carica contenuti iniziali: verranno creati sistemi, operazioni, guide e carichi pellet."/>
-        <div v-if="sezioni.length" class="riepilogo">
-          <div class="tessera" :class="{ rosso: conteggi.scaduti }">
-            <Icona nome="avviso"/><span class="tessera-numero">{{ conteggi.scaduti }}</span><span class="tessera-titolo">Da fare subito</span>
-          </div>
-          <div class="tessera" :class="{ arancione: conteggi.inScadenza }">
-            <Icona nome="orologio"/><span class="tessera-numero">{{ conteggi.inScadenza }}</span><span class="tessera-titolo">In scadenza / in corso</span>
-          </div>
-          <div class="tessera" :class="{ blu: elencoProssime.length }">
-            <Icona nome="calendario"/><span class="tessera-numero">{{ elencoProssime.length }}</span><span class="tessera-titolo">In arrivo</span>
-          </div>
-        </div>
-
-        <Gruppo titolo="Avvisi">
-          <Riga v-if="!elencoAvvisi.length" icona="sigillo" colore="var(--verde)" titolo="Tutto in regola"/>
-          <RigaAvviso v-for="a in elencoAvvisi" :key="a.id" :avviso="a" :selezionata="selezionata(a.pagina)" @apri="apriDaElenco"/>
-        </Gruppo>
-
-        <Gruppo v-if="elencoProssime.length" titolo="Prossimi 30 giorni">
-          <RigaAvviso v-for="a in elencoProssime" :key="a.id" :avviso="a" :selezionata="selezionata(a.pagina)" @apri="apriDaElenco"/>
-        </Gruppo>
-
-        <div v-if="sezioni.length" class="gruppo">
-          <h3 class="gruppo-titolo">Impianti</h3>
-          <div class="griglia-impianti">
-            <TesseraImpianto v-for="s in sezioni" :key="s.id" :sezione="s"
-                             :selezionata="selezionata({ nome: 'sistema', id: s.id })" @click="apriDaElenco({ nome: 'sistema', id: s.id })"/>
-          </div>
-        </div>
-
-      </Pagina>`,
-    setup() {
-        const elencoAvvisi = computed(() => avvisi());
-        const elencoProssime = computed(() => prossime());
-        const conteggi = computed(() => ({
-            scaduti: elencoAvvisi.value.filter(a => a.gravita === 'scaduto').length,
-            inScadenza: elencoAvvisi.value.filter(a => a.gravita === 'inScadenza' || a.gravita === 'inCorso').length
-        }));
-        const sezioni = computed(() => db.sezioni.slice().sort((a, b) => a.ordine - b.ordine));
-        return {
-            db, sezioni, elencoAvvisi, elencoProssime, conteggi, apriDaElenco,
-            selezionata: pagina => nav.largo && stessaPagina(pila()[0], pagina),
-            riepilogoSistema(s) {
-                const n = operazioniDi(s).length;
-                return n === 0 ? 'Nessuna operazione' : n === 1 ? '1 operazione' : `${n} operazioni`;
-            },
-            avvisiSistema: s => elencoAvvisi.value.filter(a => a.sezione_id === s.id).length
-        };
-    }
-};
-
-// ---------------------------------------------------------------------
-// Pagina di un sistema
+// Riepilogo delle operazioni (usato nella pagina dell'impianto)
 // ---------------------------------------------------------------------
 /// Riassunto dei dati live mostrato sotto il nome dell'operazione.
 export function riepilogoOperazione(o) {
@@ -264,64 +205,6 @@ export function riepilogoOperazione(o) {
     if (prodotti.length === 1 && o.tipo !== 'ph') parti.push(`scorta ${f.quantita(analisiScorta(prodotti[0]).giacenza, prodotti[0].unita)}`);
     return parti.join(' · ');
 }
-
-export const Sistema = {
-    components: { RigaAvviso },
-    props: { id: String },
-    template: `
-      <Pagina v-if="sezione" :titolo="sezione.nome">
-        <template #azioni>
-          <button v-if="puoModificare()" class="pulsante-barra" @click="nuova = { titolo: '' }" aria-label="Nuova operazione"><Icona nome="piu"/></button>
-        </template>
-        <Gruppo v-if="elencoAvvisi.length" titolo="Avvisi">
-          <RigaAvviso v-for="a in elencoAvvisi" :key="a.id" :avviso="a" @apri="apri"/>
-        </Gruppo>
-        <Gruppo titolo="Operazioni">
-          <Riga v-if="!operazioni.length" titolo="Nessuna operazione per questo sistema" class="secondario"/>
-          <Riga v-for="o in operazioni" :key="o.id" :icona="tipo(o).icona" quadrata :colore="coloreOperazione(o)"
-                :titolo="o.titolo" :sottotitolo="riepilogoOperazione(o)" freccia @click="apri({ nome: 'operazione', id: o.id })"/>
-        </Gruppo>
-        <Gruppo v-if="contratti.length" titolo="Contratti">
-          <RigaContratto v-for="c in contratti" :key="c.id" :contratto="c" @click="apri({ nome: 'contratto', id: c.id })"/>
-        </Gruppo>
-        <Gruppo>
-          <Riga icona="qr" titolo="Codice QR da stampare" sottotitolo="Da attaccare vicino all'impianto per aprire subito questa pagina"
-                freccia @click="apri({ nome: 'codiciQR', id: sezione.id })"/>
-        </Gruppo>
-
-        <Foglio v-if="nuova" titolo="Nuova operazione" :conferma-disabilitata="!nuova.titolo.trim()"
-                @annulla="nuova = null" @conferma="creaOperazione">
-          <Gruppo nota="Un'operazione con descrizione, passaggi, note e collegamento al manuale.">
-            <CampoTesto v-model="nuova.titolo" segnaposto="Titolo (es. Controllo filtri)"/>
-          </Gruppo>
-        </Foglio>
-      </Pagina>
-      <PaginaMancante v-else/>`,
-    data() { return { nuova: null }; },
-    computed: {
-        sezione() { return sezioneDi(this.id); },
-        operazioni() { return this.sezione ? operazioniDi(this.sezione) : []; },
-        elencoAvvisi() { return this.sezione ? avvisi({ sezione: this.sezione }) : []; },
-        contratti() { return db.contratti.filter(c => c.sezione_id === this.id); }
-    },
-    methods: {
-        apri, puoModificare, riepilogoOperazione,
-        tipo: o => TIPI_OPERAZIONE[o.tipo] ?? TIPI_OPERAZIONE.generica,
-        coloreOperazione(o) {
-            const s = statoOperazione(o);
-            if (s === 'scaduta') return 'var(--rosso)';
-            if (s === 'inScadenza') return 'var(--arancione)';
-            if (o.tipo === 'cambioAcqua' && db.processi_acqua.some(p => !p.fine)) return 'var(--blu)';
-            return COLORE_SEZIONE[this.sezione.icona] ?? 'var(--accento)';
-        },
-        async creaOperazione() {
-            const ordine = Math.max(-1, ...this.operazioni.map(o => o.ordine)) + 1;
-            const o = await salva('operazioni', { sezione_id: this.id, titolo: this.nuova.titolo.trim(), tipo: 'generica', ordine });
-            this.nuova = null;
-            apri({ nome: 'operazione', id: o.id });
-        }
-    }
-};
 
 export const PaginaMancante = {
     template: `<Pagina titolo=""><Vuoto icona="avviso" titolo="Elemento non trovato" testo="Potrebbe essere stato eliminato."/></Pagina>`

@@ -159,7 +159,7 @@ export const ContattoPagina = {
     },
     methods: {
         puoModificare, salva, apri, nomeContatto, sottotitoloContatto, cifre,
-        apriSistema(s) { nav.scheda = 'manuale'; apriDaElenco({ nome: 'sezione', id: s.id }); }
+        apriSistema(s) { nav.scheda = 'casa'; apriDaElenco({ nome: 'impianto', id: s.id }); }
     }
 };
 

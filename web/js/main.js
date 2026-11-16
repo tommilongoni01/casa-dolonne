@@ -8,6 +8,7 @@ import { Accesso, NonAutorizzato } from './views/accesso.js';
 import * as manutenzione from './views/manutenzione.js';
 import * as operazione from './views/operazione.js';
 import * as manuale from './views/manuale.js';
+import * as casa from './views/casa.js';
 import * as contatti from './views/contatti.js';
 import * as impostazioni from './views/impostazioni.js';
 
@@ -22,23 +23,23 @@ window.addEventListener('error', e => mostraErrore(e.message));
 window.addEventListener('unhandledrejection', e => mostraErrore(e.reason?.message ?? String(e.reason)));
 
 const RADICI = {
-    manutenzione: manutenzione.ManutenzioneHome,
+    casa: casa.CasaHome,
     magazzino: manutenzione.Magazzino,
-    manuale: manuale.ManualeHome,
     contatti: contatti.ContattiLista,
     impostazioni: impostazioni.Impostazioni
 };
 
 /// Pagine apribili nella pila di una scheda (nome → componente con prop "id").
 const PAGINE = {
-    sistema: manutenzione.Sistema,
+    impianto: casa.ImpiantoPagina,
+    sistema: casa.ImpiantoPagina,
+    sezione: casa.ImpiantoPagina,
     contratti: manutenzione.Contratti,
     contratto: manutenzione.ContrattoPagina,
     prodotti: manutenzione.Magazzino,
     prodotto: manutenzione.ProdottoPagina,
     operazione: operazione.OperazionePagina,
     processo: operazione.ProcessoPagina,
-    sezione: manuale.SezionePagina,
     guida: manuale.GuidaPagina,
     contatto: contatti.ContattoPagina,
     famiglia: impostazioni.Famiglia,
@@ -46,9 +47,8 @@ const PAGINE = {
 };
 
 const ETICHETTE = {
-    manutenzione: { nome: 'Manutenzione', icona: 'chiave' },
+    casa: { nome: 'Casa', icona: 'casa' },
     magazzino: { nome: 'Magazzino', icona: 'scatola' },
-    manuale: { nome: 'Manuale', icona: 'libro' },
     contatti: { nome: 'Contatti', icona: 'persone' },
     impostazioni: { nome: 'Impostazioni', icona: 'ingranaggio' }
 };
@@ -76,7 +76,7 @@ const App = {
                       :title="etichette[s].nome" @click="cambiaScheda(s)">
                 <Icona :nome="etichette[s].icona" :dimensione="20"/>
                 <span class="laterale-nome">{{ etichette[s].nome }}</span>
-                <span v-if="s === 'manutenzione' && numeroAvvisi" class="contatore-avvisi">{{ numeroAvvisi }}</span>
+                <span v-if="s === 'casa' && numeroAvvisi" class="contatore-avvisi">{{ numeroAvvisi }}</span>
               </button>
             </nav>
             <div class="laterale-utente" :title="stato.membro.email">
@@ -102,14 +102,14 @@ const App = {
           <button v-for="s in schede" :key="s" class="scheda" :class="{ attiva: nav.scheda === s }" @click="cambiaScheda(s)">
             <Icona :nome="etichette[s].icona" :dimensione="24"/>
             <span>{{ etichette[s].nome }}</span>
-            <span v-if="s === 'manutenzione' && numeroAvvisi" class="contatore-avvisi">{{ numeroAvvisi }}</span>
+            <span v-if="s === 'casa' && numeroAvvisi" class="contatore-avvisi">{{ numeroAvvisi }}</span>
           </button>
         </nav>
       </div>`,
     setup() {
         const cima = computed(() => pila().at(-1));
         const segnaposti = {
-            manutenzione: 'Scegli un sistema o un avviso', magazzino: 'Scegli un prodotto', manuale: 'Scegli un sistema',
+            casa: 'Scegli un impianto o un avviso', magazzino: 'Scegli un prodotto',
             contatti: 'Nessun contatto selezionato', impostazioni: ''
         };
         return {
@@ -137,24 +137,26 @@ avvia().then(async () => {
     apriPercorsoDiProva();
 });
 
-/// Solo per i test in modalità prova: ?percorso=manutenzione/sistema:Caldaia/operazione:Pellet apre le pagine per nome.
+/// Solo per i test in modalità prova: ?percorso=casa/impianto:Caldaia/operazione:Pellet apre le pagine per nome.
 function apriPercorsoDiProva() {
     const percorso = new URLSearchParams(location.search).get('percorso');
     if (!percorso || stato.modo !== 'prova') return;
-    const [scheda, ...pagine] = percorso.split('/');
+    const [vecchia, ...pagine] = percorso.split('/');
+    const scheda = { manutenzione: 'casa', manuale: 'casa' }[vecchia] ?? vecchia;
     const cerca = (elenco, campo, testo) => elenco.find(x => (x[campo] ?? '').toLowerCase().startsWith(testo.toLowerCase()));
     let sezione = null;
     nav.scheda = scheda;
     nav.pile[scheda] = pagine.map(p => {
         const [nome, testo] = p.split(':');
         let voce = null;
-        if (nome === 'sistema' || nome === 'sezione') voce = sezione = cerca(db.sezioni, 'nome', testo);
+        if (nome === 'impianto' || nome === 'sistema' || nome === 'sezione') voce = sezione = cerca(db.sezioni, 'nome', testo);
         else if (nome === 'operazione') voce = cerca(db.operazioni.filter(o => !sezione || o.sezione_id === sezione.id), 'titolo', testo);
         else if (nome === 'guida') voce = cerca(db.guide, 'titolo', testo);
         else if (nome === 'prodotto') voce = cerca(db.prodotti, 'nome', testo);
         else if (nome === 'contatto') voce = cerca(db.contatti, 'nome', testo);
         else if (nome === 'processo') voce = db.processi_acqua[0];
-        return voce ? { nome, id: voce.id } : { nome };
+        const pagina = ['sistema', 'sezione'].includes(nome) ? 'impianto' : nome;
+        return voce ? { nome: pagina, id: voce.id } : { nome: pagina };
     });
 }
 

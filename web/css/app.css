@@ -391,9 +391,9 @@ table.tabella { border-collapse: collapse; width: 100%; font-size: 14px; font-va
 .sezione-operazione + .segmenti { margin-top: 22px; }
 
 /* Riquadri degli impianti (home Manutenzione) */
-.griglia-impianti { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+.griglia-impianti { display: grid; grid-template-columns: repeat(auto-fill, minmax(136px, 1fr)); gap: 12px; }
 .tessera-impianto {
-    display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-height: 132px; padding: 14px; text-align: left;
+    display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-height: 124px; padding: 13px; text-align: left;
     background: var(--cella); border-radius: var(--raggio); box-shadow: var(--ombra); position: relative; overflow: hidden;
     transition: transform .15s, box-shadow .15s, background-color .15s;
 }
@@ -408,9 +408,9 @@ table.tabella { border-collapse: collapse; width: 100%; font-size: 14px; font-va
 .stato-ok { --colore-stato: var(--verde); }
 .stato-inScadenza { --colore-stato: var(--arancione); }
 .stato-scaduto { --colore-stato: var(--rosso); }
-.stato-scaduto { background: color-mix(in srgb, var(--rosso) 6%, var(--cella)); }
+.tessera-impianto.stato-scaduto { background: color-mix(in srgb, var(--rosso) 6%, var(--cella)); }
 .stato-vuoto { --colore-stato: transparent; }
-.stato-vuoto .ti-nome, .stato-vuoto .icona-quadrata { opacity: 0.55; }
+.tessera-impianto.stato-vuoto .ti-nome, .tessera-impianto.stato-vuoto .icona-quadrata { opacity: 0.55; }
 .tessera-impianto.selezionata { box-shadow: 0 0 0 2px var(--accento), var(--ombra); }
 @media (hover: hover) and (pointer: fine) {
     .tessera-impianto:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(0,0,0,.08), var(--ombra); }
@@ -436,3 +436,27 @@ table.tabella { border-collapse: collapse; width: 100%; font-size: 14px; font-va
     #stampa .cartellino-codice { max-width: 60mm; }
     #stampa .icona-quadrata { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
+
+/* Home Casa: stato in breve */
+.stato-casa { display: flex; gap: 8px; flex-wrap: wrap; margin: 4px 0 6px; }
+.pillola {
+    display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 999px; font-size: 14px; font-weight: 500;
+    background: var(--cella); box-shadow: var(--ombra); color: var(--secondario); font-variant-numeric: tabular-nums;
+}
+.pillola.rosso { color: var(--rosso); background: color-mix(in srgb, var(--rosso) 10%, var(--cella)); }
+.pillola.arancione { color: var(--arancione); background: color-mix(in srgb, var(--arancione) 10%, var(--cella)); }
+.pillola.blu { color: var(--blu); background: color-mix(in srgb, var(--blu) 10%, var(--cella)); }
+
+/* Pagina dell'impianto */
+.testata-impianto { display: flex; align-items: center; gap: 16px; padding: 8px 4px 4px; }
+.testata-impianto .icona-quadrata { box-shadow: 0 6px 16px rgba(0,0,0,.12); }
+.testata-testi { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.testata-testi h2 { margin: 0; font-size: 28px; font-weight: 700; letter-spacing: -0.5px; line-height: 1.1; }
+.testata-impianto .ti-stato { font-size: 14px; }
+.dati-impianto { display: flex; gap: 8px; flex-wrap: wrap; margin: 14px 0 0; }
+.dati-impianto .pillola { color: var(--testo); }
+.segmenti-impianto { margin-top: 24px; }
+.segmenti-impianto button { font-size: 14px; padding: 8px 6px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.segmento-numero { font-size: 12px; font-weight: 600; color: var(--secondario); background: var(--riempimento); border-radius: 999px; padding: 0 7px; line-height: 18px; }
+.segmenti-impianto button.attivo .segmento-numero { background: color-mix(in srgb, var(--accento) 15%, transparent); color: var(--accento); }
+.segmenti-impianto + .gruppo { margin-top: 12px; }
