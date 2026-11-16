@@ -70,7 +70,6 @@ export const CasaHome = {
 
             <!-- Impianti -->
             <div v-if="!modificaImpianti" class="gruppo">
-              <h3 class="gruppo-titolo">Impianti</h3>
               <div class="griglia-impianti">
                 <TesseraImpianto v-for="s in sezioni" :key="s.id" :sezione="s"
                                  :selezionata="selezionata({ nome: 'impianto', id: s.id })" @click="apriDaElenco({ nome: 'impianto', id: s.id })"/>
