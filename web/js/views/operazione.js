@@ -15,7 +15,7 @@ export const OperazionePagina = {
     props: { id: String },
     template: `
       <Pagina v-if="o" :titolo="o.titolo">
-        <Gruppo>
+        <Gruppo v-if="o.descrizione || o.passaggi?.length || puoModificare()">
           <template #intestazione>
             <span style="display:flex;justify-content:space-between">Descrizione
               <button v-if="puoModificare()" class="pulsante-testo" style="padding:0;text-transform:none" @click="descrizione = true">Modifica</button>
@@ -37,7 +37,7 @@ export const OperazionePagina = {
 
         <template v-if="o.tipo !== 'storico'">
           <!-- Prodotti: quelli del magazzino usati in questa operazione (si collegano dal Magazzino) -->
-          <template v-if="usaProdotti">
+          <template v-if="usaProdotti && (prodottiScorta.length || puoModificare())">
             <h2 class="sezione-operazione">Prodotti</h2>
             <Gruppo :nota="prodottiScorta.length ? '' : 'Per collegare un prodotto aprilo nel Magazzino e scegli questa operazione in “Impianto e operazione”.'">
               <Riga v-if="!prodottiScorta.length" titolo="Nessun prodotto collegato" class="secondario"/>
@@ -65,11 +65,13 @@ export const OperazionePagina = {
         </template>
         <Storico v-else :operazione="o"/>
 
-        <h2 class="sezione-operazione">Avvisi</h2>
-        <NotificheOperazione :operazione="o"/>
+        <template v-if="puoModificare() || avvisiImpostati">
+          <h2 class="sezione-operazione">Avvisi</h2>
+          <NotificheOperazione :operazione="o"/>
+        </template>
 
-        <h2 class="sezione-operazione">Manuale</h2>
-        <Gruppo>
+        <h2 v-if="guida || puoModificare()" class="sezione-operazione">Manuale</h2>
+        <Gruppo v-if="guida || puoModificare()">
           <Riga v-if="guida" icona="libro" :titolo="guida.titolo" freccia @click="apriGuida"/>
           <CampoScelta v-if="puoModificare()" :etichetta="guida ? 'Cambia guida' : 'Collega una guida'" :model-value="o.guida_id"
                        :opzioni="opzioniGuide" @update:model-value="v => salva('operazioni', { ...o, guida_id: v })"/>
@@ -84,6 +86,11 @@ export const OperazionePagina = {
         o() { return db.operazioni.find(o => o.id === this.id); },
         /// Cambio acqua e svuotamento cenere sono operazioni manuali, senza prodotti.
         usaProdotti() { return !['storico', 'cambioAcqua', 'cenere'].includes(this.o.tipo); },
+        /// Per chi ha sola lettura la sezione Avvisi compare solo se c'è almeno un avviso impostato.
+        avvisiImpostati() {
+            return this.o.giorni_allarme > 0 || this.prodottiScorta.some(p => Number(p.scorta_minima) > 0)
+                || tipologieDi(this.o).some(t => t.mesi_avviso > 0);
+        },
         prodottiScorta() { return prodottiOperazione(this.o); },
         prodottoScelto() { return this.prodottiScorta.find(p => p.id === this.scelto) ?? this.prodottiScorta[0] ?? null; },
         guida() { return db.guide.find(g => g.id === this.o?.guida_id); },
@@ -225,7 +232,7 @@ const MisurePH = {
         <Riga v-else titolo="Nessuna misura registrata" class="secondario"/>
         <Riga v-if="puoModificare()" azione icona="piuCerchio" titolo="Registra misura" @click="foglio = {}"/>
       </Gruppo>
-      <Gruppo v-if="misure.length > 1" nota="La fascia verde indica l'intervallo ideale 7,2 – 7,6.">
+      <Gruppo v-if="misure.length > 1" nota="La fascia verde indica l'intervallo ideale 7,2 – 7,6." nota-sempre>
         <Grafico :serie="serie" :fascia="{ min: 7.2, max: 7.6 }"/>
       </Gruppo>
       <Gruppo v-if="misure.length" titolo="Storico misure">
@@ -480,7 +487,7 @@ const Pellet = {
         <Riga v-else titolo="Nessun carico registrato" class="secondario"/>
       </Gruppo>
       <p v-if="!prodotto" class="gruppo-nota">Collega il prodotto Pellet dal magazzino (sezione Prodotti) per registrare i carichi con “Acquisto”.</p>
-      <Gruppo v-if="carichi.length" titolo="Registro carichi" :nota="puoModificare() ? 'Scorri di lato per vedere tutte le colonne. Tocca una riga per modificarla.' : 'Scorri di lato per vedere tutte le colonne.'">
+      <Gruppo v-if="carichi.length" titolo="Registro carichi" nota="Tocca una riga per modificarla">
         <div class="tabella-scorri">
           <table class="tabella">
             <thead><tr><th>Data</th><th>Fornitore</th><th>Quantità</th><th>Costo al quintale</th><th>Aliquota IVA</th><th>IVA</th><th>Totale</th><th>Pre carico</th><th>Post carico</th></tr></thead>
@@ -582,12 +589,12 @@ const Storico = {
         </Riga>
         <RigaEspandi :totale="interventi.length" v-model:aperto="tutti"/>
       </Gruppo>
-      <Gruppo titolo="Contratto di manutenzione" nota="Con una data di scadenza ricevi l'avviso prima che il contratto scada.">
+      <Gruppo v-if="contratti.length || puoModificare()" titolo="Contratto di manutenzione" nota="Con una data di scadenza ricevi l'avviso prima che il contratto scada.">
         <Riga v-if="!contratti.length" titolo="Nessun contratto" class="secondario"/>
         <RigaContratto v-for="c in contratti" :key="c.id" :contratto="c" @click="apri({ nome: 'contratto', id: c.id })"/>
         <Riga v-if="puoModificare()" azione icona="documento" titolo="Aggiungi contratto" @click="nuovoContratto = true"/>
       </Gruppo>
-      <Gruppo titolo="Manuali e documenti" :nota="'I documenti allegati compaiono anche nel Manuale, sezione ' + (sezione?.nome ?? '') + '.'">
+      <Gruppo v-if="documenti.length || puoModificare()" titolo="Manuali e documenti" :nota="'I documenti allegati compaiono anche nel Manuale, sezione ' + (sezione?.nome ?? '') + '.'">
         <Riga v-if="!documenti.length" titolo="Nessun documento" class="secondario"/>
         <RigaDocumento v-for="d in documenti" :key="d.id" :documento="d"/>
         <label v-if="puoModificare()" class="riga toccabile azione"><span class="riga-icona"><Icona nome="graffetta"/></span>

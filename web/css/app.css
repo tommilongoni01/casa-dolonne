@@ -473,3 +473,6 @@ table.tabella { border-collapse: collapse; width: 100%; font-size: 14px; font-va
 .pieno .sovrapposta .barra-riga { min-height: 52px; padding: 0 20px; }
 .scollega { width: 26px; height: 26px; border-radius: 50%; background: color-mix(in srgb, var(--rosso) 12%, transparent); color: var(--rosso);
     font-size: 18px; font-weight: 600; line-height: 1; display: inline-flex; align-items: center; justify-content: center; flex: none; }
+.barra-titolo { transition: opacity .2s; }
+.barra-titolo.nascosto { opacity: 0; }
+.pillola.verde { color: var(--verde); background: color-mix(in srgb, var(--verde) 10%, var(--cella)); }

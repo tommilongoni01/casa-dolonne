@@ -93,7 +93,7 @@ export const TesseraImpianto = {
       <button class="tessera-impianto" :class="['stato-' + r.stato, { selezionata }]">
         <span class="ti-testa">
           <IconaQuadrata :nome="sezione.icona" :dimensione="34"/>
-          <span class="ti-stato"><i></i>{{ r.etichetta }}</span>
+          <span v-if="r.stato === 'scaduto' || r.stato === 'inScadenza'" class="ti-stato"><i></i>{{ r.etichetta }}</span>
         </span>
         <span class="ti-nome">{{ sezione.nome }}</span>
         <span v-for="d in r.dati" :key="d" class="ti-dato">{{ d }}</span>
@@ -463,7 +463,7 @@ export function descriviFormati(p) {
 export const SezioniScorta = {
     props: { prodotto: Object, conGrafici: Boolean },
     template: `
-      <Gruppo :titolo="'Scorta · ' + prodotto.nome">
+      <Gruppo titolo="Scorta">
         <div class="valore-grande">
           <div class="etichetta">Giacenza attuale</div>
           <div class="numero" :class="{ rosso: basso }">{{ f.quantita(a.giacenza, prodotto.unita) }}</div>
@@ -479,7 +479,7 @@ export const SezioniScorta = {
       </Gruppo>
       <Azioni v-if="puoModificare()" :voci="azioni" @scegli="t => movimento = { tipo: t }"/>
       <Gruppo v-if="conGrafici && a.andamento.length > 1" titolo="Andamento giacenza"
-              :nota="Number(prodotto.scorta_minima) > 0 ? 'La linea tratteggiata è la scorta minima.' : ''">
+              :nota="Number(prodotto.scorta_minima) > 0 ? 'La linea tratteggiata è la scorta minima.' : ''" nota-sempre>
         <Grafico :serie="[{ nome: 'Giacenza', colore: 'var(--accento)', punti: a.andamento.map(p => ({ x: f.giorno(p.data), y: p.valore })) }]"
                  :riferimento="Number(prodotto.scorta_minima) > 0 ? Number(prodotto.scorta_minima) : null"
                  :gradini="movimenti.some(m => m.tipo === 'consumo')"/>
@@ -548,7 +548,7 @@ export const SezioniScorta = {
 export const SchedeTecniche = {
     props: { prodotto: Object },
     template: `
-      <Gruppo v-if="documenti.length || puoModificare()" :titolo="'Schede tecniche · ' + prodotto.nome"
+      <Gruppo v-if="documenti.length || puoModificare()" titolo="Schede tecniche"
               :nota="documenti.length && puoModificare() ? 'Per eliminare una scheda tocca Modifica nella pagina del prodotto.' : ''">
         <RigaDocumento v-for="d in documenti" :key="d.id" :documento="d"/>
         <label v-if="puoModificare()" class="riga toccabile azione"><span class="riga-icona"><Icona nome="graffetta"/></span>

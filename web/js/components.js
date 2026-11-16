@@ -3,6 +3,7 @@ import { computed, ref, watch, onMounted, onUnmounted, nextTick } from 'vue';
 import { svg, COLORE_SEZIONE } from './icone.js';
 import { leggiNumero, numeroCampo, dataBreve } from './format.js';
 import { indietro, nav, pila, diviso } from './nav.js';
+import { puoModificare } from './store.js';
 
 export const Icona = {
     props: { nome: String, dimensione: { type: Number, default: 22 } },
@@ -26,7 +27,8 @@ export const IconaQuadrata = {
 /// Pagina con barra di navigazione (titolo grande nelle pagine principali, piccolo nei dettagli).
 export const Pagina = {
     components: { Icona },
-    props: { titolo: String, grande: Boolean, conIndietro: { type: Boolean, default: true } },
+    // titoloSottile: il titolo è già grande nella pagina e compare nella barra solo scorrendo (come nelle app Apple).
+    props: { titolo: String, grande: Boolean, conIndietro: { type: Boolean, default: true }, titoloSottile: Boolean },
     template: `
       <div class="pagina">
         <header class="barra" :class="{ grande }">
@@ -34,13 +36,14 @@ export const Pagina = {
             <button v-if="mostraIndietro" class="pulsante-barra indietro" @click="vaiIndietro" aria-label="Indietro">
               <Icona nome="indietro"/>
             </button>
-            <div class="barra-titolo" v-if="!grande">{{ titolo }}</div>
+            <div class="barra-titolo" v-if="!grande" :class="{ nascosto: titoloSottile && !scorsa }">{{ titolo }}</div>
             <div class="barra-azioni"><slot name="azioni"/></div>
           </div>
           <h1 v-if="grande" class="titolo-grande">{{ titolo }}</h1>
         </header>
-        <main class="contenuto"><slot/></main>
+        <main class="contenuto" @scroll.passive="e => scorsa = e.target.scrollTop > 56"><slot/></main>
       </div>`,
+    data() { return { scorsa: false }; },
     computed: {
         // Su iPad la prima pagina di dettaglio è quella scelta nell'elenco a sinistra: niente "Indietro".
         mostraIndietro() { return this.conIndietro && !this.grande && (!diviso() || pila().length > 1); }
@@ -58,13 +61,15 @@ export const RigaEspandi = {
 };
 
 export const Gruppo = {
-    props: { titolo: String, nota: String },
+    // Le note spiegano come modificare: si vedono solo a chi può modificare, salvo "nota-sempre" (es. legenda di un grafico).
+    props: { titolo: String, nota: String, notaSempre: Boolean },
     template: `
       <section class="gruppo">
         <h2 v-if="titolo || $slots.intestazione" class="gruppo-titolo"><slot name="intestazione">{{ titolo }}</slot></h2>
         <div class="gruppo-celle"><slot/></div>
-        <p v-if="nota || $slots.nota" class="gruppo-nota"><slot name="nota">{{ nota }}</slot></p>
-      </section>`
+        <p v-if="(nota || $slots.nota) && (notaSempre || puoModificare())" class="gruppo-nota"><slot name="nota">{{ nota }}</slot></p>
+      </section>`,
+    methods: { puoModificare }
 };
 
 /// Riga di una lista. Con @click diventa toccabile (con freccia se `freccia`).
