@@ -636,24 +636,15 @@ const Storico = {
         <RigaContratto v-for="c in contratti" :key="c.id" :contratto="c" @click="apri({ nome: 'contratto', id: c.id })"/>
         <Riga v-if="puoModificare()" azione icona="documento" titolo="Aggiungi contratto" @click="nuovoContratto = true"/>
       </Gruppo>
-      <Gruppo v-if="documenti.length || puoModificare()" titolo="Manuali e documenti" :nota="'I documenti allegati compaiono anche nel Manuale, sezione ' + (sezione?.nome ?? '') + '.'">
-        <Riga v-if="!documenti.length" titolo="Nessun documento" class="secondario"/>
-        <RigaDocumento v-for="d in documenti" :key="d.id" :documento="d"/>
-        <label v-if="puoModificare()" class="riga toccabile azione"><span class="riga-icona"><Icona nome="graffetta"/></span>
-          <span class="riga-testi">{{ caricamento ? 'Caricamento…' : 'Allega manuale o documento' }}</span>
-          <input type="file" multiple hidden @change="allega">
-        </label>
-      </Gruppo>
       <Gruppo v-if="operazione.note" titolo="Note"><div class="riga testo-descrizione">{{ operazione.note }}</div></Gruppo>
       <InterventoFoglio v-if="foglio" :operazione="operazione" :intervento="foglio.voce" @chiudi="foglio = null"/>
       <ContrattoFoglio v-if="nuovoContratto" :sezione-id="operazione.sezione_id" @chiudi="nuovoContratto = false"/>`,
-    data() { return { foglio: null, nuovoContratto: false, caricamento: false, tutti: false }; },
+    data() { return { foglio: null, nuovoContratto: false, tutti: false }; },
     computed: {
         tipologie() { return tipologieDi(this.operazione); },
         interventi() { return interventiDi(this.operazione); },
         sezione() { return sezioneDi(this.operazione.sezione_id); },
-        contratti() { return db.contratti.filter(c => c.sezione_id === this.operazione.sezione_id); },
-        documenti() { return db.documenti.filter(d => d.sezione_id === this.operazione.sezione_id).sort((a, b) => a.titolo.localeCompare(b.titolo)); }
+        contratti() { return db.contratti.filter(c => c.sezione_id === this.operazione.sezione_id); }
     },
     methods: {
         apri, puoModificare,
@@ -664,17 +655,7 @@ const Storico = {
             const ultimo = ultimoInterventoDi(t);
             return `${periodicita} · ${ultimo ? 'ultima il ' + f.dataBreve(ultimo.data) : 'nessun intervento registrato'}`;
         },
-        nomeTipologia(i) { return db.tipologie.find(t => t.id === i.tipologia_id)?.nome ?? ''; },
-        async allega(e) {
-            this.caricamento = true;
-            try {
-                for (const file of e.target.files) {
-                    const percorso = await caricaFile(file, 'documenti');
-                    await salva('documenti', { sezione_id: this.operazione.sezione_id, titolo: file.name.replace(/\.[^.]+$/, ''),
-                                               nome_file: file.name, percorso, dimensione: file.size });
-                }
-            } finally { this.caricamento = false; e.target.value = ''; }
-        }
+        nomeTipologia(i) { return db.tipologie.find(t => t.id === i.tipologia_id)?.nome ?? ''; }
     },
     setup() { return { f }; }
 };
