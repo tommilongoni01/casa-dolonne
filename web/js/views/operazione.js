@@ -551,7 +551,7 @@ const Pellet = {
         <Grafico :serie="[{ nome: 'Costo al quintale', colore: 'var(--arancione)', punti: carichi.map(c => ({ x: f.giorno(c.data), y: calcoliCarico(c).prezzo })) }]"
                  :formato-y="v => f.numero(v) + ' €'"/>
       </Gruppo>
-      <MovimentoFoglio v-if="foglio" :prodotto="prodottoDelCarico" tipo="acquisto" :movimento="foglio" @chiudi="foglio = null"/>`,
+      <MovimentoFoglio v-if="foglio" :prodotto-iniziale="prodottoDelCarico" tipo="acquisto" :movimento="foglio" @chiudi="foglio = null"/>`,
     data() { return { foglio: null, tutti: false }; },
     computed: {
         prodotto() { return prodottiOperazione(this.operazione).find(p => p.categoria === 'pellet') ?? null; },

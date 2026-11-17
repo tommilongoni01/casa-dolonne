@@ -139,6 +139,12 @@ export function analisiScorta(prodotto) {
     };
 }
 
+/// Unità di misura dei prodotti (valore salvato → nome nel menu).
+export const UNITA_MISURA = [
+    ['kg', 'Chilogrammi (kg)'], ['g', 'Grammi (g)'], ['q', 'Quintali (q)'], ['t', 'Tonnellate (t)'],
+    ['l', 'Litri (l)'], ['ml', 'Millilitri (ml)'], ['m³', 'Metri cubi (m³)'], ['pz', 'Pezzi (pz)'], ['sacchi', 'Sacchi']
+];
+
 export const STATI_PRODOTTO = ['Liquido', 'Polvere', 'Granulare', 'Pastiglie', 'Solido', 'Gas'];
 
 /// Prodotti del magazzino collegati a un'operazione (es. Ossigeno → UNIOXY POOL; pH → pH-, pH+).

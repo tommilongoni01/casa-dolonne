@@ -188,7 +188,7 @@ a { color: var(--accento); text-decoration: none; }
 .campo.multilinea { flex-direction: column; align-items: stretch; }
 .campo.multilinea textarea { text-align: left; resize: vertical; min-height: 66px; }
 .campo-unita { color: var(--secondario); }
-.campo select { appearance: none; -webkit-appearance: none; color: var(--secondario); direction: rtl; }
+.campo select { appearance: none; -webkit-appearance: none; color: var(--secondario); text-align: right; text-align-last: right; }
 .campo input.data { color: var(--accento); }
 .interruttore input { flex: none; appearance: none; -webkit-appearance: none; width: 51px; height: 31px; border-radius: 16px;
     background: var(--riempimento); position: relative; transition: background .2s; cursor: pointer; }

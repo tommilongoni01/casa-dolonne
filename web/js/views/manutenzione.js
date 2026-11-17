@@ -7,7 +7,7 @@ import {
     avvisi, prossime, operazioniDi, statoOperazione, TIPI_OPERAZIONE, analisiScorta, sottoScorta,
     mostraPrevisioni, movimentiDi, nomeMovimento, CATEGORIE, statoScadenza, nomeContatto, sezioneDi,
     ultimoRiempimento, interventiDi, carichiOrdinati, svuotamentiOrdinati, formatiDi, nomeConfezione, descriviConfezioni,
-    prodottiOperazione, operazioneDiProdotto, categoriaPerOperazione, STATI_PRODOTTO, allarmi, coloreImpianto
+    prodottiOperazione, operazioneDiProdotto, categoriaPerOperazione, STATI_PRODOTTO, UNITA_MISURA, allarmi, coloreImpianto
 } from '../logic.js';
 import { COLORE_SEZIONE } from '../icone.js';
 import { backend } from '../backend.js';
@@ -500,7 +500,7 @@ export const SezioniScorta = {
         </Riga>
         <RigaEspandi :totale="movimenti.length" v-model:aperto="tutti"/>
       </Gruppo>
-      <MovimentoFoglio v-if="movimento" :prodotto="prodotto" :tipo="movimento.tipo" :movimento="movimento.voce" @chiudi="movimento = null"/>`,
+      <MovimentoFoglio v-if="movimento" :prodotto-iniziale="prodotto" :tipo="movimento.tipo" :movimento="movimento.voce" @chiudi="movimento = null"/>`,
     data() { return { movimento: null, tutti: false }; },
     computed: {
         a() { return analisiScorta(this.prodotto); },
@@ -579,12 +579,16 @@ export const SchedeTecniche = {
 export const schedeDi = prodotto => db.documenti.filter(d => d.prodotto_id === prodotto.id).sort((a, b) => a.titolo.localeCompare(b.titolo));
 
 export const MovimentoFoglio = {
-    props: { prodotto: Object, tipo: String, movimento: Object },
+    // prodottoIniziale: prodotto da cui si apre il foglio. Per un movimento nuovo si può scegliere un altro prodotto
+    // della stessa operazione (es. pH- / pH+): confezioni, unità, prezzi e IVA si aggiornano in base alla scelta.
+    props: { prodottoIniziale: Object, tipo: String, movimento: Object },
     emits: ['chiudi'],
     template: `
       <Foglio :titolo="nomeMovimento(tipo, prodotto.categoria)" :conferma-disabilitata="quantitaFinale === null"
               @annulla="$emit('chiudi')" @conferma="salvaMovimento">
         <Gruppo :nota="nota">
+          <CampoScelta v-if="!movimento && opzioniProdotto.length > 1" v-model="sceltoId" etichetta="Prodotto" :opzioni="opzioniProdotto"/>
+          <Riga v-else titolo="Prodotto" :valore="prodotto.nome + (prodotto.codice ? ' · ' + prodotto.codice : '')"/>
           <CampoData v-model="b.data" etichetta="Data"/>
           <CampoTesto v-if="tipo === 'acquisto'" v-model="b.descrizione_prodotto" segnaposto="Prodotto acquistato (nome, marca)"/>
         </Gruppo>
@@ -617,27 +621,23 @@ export const MovimentoFoglio = {
         <Gruppo titolo="Note"><CampoTesto v-model="b.note" multilinea segnaposto="Note"/></Gruppo>
         <Gruppo v-if="movimento"><Riga distruttiva titolo="Elimina" @click="eliminaMovimento"/></Gruppo>
       </Foglio>`,
-    data() {
-        const m = this.movimento ?? {};
-        const numeri = {}, prezzi = {};
-        for (const litri of formatiDi(this.prodotto)) {
-            const c = (m.confezioni ?? []).find(c => Number(c.litri) === litri);
-            numeri[litri] = Number(c?.numero) || 0;
-            prezzi[litri] = c?.prezzo ?? null;
+    data() { return { sceltoId: this.prodottoIniziale.id, b: {} }; },
+    created() { this.b = this.campi(); },
+    watch: {
+        /// Nuovo prodotto scelto: i campi che dipendono dal prodotto ripartono, data e note restano.
+        sceltoId() {
+            const { data, note } = this.b;
+            this.b = { ...this.campi(), data, note };
         }
-        const conConfezioni = Object.values(numeri).some(n => n > 0);
-        // IVA: quella del movimento, altrimenti quella dell'ultimo acquisto dello stesso prodotto.
-        const precedente = movimentiDi(this.prodotto).find(x => x.tipo === 'acquisto' && x.dettagli?.iva_percentuale != null);
-        const iva = m.id ? (m.dettagli?.iva_percentuale ?? null) : (precedente?.dettagli.iva_percentuale ?? null);
-        return { b: {
-            iva, precarico: m.dettagli?.precarico ?? null,
-            data: m.data ?? f.oggiISO(), quantita: m.quantita ?? null, fornitore: m.fornitore ?? (this.prodotto.fornitore || ''),
-            descrizione_prodotto: m.descrizione_prodotto ?? '', note: m.note ?? '', numeri, prezzi,
-            prezzo: !conConfezioni && m.costo && m.quantita
-                ? (m.dettagli?.prezzo_unitario ?? m.costo / m.quantita / (1 + (Number(iva) || 0) / 100)) : null
-        } };
     },
     computed: {
+        prodotto() { return db.prodotti.find(p => p.id === this.sceltoId) ?? this.prodottoIniziale; },
+        /// Prodotti del magazzino collegati alla stessa operazione.
+        opzioniProdotto() {
+            const operazione = operazioneDiProdotto(this.prodottoIniziale);
+            const prodotti = operazione ? prodottiOperazione(operazione) : [this.prodottoIniziale];
+            return prodotti.map(p => ({ valore: p.id, nome: p.codice ? `${p.nome} · ${p.codice}` : p.nome }));
+        },
         formati() { return formatiDi(this.prodotto); },
         formatiUsati() { return this.formati.filter(l => this.b.numeri[l] > 0); },
         conConfezioni() { return this.formatiUsati.length > 0; },
@@ -666,6 +666,26 @@ export const MovimentoFoglio = {
         }
     },
     methods: {
+        campi() {
+            const m = this.movimento ?? {};
+            const numeri = {}, prezzi = {};
+            for (const litri of formatiDi(this.prodotto)) {
+                const c = (m.confezioni ?? []).find(c => Number(c.litri) === litri);
+                numeri[litri] = Number(c?.numero) || 0;
+                prezzi[litri] = c?.prezzo ?? null;
+            }
+            const conConfezioni = Object.values(numeri).some(n => n > 0);
+            // IVA: quella del movimento, altrimenti quella dell'ultimo acquisto dello stesso prodotto.
+            const precedente = movimentiDi(this.prodotto).find(x => x.tipo === 'acquisto' && x.dettagli?.iva_percentuale != null);
+            const iva = m.id ? (m.dettagli?.iva_percentuale ?? null) : (precedente?.dettagli.iva_percentuale ?? null);
+            return {
+                iva, precarico: m.dettagli?.precarico ?? null,
+                data: m.data ?? f.oggiISO(), quantita: m.quantita ?? null, fornitore: m.fornitore ?? (this.prodotto.fornitore || ''),
+                descrizione_prodotto: m.descrizione_prodotto ?? '', note: m.note ?? '', numeri, prezzi,
+                prezzo: !conConfezioni && m.costo && m.quantita
+                    ? (m.dettagli?.prezzo_unitario ?? m.costo / m.quantita / (1 + (Number(iva) || 0) / 100)) : null
+            };
+        },
         nomeMovimento, nomeConfezione,
         maiuscola: t => t.charAt(0).toUpperCase() + t.slice(1),
         async salvaMovimento() {
@@ -714,7 +734,7 @@ export const ProdottoFoglio = {
         </Gruppo>
         <Gruppo titolo="Prodotto" :nota="'Confezioni: formati in cui si compra, separati da virgola (5, 1 = taniche da 5 e da 1 ' + (b.unita || 'unità') + '). Negli acquisti e nei consumi si indica il numero di confezioni. Vuoto se è sfuso.'">
           <CampoScelta v-model="b.stato" etichetta="Stato" :opzioni="stati"/>
-          <CampoTesto v-model="b.unita" etichetta="Unità di misura" segnaposto="kg, l, pz…"/>
+          <CampoScelta v-model="b.unita" etichetta="Unità di misura" :opzioni="unita"/>
           <CampoTesto v-model="b.formati" etichetta="Confezioni da" :segnaposto="'es. 5, 1 (' + (b.unita || 'unità') + ')'"/>
         </Gruppo>
         <Gruppo titolo="Fornitore">
@@ -746,6 +766,12 @@ export const ProdottoFoglio = {
             return opzioni;
         },
         stati() { return [{ valore: '', nome: '–' }, ...STATI_PRODOTTO.map(v => ({ valore: v, nome: v }))]; },
+        /// Unità del menu; un'unità già usata ma non in elenco resta selezionabile.
+        unita() {
+            const elenco = UNITA_MISURA.map(([valore, nome]) => ({ valore, nome }));
+            if (this.b.unita && !elenco.some(u => u.valore === this.b.unita)) elenco.push({ valore: this.b.unita, nome: this.b.unita });
+            return elenco;
+        },
         coloreScelto() { return coloreImpianto(db.operazioni.find(o => o.id === this.b.operazione_id)?.sezione_id); },
         schede() { return this.prodotto ? schedeDi(this.prodotto) : []; }
     },
