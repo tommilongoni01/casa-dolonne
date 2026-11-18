@@ -131,6 +131,8 @@ export const DescrizioneFoglio = {
           <Riga azione icona="piu" titolo="Aggiungi passaggio" @click="passaggi.push('')"/>
         </Gruppo>
         <Gruppo titolo="Note"><CampoTesto v-model="note" multilinea segnaposto="Note sull'impianto, codici, riferimenti…"/></Gruppo>
+        <Gruppo v-if="operazione.tipo !== 'storico'"><Riga distruttiva titolo="Elimina operazione" @click="eliminaOperazione"/></Gruppo>
+        <p v-else class="gruppo-nota">Manutenzioni è l'operazione standard di ogni impianto e non si può eliminare.</p>
       </Foglio>`,
     data() {
         return { titolo: this.operazione.titolo ?? '', icona: this.operazione.icona || '', descrizione: this.operazione.descrizione ?? '',
@@ -140,6 +142,16 @@ export const DescrizioneFoglio = {
     methods: {
         coloreImpianto,
         sposta(i, d) { const [p] = this.passaggi.splice(i, 1); this.passaggi.splice(i + d, 0, p); },
+        async eliminaOperazione() {
+            const n = db.interventi.filter(i => i.operazione_id === this.operazione.id).length;
+            const extra = n ? ` e i suoi ${n} interventi` : '';
+            if (!confirm(`Eliminare l'operazione "${this.operazione.titolo}"${extra}? I prodotti collegati restano nel Magazzino.`)) return;
+            this.$emit('chiudi');
+            indietro();
+            // I prodotti collegati restano nel magazzino, scollegati.
+            for (const p of db.prodotti.filter(p => p.operazione_id === this.operazione.id)) await salva('prodotti', { ...p, operazione_id: null });
+            await elimina('operazioni', this.operazione.id);
+        },
         async salvaDescrizione() {
             await salva('operazioni', {
                 ...this.operazione, titolo: this.titolo.trim(), icona: this.icona === this.iconaTipo ? '' : this.icona,

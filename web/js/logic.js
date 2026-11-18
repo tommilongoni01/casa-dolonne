@@ -12,7 +12,7 @@ export const TIPI_OPERAZIONE = {
     cambioAcqua: { nome: 'Cambio acqua', icona: 'ciclo' },
     pellet: { nome: 'Pellet', icona: 'fiamma' },
     cenere: { nome: 'Svuotamento cenere', icona: 'cestino' },
-    storico: { nome: 'Storico manutenzioni', icona: 'chiave' },
+    storico: { nome: 'Manutenzioni', icona: 'chiave' },
     generica: { nome: 'Operazione', icona: 'lista' }
 };
 

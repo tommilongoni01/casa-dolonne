@@ -52,17 +52,17 @@ export async function inizializzaDati(avanzamento = () => {}) {
     avanzamento('Operazioni…');
     const operazioni = [
         ['Piscina', 'pH', 'ph', {}], ['Piscina', 'Ossigeno', 'ossigeno', { giorni_allarme: 20 }],
-        ['Piscina', 'Cambio acqua', 'cambioAcqua', {}], ['Piscina', 'Storico manutenzioni', 'storico', {}, [['Manutenzione fornitore', 0]]],
+        ['Piscina', 'Cambio acqua', 'cambioAcqua', {}], ['Piscina', 'Manutenzioni', 'storico', {}, [['Manutenzione fornitore', 0]]],
         ['Caldaia', 'Pellet', 'pellet', {}], ['Caldaia', 'Svuotamento cenere', 'cenere', {}],
-        ['Caldaia', 'Storico manutenzioni', 'storico', {}, PRINCIPALE_CLIENTE],
-        ['UTA', 'Storico manutenzioni', 'storico', {}, [['Manutenzione', 12]]],
-        ['VMC', 'Storico manutenzioni', 'storico', {}, [['Manutenzione', 12]]],
-        ['Ascensore', 'Storico manutenzioni', 'storico', {}, [['Manutenzione impianto', 6], ['Verifica periodica', 24]]],
-        ['Impianto fotovoltaico', 'Storico manutenzioni', 'storico', {}, PRINCIPALE_CLIENTE],
-        ['Impianto idraulico', 'Storico manutenzioni', 'storico', {}, PRINCIPALE_CLIENTE],
-        ['Impianto elettrico', 'Storico manutenzioni', 'storico', {}, PRINCIPALE_CLIENTE],
-        ['Antifurto', 'Storico manutenzioni', 'storico', {}, PRINCIPALE_CLIENTE],
-        ['Giardino', 'Storico manutenzioni', 'storico', {}, PRINCIPALE_CLIENTE]
+        ['Caldaia', 'Manutenzioni', 'storico', {}, PRINCIPALE_CLIENTE],
+        ['UTA', 'Manutenzioni', 'storico', {}, [['Manutenzione', 12]]],
+        ['VMC', 'Manutenzioni', 'storico', {}, [['Manutenzione', 12]]],
+        ['Ascensore', 'Manutenzioni', 'storico', {}, [['Manutenzione impianto', 6], ['Verifica periodica', 24]]],
+        ['Impianto fotovoltaico', 'Manutenzioni', 'storico', {}, PRINCIPALE_CLIENTE],
+        ['Impianto idraulico', 'Manutenzioni', 'storico', {}, PRINCIPALE_CLIENTE],
+        ['Impianto elettrico', 'Manutenzioni', 'storico', {}, PRINCIPALE_CLIENTE],
+        ['Antifurto', 'Manutenzioni', 'storico', {}, PRINCIPALE_CLIENTE],
+        ['Giardino', 'Manutenzioni', 'storico', {}, PRINCIPALE_CLIENTE]
     ];
     const ordini = {}, create = {};
     for (const [sezione, titolo, tipo, extra, tipologie] of operazioni) {
