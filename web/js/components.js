@@ -377,7 +377,8 @@ export const Grafico = {
         riferimento: Number,       // linea tratteggiata (es. livello obiettivo)
         formatoY: { type: Function, default: v => String(Math.round(v * 10) / 10).replace('.', ',') },
         gradini: Boolean,
-        valori: Boolean            // scrive il valore misurato accanto a ogni punto
+        valori: Boolean,           // scrive il valore misurato accanto a ogni punto
+        perAnno: Boolean           // asse orizzontale con un'etichetta per anno (un punto per anno)
     },
     template: `
       <div class="grafico">
@@ -436,6 +437,12 @@ export const Grafico = {
         },
         etichetteX() {
             if (!this.tutti.length) return [];
+            if (this.perAnno) {
+                const n = this.serie[0]?.punti.length ?? 0;
+                return [...this.serie[0].punti].sort((a, b) => a.x - b.x).map((p, i) => ({
+                    x: this.x(p.x), testo: String(new Date(p.x).getFullYear()), ancora: i === 0 ? 'start' : i === n - 1 ? 'end' : 'middle'
+                }));
+            }
             const span = this.maxX - this.minX;
             const f = new Intl.DateTimeFormat('it-IT', span < 2 * 86_400_000 ? { hour: '2-digit', minute: '2-digit' }
                 : span < 120 * 86_400_000 ? { day: 'numeric', month: 'short' } : { month: 'short', year: '2-digit' });

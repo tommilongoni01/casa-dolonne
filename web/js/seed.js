@@ -2,7 +2,7 @@
 // Gli stessi dati dell'app iOS. Si caricano una sola volta, da un account editor.
 import { backend } from './backend.js';
 import { db, salva, salvaMolti, caricaTutto } from './store.js';
-import { DESCRIZIONI } from './descrizioni.js';
+import { DESCRIZIONI, GUIDE_EXTRA } from './descrizioni.js';
 
 const SEZIONI = [
     ['Impianto idraulico', 'goccia'], ['Impianto elettrico', 'fulmine'], ['Caldaia', 'fiamma'],
@@ -104,6 +104,12 @@ export async function inizializzaDati(avanzamento = () => {}) {
             }
             await salva('guide', { sezione_id: sezioneId, titolo: guida.titolo, blocchi, aggiornata: new Date().toISOString() });
         }
+    }
+
+    // Guide scritte apposta (es. carico del pellet), collegate alla loro operazione.
+    for (const g of GUIDE_EXTRA) {
+        const guida = await salva('guide', { sezione_id: id(g.sezione), titolo: g.titolo, blocchi: [{ tipo: 'testo', html: g.html }], aggiornata: new Date().toISOString() });
+        if (create[g.operazione]) await salva('operazioni', { ...create[g.operazione], guida_id: guida.id });
     }
 
     avanzamento('Carichi pellet…');

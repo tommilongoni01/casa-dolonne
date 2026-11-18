@@ -50,6 +50,16 @@ const ORDINE_STATI = { scaduta: 0, inScadenza: 1, ok: 2 };
 // A parità di data (dal più recente): consumo, acquisto, rettifica. In ordine cronologico quindi
 // prima la rettifica (lettura della giacenza), poi l'acquisto, poi il consumo.
 const ORDINE_MOVIMENTI = { consumo: 0, acquisto: 1, rettifica: 2 };
+/// Letture del deposito pellet (kg sul pannello della caldaia), dalla più recente.
+export const lettureDeposito = prodotto => db.letture_deposito.filter(l => l.prodotto_id === prodotto.id)
+    .sort((a, b) => b.momento.localeCompare(a.momento));
+
+/// Piani dell'impianto di riscaldamento e stati possibili, per le letture del deposito.
+export const PIANI = ['Spa', 'P-1', 'P0', 'P1'];
+export const STATI_PIANO = [['off', 'Off'], ['standby', 'Stand-by'], ['on', 'On']];
+
+const isoLocale = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
 export function movimentiDi(prodotto) {
     return db.movimenti.filter(m => m.prodotto_id === prodotto.id)
         .sort((a, b) => (b.data || '').localeCompare(a.data || '') || ORDINE_MOVIMENTI[a.tipo] - ORDINE_MOVIMENTI[b.tipo]);
@@ -116,6 +126,13 @@ export function analisiScorta(prodotto) {
     const primaLettura = andamento.findIndex(p => p.lettura);
     const senzaConsumi = !ordinati.some(m => m.tipo === 'consumo');
     if (senzaConsumi && primaLettura > 0) andamento.splice(0, primaLettura);
+    // Pellet: la giacenza vera è l'ultima lettura del deposito (kg sul pannello) più i carichi dei giorni successivi.
+    const lettura = prodotto.categoria === 'pellet' ? lettureDeposito(prodotto)[0] : null;
+    if (lettura) {
+        const giornoLettura = isoLocale(new Date(lettura.momento));
+        const dopo = ordinati.filter(m => m.tipo === 'acquisto' && m.data > giornoLettura).reduce((t, m) => t + (Number(m.quantita) || 0), 0);
+        giacenza = Number(lettura.kg) / 100 + dopo;
+    }
     let consumoGiornaliero = null;
     const fisso = Number(prodotto.consumo_mensile) || 0;
     if (fisso > 0) consumoGiornaliero = fisso / 30.4;
@@ -144,6 +161,34 @@ export const UNITA_MISURA = [
     ['kg', 'Chilogrammi (kg)'], ['g', 'Grammi (g)'], ['q', 'Quintali (q)'], ['t', 'Tonnellate (t)'],
     ['l', 'Litri (l)'], ['ml', 'Millilitri (ml)'], ['m³', 'Metri cubi (m³)'], ['pz', 'Pezzi (pz)'], ['sacchi', 'Sacchi']
 ];
+
+/// "Chilogrammi (kg)" → per il menu delle unità.
+export const nomeUnita = u => UNITA_MISURA.find(([v]) => v === u)?.[1] ?? u;
+
+/// Fornitori di un prodotto: [{ nome, link }] (anche dai vecchi campi fornitore/fornitore_link).
+export function fornitoriDi(p) {
+    const elenco = (p?.fornitori ?? []).filter(x => x?.nome?.trim());
+    if (!elenco.length && p?.fornitore?.trim()) return [{ nome: p.fornitore.trim(), link: p.fornitore_link ?? '' }];
+    return elenco;
+}
+
+/// Calcolo di un acquisto come nel foglio "costo prodotto": importo, sconto %, trasporto, IVA %.
+export function calcoliAcquisto({ quantita, prezzo, sconto, trasporto, iva }) {
+    const importo = (Number(quantita) || 0) * (Number(prezzo) || 0);
+    const scontato = importo * (1 - (Number(sconto) || 0) / 100);
+    const imponibile = scontato + (Number(trasporto) || 0);
+    const imposta = imponibile * (Number(iva) || 0) / 100;
+    return { importo, scontato, imponibile, imposta, totale: imponibile + imposta };
+}
+
+/// Prezzo del prodotto per unità di magazzino, con IVA e sconto ma senza trasporto (per il grafico dei prezzi).
+export function prezzoProdotto(m) {
+    const d = m.dettagli ?? {}, q = Number(m.quantita) || 0;
+    if (!q) return null;
+    if (d.prezzo_unitario == null) return (Number(m.costo) || 0) / q;
+    const formato = Number(d.formato) || 1;
+    return d.prezzo_unitario / formato * (1 - (Number(d.sconto) || 0) / 100) * (1 + (Number(d.iva_percentuale) || 0) / 100);
+}
 
 export const STATI_PRODOTTO = ['Liquido', 'Polvere', 'Granulare', 'Pastiglie', 'Solido', 'Gas'];
 
@@ -203,6 +248,99 @@ export function ultimoRiempimento(operazione) {
     return db.movimenti.filter(m => ids.includes(m.prodotto_id) && m.tipo === 'consumo')
         .map(m => m.data).sort().at(-1) ?? null;
 }
+
+// ---------------------------------------------------------------------
+// Contratti
+// ---------------------------------------------------------------------
+/// Avviso di scadenza attivo (preavviso_giorni = -1 vuol dire "nessun avviso").
+export const conAvviso = c => Number(c.preavviso_giorni ?? 30) >= 0;
+
+/// Nome del fornitore del contratto (campo libero, oppure il contatto collegato nei contratti vecchi).
+export function fornitoreContratto(c) {
+    if (c.fornitore?.trim()) return c.fornitore.trim();
+    const k = db.contatti.find(x => x.id === c.fornitore_id);
+    return k ? nomeContatto(k) : '';
+}
+
+/// Durata in mesi: dai campi durata, altrimenti da inizio e fine.
+export function mesiContratto(c) {
+    if (Number(c.durata_valore) > 0) return Number(c.durata_valore) * (c.durata_unita === 'mesi' ? 1 : 12);
+    if (c.inizio && c.scadenza) return Math.max(1, Math.round(giorniTra(c.inizio, c.scadenza) / 30.44));
+    return 12;
+}
+
+/// Costo complessivo del contratto con IVA (i vecchi contratti avevano solo il costo annuo).
+export function costoContratto(c) {
+    if (c.costo != null) return Number(c.costo) * (1 + (Number(c.iva_percentuale) || 0) / 100);
+    return (Number(c.costo_annuo) || 0) * mesiContratto(c) / 12;
+}
+
+export const costoAnnuoContratto = c => costoContratto(c) / mesiContratto(c) * 12;
+
+/// Fine del contratto: quella indicata, altrimenti inizio + durata.
+export function fineContratto(c) {
+    if (c.scadenza) return giorno(c.scadenza);
+    return c.inizio ? aggiungiMesi(c.inizio, mesiContratto(c)) : null;
+}
+
+/// Quota del costo del contratto che cade in un anno (i contratti pluriennali si spalmano mese per mese).
+export function costoContrattoNellAnno(c, anno) {
+    if (!c.inizio) return 0;
+    const inizio = giorno(c.inizio), mesi = mesiContratto(c), mensile = costoContratto(c) / mesi;
+    let quota = 0;
+    for (let i = 0; i < mesi; i++) {
+        const m = new Date(inizio.getFullYear(), inizio.getMonth() + i, 1);
+        if (m.getFullYear() === anno) quota += mensile;
+    }
+    return quota;
+}
+
+// ---------------------------------------------------------------------
+// Costi
+// ---------------------------------------------------------------------
+/// Voci di costo di un anno: contratti (quota dell'anno), interventi e acquisti di prodotti, con il loro impianto.
+export function vociCosto(anno) {
+    const voci = [];
+    for (const c of db.contratti) {
+        const importo = costoContrattoNellAnno(c, anno);
+        if (importo > 0) voci.push({ id: 'c' + c.id, tipo: 'contratti', sezione_id: c.sezione_id ?? null, titolo: c.titolo,
+            dettaglio: [fornitoreContratto(c), mesiContratto(c) > 12 ? 'quota annuale' : ''].filter(Boolean).join(' · '),
+            data: c.inizio, importo, pagina: { nome: 'contratto', id: c.id } });
+    }
+    for (const i of db.interventi) {
+        if (!i.data || Number(i.data.slice(0, 4)) !== anno || !(Number(i.costo) > 0)) continue;
+        const o = db.operazioni.find(o => o.id === i.operazione_id);
+        const t = db.tipologie.find(t => t.id === i.tipologia_id);
+        voci.push({ id: 'i' + i.id, tipo: 'interventi', sezione_id: o?.sezione_id ?? null, titolo: t?.nome ?? 'Manutenzione',
+            dettaglio: [i.esecutore, i.note].filter(Boolean).join(' · '), data: i.data, importo: Number(i.costo),
+            pagina: o ? { nome: 'operazione', id: o.id } : null });
+    }
+    for (const m of db.movimenti) {
+        if (m.tipo !== 'acquisto' || !m.data || Number(m.data.slice(0, 4)) !== anno || !(Number(m.costo) > 0)) continue;
+        const p = db.prodotti.find(p => p.id === m.prodotto_id);
+        const o = p ? operazioneDiProdotto(p) : null;
+        voci.push({ id: 'm' + m.id, tipo: 'prodotti', sezione_id: o?.sezione_id ?? null, titolo: p?.nome ?? 'Prodotto',
+            dettaglio: [quantita(m.quantita, p?.unita ?? ''), m.fornitore].filter(Boolean).join(' · '), data: m.data,
+            importo: Number(m.costo), pagina: o ? { nome: 'operazione', id: o.id } : null });
+    }
+    return voci.sort((a, b) => (b.data ?? '').localeCompare(a.data ?? ''));
+}
+
+/// Anni con almeno un costo, dal più recente (sempre compreso l'anno in corso).
+export function anniCosti() {
+    const anni = new Set([new Date().getFullYear()]);
+    for (const m of db.movimenti) if (m.tipo === 'acquisto' && m.data && Number(m.costo) > 0) anni.add(Number(m.data.slice(0, 4)));
+    for (const i of db.interventi) if (i.data && Number(i.costo) > 0) anni.add(Number(i.data.slice(0, 4)));
+    for (const c of db.contratti) {
+        if (!c.inizio) continue;
+        const inizio = giorno(c.inizio), mesi = mesiContratto(c);
+        for (let k = 0; k < mesi; k += 12) anni.add(new Date(inizio.getFullYear(), inizio.getMonth() + k, 1).getFullYear());
+        anni.add(new Date(inizio.getFullYear(), inizio.getMonth() + mesi - 1, 1).getFullYear());
+    }
+    return [...anni].sort((a, b) => b - a);
+}
+
+export const totale = voci => voci.reduce((t, v) => t + v.importo, 0);
 
 /// Data dell'ultima volta che l'operazione è stata fatta (per l'avviso periodico).
 export function ultimaEsecuzione(operazione) {
@@ -285,7 +423,7 @@ export function avvisi({ sezione = null } = {}) {
         }
     }
     for (const c of contratti) {
-        if (!c.scadenza) continue;
+        if (!c.scadenza || !conAvviso(c)) continue;
         const s = statoScadenza(c.scadenza, c.preavviso_giorni);
         if (s === 'ok') continue;
         elenco.push({
@@ -323,7 +461,7 @@ export function prossime(giorniAvanti = 30) {
         }
     }
     for (const c of db.contratti) {
-        if (!c.scadenza) continue;
+        if (!c.scadenza || !conAvviso(c)) continue;
         const d = giorno(c.scadenza);
         if (statoScadenza(d, c.preavviso_giorni) !== 'ok' || d > limite) continue;
         elenco.push({ id: `contratto-${c.id}`, gravita: 'info', icona: 'documento', titolo: c.titolo,
@@ -347,7 +485,7 @@ export function calendarioScadenze() {
         }
     }
     for (const c of db.contratti) {
-        if (!c.scadenza) continue;
+        if (!c.scadenza || !conAvviso(c)) continue;
         const d = giorno(c.scadenza);
         elenco.push({ id: `contratto-${c.id}`, gravita: gravita(statoScadenza(d, c.preavviso_giorni)), icona: 'documento',
                       titolo: c.titolo, dettaglio: 'Scadenza contratto', data: d, sezione_id: c.sezione_id,
@@ -398,8 +536,8 @@ export function calcoliCarico(m) {
     const q = Number(m.quantita) || 0;
     const aliquota = Number(m.dettagli?.iva_percentuale) || 0;
     const prezzo = m.dettagli?.prezzo_unitario ?? (q ? (Number(m.costo) || 0) / q / (1 + aliquota / 100) : 0);
-    const imponibile = q * (Number(prezzo) || 0);
-    const iva = imponibile * aliquota / 100;
+    const c = calcoliAcquisto({ quantita: q / (Number(m.dettagli?.formato) || 1), prezzo, sconto: m.dettagli?.sconto, trasporto: m.dettagli?.trasporto, iva: aliquota });
+    const imponibile = c.imponibile, iva = c.imposta;
     const prima = giacenzaPrima(m);
     return { prezzo: Number(prezzo) || 0, aliquota, imponibile, iva, totale: imponibile + iva, precarico: prima, postcarico: prima === null ? null : prima + q };
 }

@@ -25,6 +25,7 @@ window.addEventListener('unhandledrejection', e => mostraErrore(e.reason?.messag
 const RADICI = {
     casa: casa.CasaHome,
     magazzino: manutenzione.Magazzino,
+    contratti: manutenzione.Contratti,
     contatti: contatti.ContattiLista,
     impostazioni: impostazioni.Impostazioni
 };
@@ -43,12 +44,14 @@ const PAGINE = {
     guida: manuale.GuidaPagina,
     contatto: contatti.ContattoPagina,
     famiglia: impostazioni.Famiglia,
-    codiciQR: manutenzione.CodiciQR
+    codiciQR: manutenzione.CodiciQR,
+    costi: casa.CostiPagina
 };
 
 const ETICHETTE = {
     casa: { nome: 'Casa', icona: 'casa' },
     magazzino: { nome: 'Magazzino', icona: 'scatola' },
+    contratti: { nome: 'Contratti', icona: 'documento' },
     contatti: { nome: 'Contatti', icona: 'persone' },
     impostazioni: { nome: 'Impostazioni', icona: 'ingranaggio' }
 };
@@ -109,7 +112,7 @@ const App = {
     setup() {
         const cima = computed(() => pila().at(-1));
         const segnaposti = {
-            casa: 'Scegli un impianto o un avviso', magazzino: 'Scegli un prodotto',
+            casa: 'Scegli un impianto o un avviso', magazzino: 'Scegli un prodotto', contratti: 'Scegli un contratto',
             contatti: 'Nessun contatto selezionato', impostazioni: ''
         };
         return {

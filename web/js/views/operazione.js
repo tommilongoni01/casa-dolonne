@@ -1,12 +1,12 @@
 // Scheda di un'operazione (pH, ossigeno, cambio acqua, pellet, cenere, storico manutenzioni, generica).
-import { db, salva, elimina, caricaFile, puoModificare } from '../store.js';
+import { db, stato, salva, elimina, caricaFile, puoModificare } from '../store.js';
 import { nav, apri, apriDaElenco, indietro } from '../nav.js';
 import * as f from '../format.js';
 import {
     TIPI_OPERAZIONE, allarmi, tipologieDi, interventiDi, ultimoInterventoDi, prossimaScadenza,
     statoScadenza, analisiProcesso, calcoliCarico, carichiOrdinati, svuotamentiOrdinati, consumoCenere,
     prodottoDi, prodottiOperazione, operazioneDiProdotto, categoriaPerOperazione, sezioneDi, nomeMovimento, nomeEsecuzione,
-    coloreImpianto
+    coloreImpianto, fornitoreContratto, lettureDeposito, PIANI, STATI_PIANO, analisiScorta, sottoScorta
 } from '../logic.js';
 
 // ---------------------------------------------------------------------
@@ -49,7 +49,8 @@ export const OperazionePagina = {
             <div v-if="prodottiScorta.length > 1" class="segmenti">
               <button v-for="p in prodottiScorta" :key="p.id" :class="{ attivo: p.id === prodottoScelto.id }" @click="scelto = p.id">{{ p.nome }}</button>
             </div>
-            <SezioniScorta :prodotto="prodottoScelto" :key="prodottoScelto.id" con-grafici/>
+            <DepositoPellet v-if="o.tipo === 'pellet' && prodottoScelto.categoria === 'pellet'" :prodotto="prodottoScelto" :key="'d' + prodottoScelto.id"/>
+            <SezioniScorta v-else :prodotto="prodottoScelto" :key="prodottoScelto.id" con-grafici/>
           </template>
 
           <!-- Altre operazioni specifiche (misure pH, cambio acqua, carichi pellet, cenere) -->
@@ -566,6 +567,89 @@ const Pellet = {
     setup() { return { f }; }
 };
 
+/// Deposito del pellet: giacenza, acquisti e letture del pannello (kg) con lo stato dei piani.
+const DepositoPellet = {
+    props: { prodotto: Object },
+    template: `
+      <Gruppo titolo="Scorta">
+        <div class="valore-grande">
+          <div class="etichetta">Pellet nel deposito</div>
+          <div class="numero" :class="{ rosso: basso }">{{ f.quantita(giacenza, prodotto.unita) }}</div>
+          <div v-if="basso" class="arancione-t" style="font-size:14px">Sotto la scorta minima ({{ f.quantita(prodotto.scorta_minima, prodotto.unita) }})</div>
+        </div>
+        <Riga v-if="letture[0]" titolo="Ultima lettura" :valore="f.dataOra(letture[0].momento) + ' · ' + f.quantita(letture[0].kg, 'kg')"/>
+        <Riga v-else titolo="Nessuna lettura del deposito" class="secondario"/>
+      </Gruppo>
+      <Azioni v-if="puoModificare()" :voci="[{ id: 'acquisto', nome: 'Acquisto', icona: 'carrello' }, { id: 'lettura', nome: 'Nuova lettura', icona: 'righello' }]"
+              @scegli="t => t === 'acquisto' ? (acquisto = true) : (lettura = {})"/>
+      <Gruppo v-if="letture.length > 1" titolo="Andamento del deposito"
+              :nota="Number(prodotto.scorta_minima) > 0 ? 'La linea tratteggiata è la scorta minima.' : ''" nota-sempre>
+        <Grafico :serie="[{ nome: 'Deposito', colore: 'var(--arancione)', punti: punti }]" :formato-y="v => f.numero(v) + ' kg'"
+                 :riferimento="Number(prodotto.scorta_minima) > 0 ? prodotto.scorta_minima * 100 : null" valori/>
+      </Gruppo>
+      <Gruppo v-if="letture.length" titolo="Letture del deposito">
+        <Riga v-for="(l, i) in (tutti ? letture : letture.slice(0, 1))" :key="l.id" :titolo="f.dataOra(l.momento)" :sottotitolo="descriviPiani(l)"
+              @click="puoModificare() && (lettura = { voce: l })">
+          <template #fine>
+            <span class="riga-valore">{{ f.quantita(l.kg, 'kg') }}<br v-if="delta(i) !== null">
+              <small v-if="delta(i) !== null" class="secondario">{{ delta(i) >= 0 ? '−' : '+' }}{{ f.quantita(Math.abs(delta(i)), 'kg') }}</small></span>
+          </template>
+        </Riga>
+        <RigaEspandi :totale="letture.length" v-model:aperto="tutti"/>
+      </Gruppo>
+      <MovimentoFoglio v-if="acquisto" :prodotto-iniziale="prodotto" tipo="acquisto" @chiudi="acquisto = false"/>
+      <Foglio v-if="lettura" :titolo="lettura.voce ? 'Modifica lettura' : 'Nuova lettura'" :conferma-disabilitata="b.kg === null"
+              @annulla="lettura = null" @conferma="salvaLettura">
+        <Gruppo nota="I kg indicati dal pannello della caldaia (Deposito).">
+          <CampoData v-model="b.momento" etichetta="Data e ora" con-ora/>
+          <CampoNumero v-model="b.kg" etichetta="Pellet nel deposito" unita="kg"/>
+        </Gruppo>
+        <Gruppo titolo="Impianto">
+          <CampoScelta v-for="p in PIANI" :key="p" v-model="b.piani[p]" :etichetta="p" :opzioni="statiPiano"/>
+        </Gruppo>
+        <Gruppo titolo="Note"><CampoTesto v-model="b.note" multilinea segnaposto="Note"/></Gruppo>
+        <Gruppo v-if="lettura.voce"><Riga distruttiva titolo="Elimina lettura" @click="eliminaLettura"/></Gruppo>
+      </Foglio>`,
+    data() { return { acquisto: false, lettura: null, tutti: false, b: {}, PIANI }; },
+    watch: {
+        lettura(v) {
+            if (!v) return;
+            const l = v.voce ?? {}, ultima = this.letture[0];
+            // Nuova lettura: data e ora di adesso, stato dei piani come nell'ultima lettura.
+            const piani = Object.fromEntries(PIANI.map(p => [p, (l.piani ?? ultima?.piani ?? {})[p] ?? 'off']));
+            this.b = { momento: l.momento ?? new Date().toISOString(), kg: l.kg != null ? Number(l.kg) : null, piani, note: l.note ?? '' };
+        }
+    },
+    computed: {
+        letture() { return lettureDeposito(this.prodotto); },
+        giacenza() { return analisiScorta(this.prodotto).giacenza; },
+        basso() { return sottoScorta(this.prodotto); },
+        punti() { return [...this.letture].reverse().map(l => ({ x: new Date(l.momento), y: Number(l.kg) })); },
+        statiPiano() { return STATI_PIANO.map(([valore, nome]) => ({ valore, nome })); }
+    },
+    methods: {
+        puoModificare,
+        /// Consumo rispetto alla lettura precedente (positivo = pellet bruciato).
+        delta(i) { const prima = this.letture[i + 1]; return prima ? Number(prima.kg) - Number(this.letture[i].kg) : null; },
+        descriviPiani(l) {
+            const nomi = Object.fromEntries(STATI_PIANO);
+            const accesi = PIANI.filter(p => (l.piani ?? {})[p] && l.piani[p] !== 'off').map(p => `${p} ${nomi[l.piani[p]].toLowerCase()}`);
+            return [accesi.join(' · ') || (Object.keys(l.piani ?? {}).length ? 'Tutto spento' : ''), l.note].filter(Boolean).join(' · ');
+        },
+        async salvaLettura() {
+            await salva('letture_deposito', { ...(this.lettura.voce ?? {}), id: this.lettura.voce?.id, prodotto_id: this.prodotto.id,
+                                             momento: this.b.momento, kg: this.b.kg, piani: this.b.piani, note: this.b.note.trim() });
+            this.lettura = null;
+        },
+        async eliminaLettura() {
+            if (!confirm('Eliminare la lettura?')) return;
+            await elimina('letture_deposito', this.lettura.voce.id);
+            this.lettura = null;
+        }
+    },
+    setup() { return { f }; }
+};
+
 // ---------------------------------------------------------------------
 // Svuotamento cenere
 // ---------------------------------------------------------------------
@@ -625,9 +709,14 @@ const Storico = {
         <Riga v-if="puoModificare() && tipologie.length" azione icona="piuCerchio" titolo="Registra manutenzione" @click="foglio = {}"/>
       </Gruppo>
       <Gruppo v-if="interventi.length" titolo="Interventi">
-        <Riga v-for="i in (tutti ? interventi : interventi.slice(0, 1))" :key="i.id" :titolo="f.data(i.data)" :sottotitolo="i.note"
+        <Riga v-for="i in (tutti ? interventi : interventi.slice(0, 1))" :key="i.id" :titolo="f.data(i.data)" :sottotitolo="dettaglioIntervento(i)"
               @click="puoModificare() && (foglio = { voce: i })">
-          <template #fine><span v-if="tipologie.length > 1" class="badge ok" style="color:var(--accento);background:var(--riempimento)">{{ nomeTipologia(i) }}</span></template>
+          <template #fine>
+            <span class="riga-valore">
+              <span v-if="tipologie.length > 1" class="badge ok" style="color:var(--accento);background:var(--riempimento)">{{ nomeTipologia(i) }}</span>
+              <br v-if="Number(i.costo) && tipologie.length > 1"><small v-if="Number(i.costo)">{{ f.euro(i.costo) }}</small>
+            </span>
+          </template>
         </Riga>
         <RigaEspandi :totale="interventi.length" v-model:aperto="tutti"/>
       </Gruppo>
@@ -655,7 +744,12 @@ const Storico = {
             const ultimo = ultimoInterventoDi(t);
             return `${periodicita} · ${ultimo ? 'ultima il ' + f.dataBreve(ultimo.data) : 'nessun intervento registrato'}`;
         },
-        nomeTipologia(i) { return db.tipologie.find(t => t.id === i.tipologia_id)?.nome ?? ''; }
+        nomeTipologia(i) { return db.tipologie.find(t => t.id === i.tipologia_id)?.nome ?? ''; },
+        /// "Termoidraulica Rossi · da contratto · cambio filtri"
+        dettaglioIntervento(i) {
+            const chi = i.eseguito_da === 'proprio' ? `In proprio${i.esecutore ? ' (' + i.esecutore + ')' : ''}` : i.esecutore;
+            return [chi, i.contratto_id ? 'da contratto' : '', i.note].filter(Boolean).join(' · ');
+        }
     },
     setup() { return { f }; }
 };
@@ -668,23 +762,61 @@ const InterventoFoglio = {
         <Gruppo>
           <CampoData v-model="b.data" etichetta="Data"/>
           <CampoScelta v-if="tipologie.length > 1" v-model="b.tipologia_id" etichetta="Tipo" :opzioni="tipologie.map(t => ({ valore: t.id, nome: t.nome }))"/>
+          <CampoScelta v-model="b.contratto_id" etichetta="Da contratto" :opzioni="opzioniContratti"/>
         </Gruppo>
-        <Gruppo titolo="Note"><CampoTesto v-model="b.note" multilinea segnaposto="Cosa è stato fatto, chi l'ha fatto…"/></Gruppo>
+        <Gruppo titolo="Eseguito da">
+          <CampoScelta v-model="b.eseguito_da" etichetta="Eseguito da" :opzioni="[{ valore: 'ditta', nome: 'Ditta / fornitore' }, { valore: 'proprio', nome: 'In proprio' }]"/>
+          <CampoTesto v-if="b.eseguito_da === 'ditta'" v-model="b.esecutore" etichetta="Fornitore" segnaposto="Nome della ditta"/>
+          <CampoScelta v-else v-model="b.esecutore" etichetta="Familiare" :opzioni="familiari"/>
+        </Gruppo>
+        <Gruppo titolo="Descrizione intervento"><CampoTesto v-model="b.note" multilinea segnaposto="Cosa è stato fatto, pezzi sostituiti…"/></Gruppo>
+        <Gruppo titolo="Costo" :nota="b.contratto_id ? 'Coperto dal contratto: indica solo eventuali costi extra (es. consumabili).' : ''">
+          <CampoNumero v-model="b.costo" etichetta="Costo" unita="€" segnaposto="0"/>
+        </Gruppo>
         <Gruppo v-if="intervento"><Riga distruttiva titolo="Elimina intervento" @click="eliminaIntervento"/></Gruppo>
       </Foglio>`,
     data() {
         const i = this.intervento ?? {};
-        return { b: { data: i.data ?? f.oggiISO(), tipologia_id: i.tipologia_id ?? tipologieDi(this.operazione)[0]?.id ?? null, note: i.note ?? '' } };
+        const contratti = db.contratti.filter(c => c.sezione_id === this.operazione.sezione_id);
+        return { b: {
+            data: i.data ?? f.oggiISO(), tipologia_id: i.tipologia_id ?? tipologieDi(this.operazione)[0]?.id ?? null, note: i.note ?? '',
+            contratto_id: i.id ? (i.contratto_id ?? null) : (contratti.length === 1 ? contratti[0].id : null),
+            eseguito_da: i.eseguito_da ?? 'ditta', esecutore: i.esecutore ?? (contratti.length === 1 && !i.id ? fornitoreContratto(contratti[0]) : ''),
+            costo: i.costo ? Number(i.costo) : null
+        } };
     },
-    computed: { tipologie() { return tipologieDi(this.operazione); } },
+    watch: {
+        // Scegliendo il contratto, il fornitore è quello del contratto.
+        'b.contratto_id'(id) {
+            const c = db.contratti.find(c => c.id === id);
+            if (c && this.b.eseguito_da === 'ditta' && !this.b.esecutore) this.b.esecutore = fornitoreContratto(c);
+        },
+        'b.eseguito_da'(v) { this.b.esecutore = v === 'proprio' ? (stato.membro?.nome || '') : ''; }
+    },
+    computed: {
+        tipologie() { return tipologieDi(this.operazione); },
+        opzioniContratti() {
+            return [{ valore: null, nome: 'No' }, ...db.contratti.filter(c => c.sezione_id === this.operazione.sezione_id)
+                .map(c => ({ valore: c.id, nome: c.titolo }))];
+        },
+        familiari() {
+            const nomi = db.membri.map(m => m.nome || m.email).filter(Boolean);
+            if (this.b.esecutore && !nomi.includes(this.b.esecutore)) nomi.push(this.b.esecutore);
+            return [{ valore: '', nome: 'Scegli' }, ...nomi.map(n => ({ valore: n, nome: n }))];
+        }
+    },
     methods: {
-        async salvaIntervento() { await salva('interventi', { ...this.b, id: this.intervento?.id, operazione_id: this.operazione.id }); this.$emit('chiudi'); },
+        async salvaIntervento() {
+            await salva('interventi', { ...(this.intervento ?? {}), ...this.b, id: this.intervento?.id, operazione_id: this.operazione.id,
+                                       esecutore: (this.b.esecutore ?? '').trim(), costo: this.b.costo ?? 0 });
+            this.$emit('chiudi');
+        },
         async eliminaIntervento() { if (confirm("Eliminare l'intervento?")) { await elimina('interventi', this.intervento.id); this.$emit('chiudi'); } }
     }
 };
 
 // Le sezioni vengono registrate come componenti locali della pagina operazione.
-OperazionePagina.components = { MisurePH, CambioAcqua, Pellet, Cenere, Storico, NotificheOperazione, DescrizioneFoglio };
+OperazionePagina.components = { MisurePH, CambioAcqua, Pellet, Cenere, Storico, NotificheOperazione, DescrizioneFoglio, DepositoPellet };
 CambioAcqua.components = { AvvioFoglio };
 MisurePH.components = { MisuraFoglio };
 Storico.components = { InterventoFoglio };

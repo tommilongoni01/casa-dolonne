@@ -5,7 +5,7 @@ import { CONFIG } from './config.js';
 export const TABELLE = [
     'membri', 'sezioni', 'contatti', 'guide', 'documenti', 'contratti', 'prodotti', 'movimenti',
     'operazioni', 'tipologie', 'interventi', 'misure_ph', 'processi_acqua', 'carichi_pellet',
-    'svuotamenti_cenere'
+    'svuotamenti_cenere', 'letture_deposito'
 ];
 
 const BUCKET = 'file';
@@ -143,7 +143,7 @@ function creaProva() {
             // Cancellazioni a cascata principali, come nel database vero.
             const figli = {
                 sezioni: [['guide', 'sezione_id'], ['documenti', 'sezione_id'], ['operazioni', 'sezione_id']],
-                prodotti: [['movimenti', 'prodotto_id']],
+                prodotti: [['movimenti', 'prodotto_id'], ['letture_deposito', 'prodotto_id']],
                 operazioni: [['tipologie', 'operazione_id'], ['interventi', 'operazione_id']]
             }[tabella] ?? [];
             for (const [figlia, campo] of figli) dati[figlia] = righe(figlia).filter(r => r[campo] !== id);

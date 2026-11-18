@@ -1,6 +1,6 @@
 // Servizio offline: i file dell'app vengono tenuti in cache, così si apre anche senza rete
 // (i dati condivisi richiedono comunque la connessione). Cambia VERSIONE a ogni aggiornamento.
-const VERSIONE = 'casa-dolonne-26';
+const VERSIONE = 'casa-dolonne-27';
 
 self.addEventListener('install', evento => {
     self.skipWaiting();

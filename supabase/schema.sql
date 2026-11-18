@@ -211,6 +211,29 @@ create table if not exists svuotamenti_cenere (
     note text not null default ''
 );
 
+create table if not exists letture_deposito (
+    id uuid primary key default gen_random_uuid(),
+    prodotto_id uuid references prodotti(id) on delete cascade,
+    momento timestamptz not null default now(),
+    kg numeric not null default 0,
+    -- Stato dei piani: { "Spa": "on", "P-1": "standby", "P0": "off", "P1": "on" }
+    piani jsonb not null default '{}',
+    note text not null default ''
+);
+
+-- Campi aggiunti nel 2026 (vedi aggiornamento-10).
+alter table prodotti add column if not exists fornitori jsonb not null default '[]';
+alter table contratti add column if not exists fornitore text not null default '';
+alter table contratti add column if not exists durata_valore int;
+alter table contratti add column if not exists durata_unita text not null default 'anni';
+alter table contratti add column if not exists costo numeric;
+alter table contratti add column if not exists iva_percentuale numeric;
+alter table contratti add column if not exists obbligo_legge boolean not null default false;
+alter table interventi add column if not exists contratto_id uuid references contratti(id) on delete set null;
+alter table interventi add column if not exists eseguito_da text not null default 'ditta';
+alter table interventi add column if not exists esecutore text not null default '';
+alter table interventi add column if not exists costo numeric not null default 0;
+
 -- ---------------------------------------------------------------------
 -- Regole di accesso: i familiari leggono, gli editor modificano.
 -- ---------------------------------------------------------------------
@@ -221,7 +244,7 @@ begin
     foreach tabella in array array[
         'membri', 'sezioni', 'contatti', 'guide', 'documenti', 'contratti', 'prodotti', 'movimenti',
         'operazioni', 'tipologie', 'interventi', 'misure_ph', 'processi_acqua', 'carichi_pellet',
-        'svuotamenti_cenere'
+        'svuotamenti_cenere', 'letture_deposito'
     ] loop
         execute format('alter table %I enable row level security', tabella);
         execute format('drop policy if exists "lettura familiari" on %I', tabella);

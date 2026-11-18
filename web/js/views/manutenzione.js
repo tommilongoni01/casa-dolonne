@@ -7,7 +7,9 @@ import {
     avvisi, prossime, operazioniDi, statoOperazione, TIPI_OPERAZIONE, analisiScorta, sottoScorta,
     mostraPrevisioni, movimentiDi, nomeMovimento, CATEGORIE, statoScadenza, nomeContatto, sezioneDi,
     ultimoRiempimento, interventiDi, carichiOrdinati, svuotamentiOrdinati, formatiDi, nomeConfezione, descriviConfezioni,
-    prodottiOperazione, operazioneDiProdotto, categoriaPerOperazione, STATI_PRODOTTO, UNITA_MISURA, allarmi, coloreImpianto
+    prodottiOperazione, operazioneDiProdotto, categoriaPerOperazione, STATI_PRODOTTO, UNITA_MISURA, allarmi, coloreImpianto,
+    calcoliAcquisto, fornitoriDi, nomeUnita, prezzoProdotto,
+    conAvviso, costoContratto, costoAnnuoContratto, fineContratto, mesiContratto, fornitoreContratto
 } from '../logic.js';
 import { COLORE_SEZIONE } from '../icone.js';
 import { backend } from '../backend.js';
@@ -216,37 +218,53 @@ export const RigaContratto = {
     props: { contratto: Object },
     template: `
       <Riga icona="documento" :titolo="contratto.titolo" :sottotitolo="dettaglio" freccia>
-        <template #fine><BadgeScadenza v-if="contratto.scadenza" :data="contratto.scadenza" :stato="stato"/></template>
+        <template #fine><BadgeScadenza v-if="fine && conAvviso(contratto)" :data="fine" :stato="stato"/></template>
       </Riga>`,
     computed: {
+        fine() { return fineContratto(this.contratto); },
         dettaglio() {
-            const fornitore = db.contatti.find(c => c.id === this.contratto.fornitore_id);
-            return [fornitore && nomeContatto(fornitore), sezioneDi(this.contratto.sezione_id)?.nome].filter(Boolean).join(' · ');
+            const c = this.contratto;
+            return [fornitoreContratto(c), c.obbligo_legge ? 'obbligo di legge' : '', costoContratto(c) ? f.euro(costoAnnuoContratto(c)) + '/anno' : '']
+                .filter(Boolean).join(' · ');
         },
-        stato() { return statoScadenza(this.contratto.scadenza, this.contratto.preavviso_giorni); }
-    }
+        stato() { return statoScadenza(this.fine, this.contratto.preavviso_giorni); }
+    },
+    methods: { conAvviso }
 };
 
+/// Scheda Contratti: tutti i contratti, divisi per impianto.
 export const Contratti = {
     components: { RigaContratto },
     template: `
-      <Pagina titolo="Contratti">
+      <Pagina titolo="Contratti" grande :con-indietro="false">
         <template #azioni>
           <button v-if="puoModificare()" class="pulsante-barra" @click="nuovo = true" aria-label="Nuovo contratto"><Icona nome="piu"/></button>
         </template>
-        <Vuoto v-if="!contratti.length" icona="documento" titolo="Nessun contratto" testo="Aggiungi i contratti di manutenzione degli impianti."/>
-        <Gruppo v-else>
-          <RigaContratto v-for="c in contratti" :key="c.id" :contratto="c" @click="apri({ nome: 'contratto', id: c.id })"/>
-          <Riga titolo="Totale annuo" :valore="f.euro(totale)"/>
-        </Gruppo>
+        <Vuoto v-if="!db.contratti.length" icona="documento" titolo="Nessun contratto" testo="Aggiungi i contratti di manutenzione, assistenza e verifica degli impianti."/>
+        <template v-else>
+          <Gruppo v-for="g in gruppi" :key="g.id" :titolo="g.nome">
+            <RigaContratto v-for="c in g.contratti" :key="c.id" :contratto="c" :selezionata="selezionata(c)" @click="apriDaElenco({ nome: 'contratto', id: c.id })"/>
+          </Gruppo>
+          <Gruppo><Riga titolo="Costo annuo di tutti i contratti" :valore="f.euro(totale)" style="font-weight:600"/></Gruppo>
+        </template>
         <ContrattoFoglio v-if="nuovo" @chiudi="nuovo = false"/>
       </Pagina>`,
     data() { return { nuovo: false }; },
     computed: {
-        contratti() { return db.contratti.slice().sort((a, b) => a.titolo.localeCompare(b.titolo)); },
-        totale() { return this.contratti.reduce((s, c) => s + (Number(c.costo_annuo) || 0), 0); }
+        db() { return db; },
+        gruppi() {
+            const ordinati = db.contratti.slice().sort((a, b) => a.titolo.localeCompare(b.titolo));
+            const gruppi = db.sezioni.slice().sort((a, b) => a.ordine - b.ordine)
+                .map(s => ({ id: s.id, nome: s.nome, contratti: ordinati.filter(c => c.sezione_id === s.id) }));
+            gruppi.push({ id: 'nessuno', nome: 'Senza impianto', contratti: ordinati.filter(c => !sezioneDi(c.sezione_id)) });
+            return gruppi.filter(g => g.contratti.length);
+        },
+        totale() { return db.contratti.reduce((t, c) => t + costoAnnuoContratto(c), 0); }
     },
-    methods: { apri, puoModificare },
+    methods: {
+        apriDaElenco, puoModificare,
+        selezionata(c) { return nav.largo && stessaPagina(pila()[0], { nome: 'contratto', id: c.id }); }
+    },
     setup() { return { f }; }
 };
 
@@ -257,18 +275,26 @@ export const ContrattoPagina = {
         <template #azioni>
           <button v-if="puoModificare()" class="pulsante-barra" @click="modifica = true">Modifica</button>
         </template>
-        <Gruppo>
+        <Gruppo titolo="Contratto">
+          <Riga titolo="Fornitore" :valore="fornitore || '–'"/>
+          <Riga titolo="Impianto" :valore="sezione?.nome || '–'"/>
           <Riga v-if="contratto.numero" titolo="Numero" :valore="contratto.numero"/>
-          <Riga v-if="contratto.inizio" titolo="Inizio" :valore="f.data(contratto.inizio)"/>
-          <Riga v-if="contratto.scadenza" titolo="Scadenza">
-            <template #fine><BadgeScadenza :data="contratto.scadenza" :stato="stato"/></template>
-          </Riga>
-          <Riga titolo="Rinnovo automatico" :valore="contratto.rinnovo_automatico ? 'Sì' : 'No'"/>
-          <Riga v-if="contratto.costo_annuo" titolo="Costo annuo" :valore="f.euro(contratto.costo_annuo)"/>
-          <Riga v-if="sezione" titolo="Sistema" :valore="sezione.nome"/>
+          <Riga titolo="Obbligo di legge" :valore="contratto.obbligo_legge ? 'Sì' : 'No'"/>
         </Gruppo>
-        <Gruppo v-if="fornitore" titolo="Fornitore">
-          <Riga icona="persona" :titolo="nomeContatto(fornitore)" freccia @click="apriContatto"/>
+        <Gruppo titolo="Durata">
+          <Riga titolo="Durata" :valore="durata"/>
+          <Riga v-if="contratto.inizio" titolo="Inizio" :valore="f.data(contratto.inizio)"/>
+          <Riga v-if="fine" titolo="Fine">
+            <template #fine><BadgeScadenza :data="fine" :stato="stato"/></template>
+          </Riga>
+          <Riga titolo="Tacito rinnovo" :valore="contratto.rinnovo_automatico ? 'Sì' : 'No'"/>
+          <Riga titolo="Avviso di scadenza" :valore="conAvviso(contratto) ? contratto.preavviso_giorni + ' giorni prima' : 'No'"/>
+        </Gruppo>
+        <Gruppo titolo="Costi">
+          <Riga v-if="contratto.costo != null" titolo="Costo" :valore="f.euro(contratto.costo)"/>
+          <Riga v-if="contratto.iva_percentuale" titolo="IVA" :valore="f.numero(contratto.iva_percentuale) + '%'"/>
+          <Riga titolo="Costo totale" :valore="f.euro(costoContratto(contratto))" style="font-weight:600"/>
+          <Riga v-if="mesi > 12" titolo="Costo per anno" :valore="f.euro(costoAnnuoContratto(contratto))"/>
         </Gruppo>
         <Gruppo v-if="contratto.allegato" titolo="Documento">
           <Riga icona="documento" :titolo="contratto.nome_allegato || 'Apri contratto'" freccia @click="apriAllegato"/>
@@ -281,16 +307,25 @@ export const ContrattoPagina = {
     computed: {
         contratto() { return db.contratti.find(c => c.id === this.id); },
         sezione() { return sezioneDi(this.contratto?.sezione_id); },
-        fornitore() { return db.contatti.find(c => c.id === this.contratto?.fornitore_id); },
-        stato() { return statoScadenza(this.contratto.scadenza, this.contratto.preavviso_giorni); }
+        fornitore() { return fornitoreContratto(this.contratto); },
+        fine() { return fineContratto(this.contratto); },
+        mesi() { return mesiContratto(this.contratto); },
+        durata() { return descriviDurata(this.mesi); },
+        stato() { return statoScadenza(this.fine, this.contratto.preavviso_giorni); }
     },
     methods: {
-        puoModificare, nomeContatto,
-        async apriAllegato() { window.open(await urlFile(this.contratto.allegato), '_blank'); },
-        apriContatto() { nav.scheda = 'contatti'; apriDaElenco({ nome: 'contatto', id: this.fornitore.id }); }
+        puoModificare, conAvviso, costoContratto, costoAnnuoContratto,
+        async apriAllegato() { window.open(await urlFile(this.contratto.allegato), '_blank'); }
     },
     setup() { return { f }; }
 };
+
+/// "2 anni", "6 mesi", "1 anno e 6 mesi"
+export function descriviDurata(mesi) {
+    const a = Math.floor(mesi / 12), m = mesi % 12;
+    const anni = a ? (a === 1 ? '1 anno' : `${a} anni`) : '', resto = m ? (m === 1 ? '1 mese' : `${m} mesi`) : '';
+    return [anni, resto].filter(Boolean).join(' e ') || '–';
+}
 
 export const ContrattoFoglio = {
     props: { contratto: Object, sezioneId: String },
@@ -299,18 +334,28 @@ export const ContrattoFoglio = {
       <Foglio :titolo="contratto ? 'Modifica contratto' : 'Nuovo contratto'" :conferma-disabilitata="!b.titolo.trim()"
               @annulla="$emit('chiudi')" @conferma="salvaContratto">
         <Gruppo>
-          <CampoTesto v-model="b.titolo" segnaposto="Titolo (es. Assistenza caldaia)"/>
-          <CampoTesto v-model="b.numero" etichetta="Numero"/>
-          <CampoScelta v-model="b.fornitore_id" etichetta="Fornitore" :opzioni="opzioniContatti"/>
-          <CampoScelta v-model="b.sezione_id" etichetta="Sistema" :opzioni="opzioniSezioni"/>
+          <CampoTesto v-model="b.titolo" etichetta="Nome" segnaposto="es. Manutenzione caldaia"/>
+          <CampoTesto v-model="b.fornitore" etichetta="Fornitore" segnaposto="Nome della ditta"/>
+          <CampoScelta v-model="b.sezione_id" etichetta="Impianto" :opzioni="opzioniSezioni"/>
+          <CampoTesto v-model="b.numero" etichetta="Numero" segnaposto="facoltativo"/>
+          <Interruttore v-model="b.obbligo_legge" etichetta="Obbligo di legge"/>
         </Gruppo>
-        <Gruppo titolo="Durata">
+        <Gruppo titolo="Durata" :nota="b.durata_valore ? 'La fine si calcola da inizio e durata; puoi comunque modificarla.' : ''">
+          <CampoNumero v-model="b.durata_valore" etichetta="Durata" segnaposto="es. 2"/>
+          <CampoScelta v-model="b.durata_unita" etichetta="In" :opzioni="[{ valore: 'mesi', nome: 'Mesi' }, { valore: 'anni', nome: 'Anni' }]"/>
           <CampoData v-model="b.inizio" etichetta="Inizio"/>
-          <CampoData v-model="b.scadenza" etichetta="Scadenza"/>
-          <Passo v-model="b.preavviso_giorni" :min="0" :max="180" :passo="5">Avvisa {{ b.preavviso_giorni }} giorni prima</Passo>
-          <Interruttore v-model="b.rinnovo_automatico" etichetta="Rinnovo automatico"/>
+          <CampoData v-model="b.scadenza" etichetta="Fine"/>
+          <Interruttore v-model="b.rinnovo_automatico" etichetta="Tacito rinnovo"/>
         </Gruppo>
-        <Gruppo titolo="Costi"><CampoNumero v-model="b.costo_annuo" etichetta="Costo annuo" unita="€"/></Gruppo>
+        <Gruppo titolo="Avviso di scadenza">
+          <Interruttore v-model="b.avviso" etichetta="Avvisami prima della scadenza"/>
+          <Passo v-if="b.avviso" v-model="b.preavviso_giorni" :min="0" :max="180" :passo="5">{{ b.preavviso_giorni }} giorni prima</Passo>
+        </Gruppo>
+        <Gruppo titolo="Costi" nota="Costo per tutta la durata del contratto, IVA esclusa. Nei costi annuali i contratti pluriennali vengono divisi per anno.">
+          <CampoNumero v-model="b.costo" etichetta="Costo" unita="€"/>
+          <CampoNumero v-model="b.iva_percentuale" etichetta="IVA" unita="%" segnaposto="0"/>
+          <Riga titolo="Costo totale" :valore="f.euro(totale)" style="font-weight:600"/>
+        </Gruppo>
         <Gruppo titolo="Documento">
           <Riga v-if="b.allegato" icona="documento" :titolo="b.nome_allegato"/>
           <label class="riga toccabile azione"><span class="riga-icona"><Icona nome="graffetta"/></span>
@@ -326,27 +371,42 @@ export const ContrattoFoglio = {
         return {
             file: null,
             b: {
-                titolo: c.titolo ?? '', numero: c.numero ?? '', fornitore_id: c.fornitore_id ?? null,
-                sezione_id: c.sezione_id ?? this.sezioneId ?? null, inizio: c.inizio ?? f.oggiISO(),
-                scadenza: c.scadenza ?? null, preavviso_giorni: c.preavviso_giorni ?? 30,
-                rinnovo_automatico: c.rinnovo_automatico ?? false, costo_annuo: c.costo_annuo ?? null,
+                titolo: c.titolo ?? '', numero: c.numero ?? '', fornitore: c.id ? fornitoreContratto(c) : '',
+                sezione_id: c.sezione_id ?? this.sezioneId ?? null, inizio: c.inizio ?? f.oggiISO(), scadenza: c.scadenza ?? null,
+                durata_valore: c.durata_valore ?? null, durata_unita: c.durata_unita || 'anni',
+                avviso: c.id ? conAvviso(c) : true, preavviso_giorni: Math.max(0, Number(c.preavviso_giorni ?? 30)),
+                rinnovo_automatico: c.rinnovo_automatico ?? false, obbligo_legge: c.obbligo_legge ?? false,
+                costo: c.costo ?? (c.costo_annuo ? Number(c.costo_annuo) : null), iva_percentuale: c.iva_percentuale ?? null,
                 note: c.note ?? '', allegato: c.allegato ?? '', nome_allegato: c.nome_allegato ?? ''
             }
         };
     },
+    watch: {
+        // Con inizio e durata la fine si calcola da sola.
+        'b.durata_valore'() { this.calcolaFine(); },
+        'b.durata_unita'() { this.calcolaFine(); },
+        'b.inizio'() { this.calcolaFine(); }
+    },
     computed: {
-        opzioniContatti() {
-            return [{ valore: null, nome: 'Nessuno' },
-                ...db.contatti.map(c => ({ valore: c.id, nome: nomeContatto(c) })).sort((a, b) => a.nome.localeCompare(b.nome))];
-        },
+        totale() { return (Number(this.b.costo) || 0) * (1 + (Number(this.b.iva_percentuale) || 0) / 100); },
         opzioniSezioni() {
             return [{ valore: null, nome: 'Nessuno' }, ...db.sezioni.slice().sort((a, b) => a.ordine - b.ordine).map(s => ({ valore: s.id, nome: s.nome }))];
         }
     },
     methods: {
+        calcolaFine() {
+            if (!this.b.inizio || !(this.b.durata_valore > 0)) return;
+            const mesi = this.b.durata_valore * (this.b.durata_unita === 'mesi' ? 1 : 12);
+            const d = f.aggiungiMesi(this.b.inizio, mesi);
+            this.b.scadenza = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        },
         scegliFile(e) { this.file = e.target.files[0]; if (this.file) { this.b.nome_allegato = this.file.name; this.b.allegato = 'nuovo'; } },
         async salvaContratto() {
-            const record = { ...this.b, id: this.contratto?.id, costo_annuo: this.b.costo_annuo ?? 0 };
+            const { avviso, ...campi } = this.b;
+            const record = {
+                ...(this.contratto ?? {}), ...campi, id: this.contratto?.id, titolo: campi.titolo.trim(), fornitore: campi.fornitore.trim(),
+                preavviso_giorni: avviso ? campi.preavviso_giorni : -1, costo_annuo: 0
+            };
             if (this.file) record.allegato = await caricaFile(this.file, 'contratti');
             await salva('contratti', record);
             this.$emit('chiudi');
@@ -357,7 +417,8 @@ export const ContrattoFoglio = {
             await elimina('contratti', this.contratto.id);
             indietro();
         }
-    }
+    },
+    setup() { return { f }; }
 };
 
 // ---------------------------------------------------------------------
@@ -398,7 +459,7 @@ export const Magazzino = {
         db() { return db; },
         gruppi() {
             const testo = this.ricerca.trim().toLowerCase();
-            const prodotti = db.prodotti.filter(p => !testo || [p.nome, p.codice, p.fornitore].some(v => (v ?? '').toLowerCase().includes(testo)))
+            const prodotti = db.prodotti.filter(p => !testo || [p.nome, p.codice, ...fornitoriDi(p).map(x => x.nome)].some(v => (v ?? '').toLowerCase().includes(testo)))
                 .sort((a, b) => a.ordine - b.ordine || a.nome.localeCompare(b.nome));
             const gruppi = db.sezioni.slice().sort((a, b) => a.ordine - b.ordine).map(s => ({
                 id: s.id, nome: s.nome, prodotti: prodotti.filter(p => operazioneDiProdotto(p)?.sezione_id === s.id)
@@ -425,8 +486,9 @@ export const ProdottoPagina = {
           <Riga titolo="Impianto" :valore="impianto || 'Non collegato'"/>
           <Riga titolo="Stato" :valore="prodotto.stato || '–'"/>
           <Riga titolo="Confezioni" :valore="confezioni"/>
-          <Riga titolo="Fornitore" :valore="prodotto.fornitore || '–'" :sottotitolo="prodotto.fornitore_link"
-                :freccia="!!prodotto.fornitore_link" @click="prodotto.fornitore_link && apriSito()"/>
+          <Riga v-if="!fornitori.length" titolo="Fornitore" valore="–"/>
+          <Riga v-for="(x, i) in fornitori" :key="i" :titolo="fornitori.length > 1 ? 'Fornitore ' + (i + 1) : 'Fornitore'" :valore="x.nome"
+                :sottotitolo="x.link" :freccia="!!x.link" @click="x.link && apriSito(x.link)"/>
           <div v-if="prodotto.note" class="riga testo-descrizione">{{ prodotto.note }}</div>
         </Gruppo>
         <SchedeTecniche :prodotto="prodotto"/>
@@ -441,12 +503,12 @@ export const ProdottoPagina = {
             if (!this.operazione) return '';
             return [sezioneDi(this.operazione.sezione_id)?.nome, this.operazione.titolo].filter(Boolean).join(' · ');
         },
-        confezioni() { return descriviFormati(this.prodotto); }
+        confezioni() { return descriviFormati(this.prodotto); },
+        fornitori() { return fornitoriDi(this.prodotto); }
     },
     methods: {
         puoModificare,
-        apriSito() {
-            const link = this.prodotto.fornitore_link;
+        apriSito(link) {
             window.open(/^https?:\/\//i.test(link) ? link : 'https://' + link, '_blank', 'noopener');
         }
     }
@@ -470,8 +532,6 @@ export const SezioniScorta = {
           <div class="numero" :class="{ rosso: basso }">{{ f.quantita(a.giacenza, prodotto.unita) }}</div>
           <div v-if="basso" class="arancione-t" style="font-size:14px">Sotto la scorta minima ({{ f.quantita(prodotto.scorta_minima, prodotto.unita) }})</div>
         </div>
-        <Riga v-for="c in a.confezioni" :key="c.litri" :titolo="maiuscola(nomeConfezione(prodotto, 2)) + ' da ' + f.quantita(c.litri, prodotto.unita)"
-              :valore="String(c.numero)"/>
         <Riga v-if="a.ultimoMovimento" titolo="Ultimo movimento" :valore="f.data(a.ultimoMovimento)"/>
         <Riga titolo="Totale acquistato" :valore="f.quantita(a.acquistato, prodotto.unita)"/>
         <Riga titolo="Totale consumato" :valore="f.quantita(a.consumato, prodotto.unita)"/>
@@ -484,6 +544,9 @@ export const SezioniScorta = {
         <Grafico :serie="[{ nome: 'Giacenza', colore: 'var(--accento)', punti: a.andamento.map(p => ({ x: f.giorno(p.data), y: p.valore })) }]"
                  :riferimento="Number(prodotto.scorta_minima) > 0 ? Number(prodotto.scorta_minima) : null"
                  :gradini="movimenti.some(m => m.tipo === 'consumo')"/>
+      </Gruppo>
+      <Gruppo v-if="conGrafici && prezzi.length > 1" titolo="Prezzo nel tempo" nota="Prezzo del prodotto con IVA, senza trasporto." nota-sempre>
+        <Grafico :serie="[{ nome: 'Prezzo', colore: 'var(--verde)', punti: prezzi }]" :formato-y="v => f.numero(v) + ' €'" valori/>
       </Gruppo>
       <Gruppo v-if="conGrafici && consumiMensili.length > 1" :titolo="nomeMovimento('consumo', prodotto.categoria) + ' per mese'">
         <Grafico :serie="[{ nome: 'Consumo', colore: 'var(--arancione)', punti: consumiMensili }]"/>
@@ -507,6 +570,11 @@ export const SezioniScorta = {
         basso() { return sottoScorta(this.prodotto); },
         previsioni() { return mostraPrevisioni(this.prodotto); },
         movimenti() { return movimentiDi(this.prodotto); },
+        /// Prezzo per unità di ogni acquisto (es. €/kg), dal più vecchio.
+        prezzi() {
+            return this.movimenti.filter(m => m.tipo === 'acquisto').map(m => ({ x: f.giorno(m.data), y: prezzoProdotto(m) }))
+                .filter(p => p.y != null).reverse();
+        },
         /// Totale consumato in ogni mese (dal primo all'ultimo mese con movimenti).
         consumiMensili() {
             const perMese = {};
@@ -580,82 +648,80 @@ export const schedeDi = prodotto => db.documenti.filter(d => d.prodotto_id === p
 
 export const MovimentoFoglio = {
     // prodottoIniziale: prodotto da cui si apre il foglio. Per un movimento nuovo si può scegliere un altro prodotto
-    // della stessa operazione (es. pH- / pH+): confezioni, unità, prezzi e IVA si aggiornano in base alla scelta.
+    // della stessa operazione (es. pH- / pH+): unità, confezioni, prezzi, IVA e fornitori si aggiornano in base alla scelta.
     props: { prodottoIniziale: Object, tipo: String, movimento: Object },
     emits: ['chiudi'],
     template: `
-      <Foglio :titolo="nomeMovimento(tipo, prodotto.categoria)" :conferma-disabilitata="quantitaFinale === null"
+      <Foglio :titolo="nomeMovimento(tipo, prodotto.categoria)" :conferma-disabilitata="!(quantitaFinale > 0) && tipo !== 'rettifica'"
               @annulla="$emit('chiudi')" @conferma="salvaMovimento">
         <Gruppo :nota="nota">
           <CampoScelta v-if="!movimento && opzioniProdotto.length > 1" v-model="sceltoId" etichetta="Prodotto" :opzioni="opzioniProdotto"/>
           <Riga v-else titolo="Prodotto" :valore="prodotto.nome + (prodotto.codice ? ' · ' + prodotto.codice : '')"/>
           <CampoData v-model="b.data" etichetta="Data"/>
-          <CampoTesto v-if="tipo === 'acquisto'" v-model="b.descrizione_prodotto" segnaposto="Prodotto acquistato (nome, marca)"/>
-        </Gruppo>
-        <Gruppo v-if="formati.length" :titolo="maiuscola(nomeConfezione(prodotto, 2))" :nota="notaConfezioni">
-          <Passo v-for="litri in formati" :key="litri" v-model="b.numeri[litri]" :min="0">
-            Da {{ f.quantita(litri, prodotto.unita) }}<br>
-            <small class="secondario">{{ b.numeri[litri] }} {{ nomeConfezione(prodotto, b.numeri[litri]) }}</small>
-          </Passo>
-        </Gruppo>
-        <Gruppo>
-          <Riga v-if="conConfezioni" :titolo="etichettaQuantita" :valore="f.quantita(quantitaFinale, prodotto.unita)" style="font-weight:600"/>
-          <CampoNumero v-else v-model="b.quantita" :etichetta="etichettaQuantita" :unita="prodotto.unita"/>
-        </Gruppo>
-        <Gruppo v-if="tipo === 'acquisto'" titolo="Acquisto">
-          <template v-if="conConfezioni">
-            <CampoNumero v-for="litri in formatiUsati" :key="litri" v-model="b.prezzi[litri]"
-                         :etichetta="'Costo ' + nomeConfezione(prodotto, 1) + ' da ' + f.quantita(litri, prodotto.unita)" unita="€"/>
+          <template v-if="acquisto">
+            <CampoScelta v-if="opzioniFornitori.length > 1" v-model="b.fornitore" etichetta="Fornitore" :opzioni="opzioniFornitori"/>
+            <CampoTesto v-if="opzioniFornitori.length <= 1 || b.fornitore === ALTRO" v-model="b.fornitoreLibero" etichetta="Fornitore" segnaposto="Nome fornitore"/>
           </template>
-          <CampoNumero v-else v-model="b.prezzo" :etichetta="'Costo al ' + prodotto.unita + (b.iva ? ' (IVA esclusa)' : '')" unita="€"/>
-          <CampoNumero v-model="b.iva" etichetta="IVA" unita="%" segnaposto="inclusa"/>
-          <Riga v-if="b.iva" titolo="IVA in euro" :valore="f.euro(totale - imponibile)"/>
-          <Riga titolo="Costo totale" :valore="f.euro(totale)" style="font-weight:600"/>
-          <CampoTesto v-model="b.fornitore" segnaposto="Fornitore"/>
         </Gruppo>
-        <Gruppo v-if="tipo === 'acquisto' && prodotto.categoria === 'pellet'" titolo="Deposito"
-                nota="Facoltativo: pellet presente nel silo prima del carico (lo indica il pannello della caldaia). Serve a calcolare consumo e autonomia.">
+        <Gruppo :nota="notaQuantita">
+          <CampoScelta v-if="opzioniUnita.length > 1" v-model="b.unita" etichetta="Unità di misura" :opzioni="opzioniUnita"/>
+          <CampoNumero v-model="b.quantita" :etichetta="etichettaQuantita" :unita="unitaBreve"/>
+          <Riga v-if="b.unita !== 'base' && quantitaFinale" titolo="In magazzino" :valore="segno + f.quantita(quantitaFinale, prodotto.unita)"/>
+        </Gruppo>
+        <Gruppo v-if="acquisto" titolo="Costo">
+          <CampoNumero v-model="b.prezzo" :etichetta="'Prezzo per ' + unitaBreve" unita="€"/>
+          <Riga titolo="Importo" :valore="f.euro(c.importo)"/>
+          <CampoNumero v-model="b.sconto" etichetta="Sconto" unita="%" segnaposto="0"/>
+          <Riga v-if="b.sconto" titolo="Importo scontato" :valore="f.euro(c.scontato)"/>
+          <CampoNumero v-model="b.trasporto" etichetta="Trasporto" unita="€" segnaposto="0"/>
+          <CampoNumero v-model="b.iva" etichetta="IVA" unita="%" segnaposto="inclusa"/>
+          <Riga titolo="Imponibile" :valore="f.euro(c.imponibile)"/>
+          <Riga v-if="b.iva" titolo="Imposta" :valore="f.euro(c.imposta)"/>
+          <Riga titolo="Costo totale" :valore="f.euro(c.totale)" style="font-weight:600"/>
+        </Gruppo>
+        <Gruppo v-if="acquisto && prodotto.categoria === 'pellet'" titolo="Deposito"
+                nota="Facoltativo: pellet presente nel silo prima del carico, come lo indica il pannello della caldaia.">
           <CampoNumero v-model="b.precarico" etichetta="Prima del carico" :unita="prodotto.unita"/>
           <Riga v-if="b.precarico !== null" titolo="Dopo il carico" :valore="f.quantita(b.precarico + (quantitaFinale || 0), prodotto.unita)"/>
         </Gruppo>
         <Gruppo titolo="Note"><CampoTesto v-model="b.note" multilinea segnaposto="Note"/></Gruppo>
         <Gruppo v-if="movimento"><Riga distruttiva titolo="Elimina" @click="eliminaMovimento"/></Gruppo>
       </Foglio>`,
-    data() { return { sceltoId: this.prodottoIniziale.id, b: {} }; },
+    data() { return { sceltoId: this.prodottoIniziale.id, b: {}, ALTRO: '__altro__' }; },
     created() { this.b = this.campi(); },
     watch: {
         /// Nuovo prodotto scelto: i campi che dipendono dal prodotto ripartono, data e note restano.
-        sceltoId() {
-            const { data, note } = this.b;
-            this.b = { ...this.campi(), data, note };
-        }
+        sceltoId() { const { data, note } = this.b; this.b = { ...this.campi(), data, note }; }
     },
     computed: {
         prodotto() { return db.prodotti.find(p => p.id === this.sceltoId) ?? this.prodottoIniziale; },
+        acquisto() { return this.tipo === 'acquisto'; },
         /// Prodotti del magazzino collegati alla stessa operazione.
         opzioniProdotto() {
             const operazione = operazioneDiProdotto(this.prodottoIniziale);
             const prodotti = operazione ? prodottiOperazione(operazione) : [this.prodottoIniziale];
             return prodotti.map(p => ({ valore: p.id, nome: p.codice ? `${p.nome} · ${p.codice}` : p.nome }));
         },
-        formati() { return formatiDi(this.prodotto); },
-        formatiUsati() { return this.formati.filter(l => this.b.numeri[l] > 0); },
-        conConfezioni() { return this.formatiUsati.length > 0; },
-        /// Con le confezioni la quantità è la loro somma, altrimenti quella scritta a mano.
-        quantitaFinale() {
-            return this.conConfezioni ? this.formati.reduce((t, l) => t + l * this.b.numeri[l], 0) : this.b.quantita;
+        /// Unità con cui si inserisce la quantità: confezioni del prodotto oppure la sua unità di misura.
+        opzioniUnita() {
+            const p = this.prodotto;
+            return [...formatiDi(p).map(l => ({ valore: String(l), nome: `${nomeConfezione(p, 2)} da ${f.quantita(l, p.unita)}` })),
+                    { valore: 'base', nome: nomeUnita(p.unita) }];
         },
-        /// Costo IVA esclusa (se l'IVA è vuota i prezzi si intendono IVA inclusa).
-        imponibile() {
-            if (this.conConfezioni) return this.formatiUsati.reduce((t, l) => t + this.b.numeri[l] * (this.b.prezzi[l] || 0), 0);
-            return (this.b.quantita || 0) * (this.b.prezzo || 0);
+        formato() { return this.b.unita === 'base' ? 1 : Number(this.b.unita) || 1; },
+        unitaBreve() { return this.b.unita === 'base' ? this.prodotto.unita : nomeConfezione(this.prodotto, 1); },
+        quantitaFinale() { return this.b.quantita == null ? null : this.b.quantita * this.formato; },
+        segno() { return { acquisto: '+', consumo: '−', rettifica: '= ' }[this.tipo]; },
+        opzioniFornitori() {
+            const nomi = fornitoriDi(this.prodotto).map(x => x.nome);
+            if (this.b.fornitore && this.b.fornitore !== this.ALTRO && !nomi.includes(this.b.fornitore)) nomi.push(this.b.fornitore);
+            return [...nomi.map(n => ({ valore: n, nome: n })), { valore: this.ALTRO, nome: 'Altro…' }];
         },
-        totale() { return this.imponibile * (1 + (Number(this.b.iva) || 0) / 100); },
+        c() { return calcoliAcquisto({ quantita: this.b.quantita, prezzo: this.b.prezzo, sconto: this.b.sconto, trasporto: this.b.trasporto, iva: this.b.iva }); },
         etichettaQuantita() { return this.tipo === 'rettifica' ? 'Quantità presente' : 'Quantità'; },
-        notaConfezioni() {
-            const nome = nomeConfezione(this.prodotto, 2);
-            if (this.tipo === 'rettifica') return `Quante ${nome} ci sono adesso. Se ne resta una aperta, lasciale a zero e scrivi la quantità a mano.`;
-            return `La quantità si calcola dalle ${nome}. Lasciale a zero per scriverla a mano (es. una ${nomeConfezione(this.prodotto, 1)} usata a metà).`;
+        notaQuantita() {
+            if (this.b.unita === 'base' || this.opzioniUnita.length < 2) return '';
+            return `La quantità è il numero di ${nomeConfezione(this.prodotto, 2)}; in magazzino si conta in ${this.prodotto.unita}.`;
         },
         nota() {
             return {
@@ -666,43 +732,41 @@ export const MovimentoFoglio = {
         }
     },
     methods: {
+        /// Campi del modulo per il prodotto scelto (e per il movimento da modificare).
         campi() {
-            const m = this.movimento ?? {};
-            const numeri = {}, prezzi = {};
-            for (const litri of formatiDi(this.prodotto)) {
-                const c = (m.confezioni ?? []).find(c => Number(c.litri) === litri);
-                numeri[litri] = Number(c?.numero) || 0;
-                prezzi[litri] = c?.prezzo ?? null;
-            }
-            const conConfezioni = Object.values(numeri).some(n => n > 0);
-            // IVA: quella del movimento, altrimenti quella dell'ultimo acquisto dello stesso prodotto.
-            const precedente = movimentiDi(this.prodotto).find(x => x.tipo === 'acquisto' && x.dettagli?.iva_percentuale != null);
-            const iva = m.id ? (m.dettagli?.iva_percentuale ?? null) : (precedente?.dettagli.iva_percentuale ?? null);
+            const m = this.movimento ?? {}, d = m.dettagli ?? {}, p = this.prodotto;
+            const formati = formatiDi(p);
+            // Unità: quella salvata, altrimenti la prima confezione (se c'è) oppure l'unità del prodotto.
+            let unita = d.formato ? String(d.formato) : m.id ? 'base' : (formati[0] ? String(formati[0]) : 'base');
+            const conf = (m.confezioni ?? []).filter(c => c.numero > 0);
+            if (!d.formato && conf.length === 1) unita = String(conf[0].litri);
+            const fmt = unita === 'base' ? 1 : Number(unita);
+            const precedente = movimentiDi(p).find(x => x.tipo === 'acquisto' && x.dettagli?.iva_percentuale != null);
+            const iva = m.id ? (d.iva_percentuale ?? null) : (precedente?.dettagli.iva_percentuale ?? null);
+            const nomiFornitori = fornitoriDi(p).map(x => x.nome);
+            const fornitore = m.id ? (m.fornitore || '') : (nomiFornitori[0] ?? '');
+            // Con fornitori in elenco si usa il menu (il nome salvato resta tra le opzioni), altrimenti il campo libero.
+            const prezzoVecchio = m.costo && m.quantita ? m.costo / (m.quantita / fmt) / (1 + (Number(iva) || 0) / 100) : null;
             return {
-                iva, precarico: m.dettagli?.precarico ?? null,
-                data: m.data ?? f.oggiISO(), quantita: m.quantita ?? null, fornitore: m.fornitore ?? (this.prodotto.fornitore || ''),
-                descrizione_prodotto: m.descrizione_prodotto ?? '', note: m.note ?? '', numeri, prezzi,
-                prezzo: !conConfezioni && m.costo && m.quantita
-                    ? (m.dettagli?.prezzo_unitario ?? m.costo / m.quantita / (1 + (Number(iva) || 0) / 100)) : null
+                data: m.data ?? f.oggiISO(), unita, quantita: m.quantita != null ? m.quantita / fmt : null,
+                prezzo: d.prezzo_unitario ?? (d.trasporto == null ? prezzoVecchio : null),
+                sconto: d.sconto ?? null, trasporto: d.trasporto ?? null, iva, precarico: d.precarico ?? null,
+                fornitore: nomiFornitori.length ? (fornitore || nomiFornitori[0]) : '', fornitoreLibero: nomiFornitori.length ? '' : fornitore,
+                note: m.note ?? '', descrizione_prodotto: m.descrizione_prodotto ?? ''
             };
         },
-        nomeMovimento, nomeConfezione,
-        maiuscola: t => t.charAt(0).toUpperCase() + t.slice(1),
+        nomeMovimento,
         async salvaMovimento() {
-            const acquisto = this.tipo === 'acquisto';
-            // La rettifica registra tutti i formati (anche a zero): fissa il conteggio delle confezioni.
-            const formati = this.tipo === 'rettifica' ? this.formati : this.formatiUsati;
-            const confezioni = formati.map(litri => ({
-                litri, numero: this.b.numeri[litri],
-                ...(acquisto && this.b.prezzi[litri] !== null ? { prezzo: this.b.prezzi[litri] } : {})
-            }));
+            const fornitore = this.opzioniFornitori.length > 1 && this.b.fornitore !== this.ALTRO ? this.b.fornitore : this.b.fornitoreLibero.trim();
+            const confezioni = this.b.unita !== 'base' && this.b.quantita ? [{ litri: this.formato, numero: this.b.quantita }] : [];
             await salva('movimenti', {
                 id: this.movimento?.id, prodotto_id: this.prodotto.id, tipo: this.tipo, data: this.b.data,
-                quantita: this.quantitaFinale, costo: acquisto ? this.totale : 0, fornitore: acquisto ? this.b.fornitore : '',
-                descrizione_prodotto: acquisto ? this.b.descrizione_prodotto : '', note: this.b.note, confezioni,
-                dettagli: acquisto ? {
-                    ...(this.movimento?.dettagli ?? {}),
-                    prezzo_unitario: this.conConfezioni ? null : this.b.prezzo, iva_percentuale: this.b.iva, precarico: this.b.precarico
+                quantita: this.quantitaFinale ?? 0, costo: this.acquisto ? this.c.totale : 0, fornitore: this.acquisto ? fornitore : '',
+                descrizione_prodotto: this.b.descrizione_prodotto, note: this.b.note, confezioni,
+                dettagli: this.acquisto ? {
+                    ...(this.movimento?.dettagli ?? {}), formato: this.b.unita === 'base' ? null : this.formato,
+                    prezzo_unitario: this.b.prezzo, sconto: this.b.sconto, trasporto: this.b.trasporto,
+                    iva_percentuale: this.b.iva, precarico: this.b.precarico
                 } : {}
             });
             this.$emit('chiudi');
@@ -737,9 +801,12 @@ export const ProdottoFoglio = {
           <CampoScelta v-model="b.unita" etichetta="Unità di misura" :opzioni="unita"/>
           <CampoTesto v-model="b.formati" etichetta="Confezioni da" :segnaposto="'es. 5, 1 (' + (b.unita || 'unità') + ')'"/>
         </Gruppo>
-        <Gruppo titolo="Fornitore">
-          <CampoTesto v-model="b.fornitore" segnaposto="Nome fornitore"/>
-          <CampoTesto v-model="b.fornitore_link" segnaposto="Sito (es. https://www.gecostore.it)" tipo="url"/>
+        <Gruppo titolo="Fornitori" nota="Negli acquisti si sceglie il fornitore da questo elenco. Svuota il nome per toglierlo.">
+          <template v-for="(x, i) in b.fornitori" :key="i">
+            <CampoTesto v-model="x.nome" :etichetta="'Fornitore ' + (i + 1)" segnaposto="Nome"/>
+            <CampoTesto v-model="x.link" segnaposto="Sito (es. https://www.gecostore.it)" tipo="url"/>
+          </template>
+          <Riga azione icona="piu" titolo="Aggiungi fornitore" @click="b.fornitori.push({ nome: '', link: '' })"/>
         </Gruppo>
         <Gruppo titolo="Note"><CampoTesto v-model="b.note" multilinea segnaposto="Note (dosaggi, avvertenze…)"/></Gruppo>
         <Gruppo v-if="schede.length" titolo="Schede tecniche" nota="Tocca una scheda per eliminarla. Per aggiungerle usa “Allega scheda tecnica” nella pagina del prodotto.">
@@ -752,7 +819,7 @@ export const ProdottoFoglio = {
         return { b: {
             nome: p.nome ?? '', codice: p.codice ?? '', stato: p.stato ?? '', unita: p.unita ?? 'kg', icona: p.icona || '',
             operazione_id: p.operazione_id ?? operazioneDiProdotto(p)?.id ?? this.operazioneId ?? null,
-            fornitore: p.fornitore ?? '', fornitore_link: p.fornitore_link ?? '',
+            fornitori: (fornitoriDi(p).length ? fornitoriDi(p) : [{ nome: '', link: '' }]).map(x => ({ nome: x.nome, link: x.link ?? '' })),
             note: p.note ?? '',
             formati: formatiDi(p).map(v => String(v).replace('.', ',')).join(', ')
         } };
@@ -788,7 +855,10 @@ export const ProdottoFoglio = {
             await salva('prodotti', {
                 ...(this.prodotto ?? { scorta_minima: 0, consumo_mensile: null }), ...campi, confezioni, id: this.prodotto?.id,
                 categoria: categoriaPerOperazione(operazione), icona: campi.icona === 'scatola' ? '' : campi.icona,
-                fornitore_link: campi.fornitore_link.trim(),
+                // I vecchi campi restano allineati al primo fornitore (ricerca, contenuti iniziali).
+                fornitori: campi.fornitori.map(x => ({ nome: x.nome.trim(), link: x.link.trim() })).filter(x => x.nome),
+                fornitore: campi.fornitori.find(x => x.nome.trim())?.nome.trim() ?? '',
+                fornitore_link: campi.fornitori.find(x => x.nome.trim())?.link.trim() ?? '',
                 ordine: this.prodotto?.ordine ?? db.prodotti.length
             });
             // L'operazione non punta più al prodotto: il collegamento ora sta nel prodotto.

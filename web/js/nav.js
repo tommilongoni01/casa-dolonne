@@ -2,7 +2,7 @@
 // Su iPad la prima pagina della pila va nella colonna di destra; su iPhone la pila si sovrappone all'elenco.
 import { reactive, watch } from 'vue';
 
-export const SCHEDE = ['casa', 'magazzino', 'contatti', 'impostazioni'];
+export const SCHEDE = ['casa', 'magazzino', 'contratti', 'contatti', 'impostazioni'];
 
 export const nav = reactive({
     scheda: 'casa',

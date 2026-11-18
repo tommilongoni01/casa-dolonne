@@ -7,7 +7,7 @@ import * as f from '../format.js';
 import { COLORE_SEZIONE, ICONE_SEZIONE } from '../icone.js';
 import {
     avvisi, prossime, operazioniDi, statoOperazione, TIPI_OPERAZIONE, sezioneDi, nomeContatto, sottotitoloContatto, calendarioScadenze,
-    iconaOperazione, coloreImpianto
+    iconaOperazione, coloreImpianto, vociCosto, anniCosti, totale
 } from '../logic.js';
 import { riassuntoImpianto, riepilogoOperazione, TesseraImpianto, RigaAvviso } from './manutenzione.js';
 import { ContattoFoglio } from './contatti.js';
@@ -103,7 +103,18 @@ const CalendarioCasa = {
     emits: ['apri'],
     template: `
       <section class="gruppo calendario-casa">
-        <div class="calendario-testa">
+        <h3 class="gruppo-titolo calendario-agenda-titolo" style="margin-top:0">
+          {{ scelto ? nomeGiorno(dataScelta) : 'Prossimi interventi' }}
+          <button v-if="scelto" type="button" class="pulsante-testo" @click="scelto = null">Mostra i prossimi</button>
+        </h3>
+        <div class="gruppo-celle">
+          <Riga v-if="!agenda.length" :titolo="scelto ? 'Niente in programma' : 'Nessuna scadenza in programma'" class="secondario"/>
+          <template v-for="g in agenda" :key="g.chiave">
+            <div v-if="!scelto" class="agenda-giorno">{{ nomeGiorno(g.data) }}</div>
+            <RigaAvviso v-for="v in g.voci" :key="v.id" :avviso="v" @apri="p => $emit('apri', p)"/>
+          </template>
+        </div>
+        <div class="calendario-testa" style="margin-top:18px">
           <h3 class="gruppo-titolo" style="margin:0">{{ titoloMese }}</h3>
           <span class="calendario-frecce">
             <button v-if="!meseCorrente" type="button" class="pulsante-testo" @click="vaiOggi">Oggi</button>
@@ -120,17 +131,6 @@ const CalendarioCasa = {
               <span class="calendario-pallini"><i v-for="v in c.voci.slice(0, 3)" :key="v.id" :class="'gravita-' + v.gravita"></i></span>
             </button>
           </div>
-        </div>
-        <h3 class="gruppo-titolo calendario-agenda-titolo">
-          {{ scelto ? nomeGiorno(dataScelta) : 'Prossimi interventi' }}
-          <button v-if="scelto" type="button" class="pulsante-testo" @click="scelto = null">Mostra i prossimi</button>
-        </h3>
-        <div class="gruppo-celle">
-          <Riga v-if="!agenda.length" :titolo="scelto ? 'Niente in programma' : 'Nessuna scadenza in programma'" class="secondario"/>
-          <template v-for="g in agenda" :key="g.chiave">
-            <div v-if="!scelto" class="agenda-giorno">{{ nomeGiorno(g.data) }}</div>
-            <RigaAvviso v-for="v in g.voci" :key="v.id" :avviso="v" @apri="p => $emit('apri', p)"/>
-          </template>
         </div>
       </section>`,
     data() { const oggi = new Date(); return { mese: new Date(oggi.getFullYear(), oggi.getMonth(), 1), scelto: null }; },
@@ -178,6 +178,72 @@ const CalendarioCasa = {
             if (!c.delMese) this.mese = new Date(c.data.getFullYear(), c.data.getMonth(), 1);
         }
     }
+};
+
+// ---------------------------------------------------------------------
+// Costi della casa e degli impianti
+// ---------------------------------------------------------------------
+const NOMI_VOCE = { contratti: 'Contratti', interventi: 'Interventi', prodotti: 'Prodotti acquistati' };
+
+export const CostiPagina = {
+    components: { RigaAvviso },
+    props: { id: String },
+    template: `
+      <Pagina :titolo="sezione ? 'Costi · ' + sezione.nome : 'Costi della casa'">
+        <div class="segmenti segmenti-anni">
+          <button v-for="a in anni" :key="a" :class="{ attivo: a === anno }" @click="anno = a">{{ a }}</button>
+        </div>
+        <div class="valore-grande totale-costi">
+          <div class="etichetta">{{ sezione ? 'Spesa per ' + sezione.nome : 'Spesa totale della casa' }} nel {{ anno }}</div>
+          <div class="numero">{{ f.euro(totale(voci)) }}</div>
+        </div>
+
+        <Gruppo titolo="Per voce" nota="I contratti pluriennali sono divisi per anno; i prodotti contano nell'anno in cui li compri." nota-sempre>
+          <Riga v-for="t in tipi" :key="t" :titolo="NOMI_VOCE[t]" :valore="f.euro(totale(voci.filter(v => v.tipo === t)))"/>
+        </Gruppo>
+
+        <Gruppo v-if="!sezione" titolo="Per impianto">
+          <Riga v-if="!perImpianto.length" titolo="Nessun costo in questo anno" class="secondario"/>
+          <Riga v-for="g in perImpianto" :key="g.id" :icona="g.icona" quadrata :titolo="g.nome" :sottotitolo="g.dettaglio"
+                :valore="f.euro(g.totale)" :freccia="g.id !== 'nessuno'" @click="g.id !== 'nessuno' && apri({ nome: 'costi', id: g.id })"/>
+        </Gruppo>
+
+        <Gruppo v-if="andamento.length > 1" titolo="Negli anni">
+          <Grafico :serie="[{ nome: 'Spesa', colore: 'var(--accento)', punti: andamento }]" :formato-y="v => f.euro(v).replace(',00', '')" valori per-anno/>
+        </Gruppo>
+
+        <Gruppo :titolo="'Spese del ' + anno">
+          <Riga v-if="!voci.length" titolo="Nessuna spesa registrata" class="secondario"/>
+          <Riga v-for="v in (tutte ? voci : voci.slice(0, 5))" :key="v.id" :icona="ICONE_VOCE[v.tipo]" :titolo="v.titolo"
+                :sottotitolo="[v.data ? f.dataBreve(v.data) : '', sezione ? '' : nomeImpianto(v.sezione_id), v.dettaglio].filter(Boolean).join(' · ')"
+                :valore="f.euro(v.importo)" :freccia="!!v.pagina" @click="v.pagina && apri(v.pagina)"/>
+          <Riga v-if="voci.length > 5" azione :icona="tutte ? 'frecciaSu' : 'frecciaGiu'" :titolo="tutte ? 'Mostra meno' : 'Mostra tutte (' + voci.length + ')'" @click="tutte = !tutte"/>
+        </Gruppo>
+      </Pagina>`,
+    data() { return { anno: new Date().getFullYear(), tutte: false, NOMI_VOCE, tipi: ['contratti', 'interventi', 'prodotti'],
+                      ICONE_VOCE: { contratti: 'documento', interventi: 'chiave', prodotti: 'carrello' } }; },
+    computed: {
+        sezione() { return this.id ? sezioneDi(this.id) : null; },
+        anni() { return anniCosti(); },
+        voci() { const v = vociCosto(this.anno); return this.sezione ? v.filter(x => x.sezione_id === this.sezione.id) : v; },
+        perImpianto() {
+            const gruppi = db.sezioni.slice().sort((a, b) => a.ordine - b.ordine).map(s => ({ id: s.id, nome: s.nome, icona: s.icona, voci: this.voci.filter(v => v.sezione_id === s.id) }));
+            gruppi.push({ id: 'nessuno', nome: 'Senza impianto', icona: 'lista', voci: this.voci.filter(v => !sezioneDi(v.sezione_id)) });
+            return gruppi.filter(g => g.voci.length).map(g => ({
+                ...g, totale: totale(g.voci),
+                dettaglio: this.tipi.map(t => [t, totale(g.voci.filter(v => v.tipo === t))]).filter(([, x]) => x > 0)
+                    .map(([t, x]) => `${NOMI_VOCE[t].split(' ')[0]} ${f.euro(x)}`).join(' · ')
+            })).sort((a, b) => b.totale - a.totale);
+        },
+        andamento() {
+            return [...this.anni].reverse().map(a => {
+                const v = vociCosto(a);
+                return { x: new Date(a, 6, 1), y: totale(this.sezione ? v.filter(x => x.sezione_id === this.sezione.id) : v) };
+            });
+        }
+    },
+    methods: { apri, totale, nomeImpianto: id => sezioneDi(id)?.nome ?? '' },
+    setup() { return { f }; }
 };
 
 // ---------------------------------------------------------------------
@@ -231,6 +297,11 @@ export const CasaHome = {
             <div class="cruscotto">
               <div class="cruscotto-stato">
                 <SchedaStato :avvisi="elencoAvvisi" :prossima="prossimaScadenza"/>
+                <button class="scheda-costi" @click="apriDaElenco({ nome: 'costi' })">
+                  <IconaQuadrata nome="carrello" colore="var(--accento)" :dimensione="34"/>
+                  <span class="scheda-costi-testi"><span class="secondario">Costi {{ annoCorrente }}</span><b>{{ f.euro(costiAnno) }}</b></span>
+                  <Icona nome="avanti" :dimensione="16" class="secondario"/>
+                </button>
                 <!-- Avvisi come schede -->
                 <div v-if="elencoAvvisi.length" class="schede-avvisi">
                   <SchedaAvviso v-for="a in elencoAvvisi" :key="a.id" :avviso="a" @apri="apriDaElenco"/>
@@ -289,7 +360,9 @@ export const CasaHome = {
         const scadenze = computed(() => calendarioScadenze());
         // Prossima scadenza futura non ancora in allarme (per il riquadro dello stato).
         const prossimaScadenza = computed(() => scadenze.value.find(v => v.gravita === 'info' && v.data >= f.giorno(new Date())) ?? null);
-        return { elencoAvvisi, elencoProssime, conteggi, sezioni, scadenze, prossimaScadenza };
+        const annoCorrente = new Date().getFullYear();
+        const costiAnno = computed(() => totale(vociCosto(annoCorrente)));
+        return { elencoAvvisi, elencoProssime, conteggi, sezioni, scadenze, prossimaScadenza, annoCorrente, costiAnno, f };
     },
     computed: {
         risultati() {
@@ -383,6 +456,9 @@ export const ImpiantoPagina = {
                   :titolo="o.titolo" :sottotitolo="riepilogoOperazione(o)" freccia @click="apri({ nome: 'operazione', id: o.id })"/>
             <Riga v-if="puoModificare()" azione icona="piuCerchio" titolo="Nuova operazione" @click="nuova = { titolo: '', icona: '' }"/>
           </Gruppo>
+          <Gruppo>
+            <Riga icona="carrello" titolo="Costi dell'impianto" :valore="f.euro(costiImpianto)" freccia @click="apri({ nome: 'costi', id: sezione.id })"/>
+          </Gruppo>
         </template>
 
         <!-- Manuale: guide scritte da noi e documenti del fornitore -->
@@ -442,6 +518,7 @@ export const ImpiantoPagina = {
     computed: {
         sezione() { return sezioneDi(this.id); },
         r() { return riassuntoImpianto(this.sezione); },
+        costiImpianto() { return totale(vociCosto(new Date().getFullYear()).filter(v => v.sezione_id === this.id)); },
         operazioni() { return this.sezione ? operazioniDi(this.sezione) : []; },
         elencoAvvisi() { return this.sezione ? avvisi({ sezione: this.sezione }) : []; },
         guide() { return db.guide.filter(g => g.sezione_id === this.id).sort(ordinaTitoli); },

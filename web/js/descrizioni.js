@@ -2,6 +2,12 @@
 // Usati dai contenuti iniziali; lo script supabase/aggiornamento-6-descrizioni.sql li riporta sui dati esistenti.
 // Fonti: guide della casa (caldaia ETA, fotovoltaico Huawei), scheda tecnica UNIOXY POOL,
 // manuale ETA PelletsCompact, DPR 162/99 (ascensori), norma CEI 79-3 (antintrusione).
+/// Guide da creare nel Manuale insieme ai contenuti iniziali (testo HTML semplice).
+export const GUIDE_EXTRA = [{
+    sezione: 'Caldaia', titolo: 'Carico del pellet e deposito', operazione: 'pellet',
+    html: '<h3>Carico del pellet</h3><ol>' + ["Prima del carico leggi sul pannello ETA i kg presenti nel deposito.", "Usa pellet certificato ENplus A1, asciutto e con pochi residui di polvere.", "Registra l'acquisto (pulsante Acquisto) con quantità, prezzo al quintale, sconto, trasporto, IVA e fornitore.", "Dopo il carico registra una nuova lettura del deposito con i kg indicati dal pannello.", "Durante la stagione registra le letture del deposito con lo stato dei piani (Spa, P-1, P0, P1): così si vede quanto consuma ogni configurazione.", "Sotto i 5 q compare l'avviso di scorta minima.", "Se il pellet finisce, la pompa di calore può scaldare al posto della caldaia (vedi guida \"Gestione priorità\")."].map(p => `<li>${p}</li>`).join('') + '</ol>'
+}];
+
 export const DESCRIZIONI = {
     Piscina: {
         ph: {
@@ -47,14 +53,8 @@ export const DESCRIZIONI = {
     },
     Caldaia: {
         pellet: {
-            descrizione: "Carico del pellet nel deposito della caldaia ETA PelletsCompact. Il pannello della caldaia indica la scorta presente (Deposito) e avvisa quando si scende sotto la riserva.",
-            passaggi: [
-                "Prima del carico leggi sul pannello ETA la scorta nel deposito e annotala come \"Prima del carico\".",
-                "Usa pellet certificato (ENplus A1), asciutto e con pochi residui di polvere.",
-                "Dopo il carico aggiorna sul pannello il valore del deposito.",
-                "Registra l'acquisto con quantità, prezzo al quintale, IVA e fornitore.",
-                "Se il pellet finisce, la pompa di calore può scaldare al posto della caldaia (vedi guida \"Gestione priorità\")."
-            ]
+            descrizione: "Carichi di pellet e letture del deposito della caldaia.",
+            passaggi: []
         },
         cenere: {
             descrizione: "Svuotamento del cassetto cenere della ETA PelletsCompact: la caldaia compatta la cenere da sola, basta svuotarlo qualche volta per stagione (indicativamente 3–4 volte l'anno) o quando il pannello lo segnala.",
