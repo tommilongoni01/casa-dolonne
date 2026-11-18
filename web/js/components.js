@@ -378,7 +378,7 @@ export const Grafico = {
         formatoY: { type: Function, default: v => String(Math.round(v * 10) / 10).replace('.', ',') },
         gradini: Boolean,
         valori: Boolean,           // scrive il valore misurato accanto a ogni punto
-        perAnno: Boolean           // asse orizzontale con un'etichetta per anno (un punto per anno),
+        perAnno: Boolean,          // asse orizzontale con un'etichetta per anno (un punto per anno)
         minY: Number, maxY: Number // estremi fissi dell'asse verticale (es. deposito pellet 0 – 3.600 kg)
     },
     template: `
