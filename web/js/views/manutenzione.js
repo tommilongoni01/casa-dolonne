@@ -9,7 +9,7 @@ import {
     ultimoRiempimento, interventiDi, carichiOrdinati, svuotamentiOrdinati, formatiDi, nomeConfezione, descriviConfezioni,
     prodottiOperazione, operazioneDiProdotto, categoriaPerOperazione, STATI_PRODOTTO, UNITA_MISURA, allarmi, coloreImpianto,
     calcoliAcquisto, fornitoriDi, nomeUnita, prezzoProdotto,
-    conAvviso, costoContratto, costoAnnuoContratto, fineContratto, mesiContratto, fornitoreContratto
+    conAvviso, costoContratto, costoAnnuoContratto, fineContratto, mesiContratto, fornitoreContratto, quantitaScorta
 } from '../logic.js';
 import { COLORE_SEZIONE } from '../icone.js';
 import { backend } from '../backend.js';
@@ -65,7 +65,7 @@ function datoChiave(o) {
     const prodotti = prodottiOperazione(o);
     if (prodotti.length === 1) {
         const p = prodotti[0], a = analisiScorta(p);
-        return `${o.titolo} ${f.quantita(a.giacenza, p.unita)}`;
+        return `${o.titolo} ${quantitaScorta(p, a.giacenza)}`;
     }
     return null;
 }
@@ -203,7 +203,7 @@ export function riepilogoOperazione(o) {
             if (o.passaggi?.length) parti.push(`${o.passaggi.length} passaggi`);
     }
     const prodotti = prodottiOperazione(o);
-    if (prodotti.length === 1 && o.tipo !== 'ph') parti.push(`scorta ${f.quantita(analisiScorta(prodotti[0]).giacenza, prodotti[0].unita)}`);
+    if (prodotti.length === 1 && o.tipo !== 'ph') parti.push(`scorta ${quantitaScorta(prodotti[0], analisiScorta(prodotti[0]).giacenza)}`);
     return parti.join(' · ');
 }
 

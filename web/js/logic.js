@@ -50,6 +50,13 @@ const ORDINE_STATI = { scaduta: 0, inScadenza: 1, ok: 2 };
 // A parità di data (dal più recente): consumo, acquisto, rettifica. In ordine cronologico quindi
 // prima la rettifica (lettura della giacenza), poi l'acquisto, poi il consumo.
 const ORDINE_MOVIMENTI = { consumo: 0, acquisto: 1, rettifica: 2 };
+/// Unità con cui si mostra la scorta: il pellet si acquista in quintali ma il deposito si legge in kg.
+export function unitaScorta(p) {
+    return p?.categoria === 'pellet' && p.unita === 'q' ? { unita: 'kg', fattore: 100 } : { unita: p?.unita ?? '', fattore: 1 };
+}
+/// Quantità di scorta (nell'unità del prodotto) scritta nell'unità di lettura: 21,2 q → "2.120 kg".
+export const quantitaScorta = (p, valore) => quantita(Number(valore) * unitaScorta(p).fattore, unitaScorta(p).unita);
+
 /// Letture del deposito pellet (kg sul pannello della caldaia), dalla più recente.
 export const lettureDeposito = prodotto => db.letture_deposito.filter(l => l.prodotto_id === prodotto.id)
     .sort((a, b) => b.momento.localeCompare(a.momento));
@@ -436,7 +443,7 @@ export function avvisi({ sezione = null } = {}) {
     for (const p of prodotti.filter(sottoScorta)) {
         elenco.push({
             id: `scorta-${p.id}`, gravita: 'inScadenza', icona: 'scatola',
-            titolo: `Scorta bassa: ${p.nome}`, dettaglio: `Restano ${quantita(analisiScorta(p).giacenza, p.unita)}`,
+            titolo: `Scorta bassa: ${p.nome}`, dettaglio: `Restano ${quantitaScorta(p, analisiScorta(p).giacenza)}`,
             data: null,
             // Le scorte si gestiscono nell'operazione: l'avviso apre quella (o il prodotto, se non è collegato).
             pagina: operazioneDiProdotto(p) ? { nome: 'operazione', id: operazioneDiProdotto(p).id } : { nome: 'prodotto', id: p.id },

@@ -6,7 +6,8 @@ import {
     TIPI_OPERAZIONE, allarmi, tipologieDi, interventiDi, ultimoInterventoDi, prossimaScadenza,
     statoScadenza, analisiProcesso, calcoliCarico, carichiOrdinati, svuotamentiOrdinati, consumoCenere,
     prodottoDi, prodottiOperazione, operazioneDiProdotto, categoriaPerOperazione, sezioneDi, nomeMovimento, nomeEsecuzione,
-    coloreImpianto, fornitoreContratto, lettureDeposito, PIANI, STATI_PIANO, analisiScorta, sottoScorta
+    coloreImpianto, fornitoreContratto, lettureDeposito, PIANI, STATI_PIANO, analisiScorta, sottoScorta,
+    unitaScorta, quantitaScorta
 } from '../logic.js';
 
 // ---------------------------------------------------------------------
@@ -165,9 +166,10 @@ export const NotificheOperazione = {
           <Interruttore :etichetta="prodotti.length > 1 ? 'Scorta minima · ' + p.nome : 'Avviso di scorta minima'" :model-value="p.scorta_minima > 0"
                         :disabilitato="!modifica" @update:model-value="v => salva('prodotti', { ...p, scorta_minima: v ? sogliaPredefinita(p) : 0 })"/>
           <!-- Salva solo a fine modifica: salvando a ogni tasto l'aggiornamento in tempo reale riscriveva il campo. -->
-          <CampoNumero v-if="p.scorta_minima > 0 && modifica" etichetta="Sotto" :unita="p.unita" :model-value="Number(p.scorta_minima)"
-                       @fine="v => v > 0 && v !== Number(p.scorta_minima) && salva('prodotti', { ...p, scorta_minima: v })"/>
-          <Riga v-else-if="p.scorta_minima > 0" titolo="Sotto" :valore="f.quantita(p.scorta_minima, p.unita)"/>
+          <CampoNumero v-if="p.scorta_minima > 0 && modifica" etichetta="Sotto" :unita="unitaScorta(p).unita"
+                       :model-value="Number(p.scorta_minima) * unitaScorta(p).fattore"
+                       @fine="v => v > 0 && v / unitaScorta(p).fattore !== Number(p.scorta_minima) && salva('prodotti', { ...p, scorta_minima: v / unitaScorta(p).fattore })"/>
+          <Riga v-else-if="p.scorta_minima > 0" titolo="Sotto" :valore="quantitaScorta(p, p.scorta_minima)"/>
         </template>
         <template v-if="o.tipo === 'storico'">
           <Passo v-for="t in tipologie" :key="t.id" :model-value="t.mesi_avviso" :min="0" :max="120" :disabilitato="!modifica"
@@ -200,7 +202,7 @@ export const NotificheOperazione = {
         }
     },
     methods: {
-        salva,
+        salva, unitaScorta, quantitaScorta,
         sogliaPredefinita: p => p.categoria === 'ossigeno' ? 50 : 5,
         aggiorna(campi) { salva('operazioni', { ...this.o, ...campi }); },
         async aggiungiTipologia() {
@@ -574,8 +576,8 @@ const DepositoPellet = {
       <Gruppo titolo="Scorta">
         <div class="valore-grande">
           <div class="etichetta">Pellet nel deposito</div>
-          <div class="numero" :class="{ rosso: basso }">{{ f.quantita(giacenza, prodotto.unita) }}</div>
-          <div v-if="basso" class="arancione-t" style="font-size:14px">Sotto la scorta minima ({{ f.quantita(prodotto.scorta_minima, prodotto.unita) }})</div>
+          <div class="numero" :class="{ rosso: basso }">{{ quantitaScorta(prodotto, giacenza) }}</div>
+          <div v-if="basso" class="arancione-t" style="font-size:14px">Sotto la scorta minima ({{ quantitaScorta(prodotto, prodotto.scorta_minima) }})</div>
         </div>
         <Riga v-if="letture[0]" titolo="Ultima lettura" :valore="f.dataOra(letture[0].momento) + ' · ' + f.quantita(letture[0].kg, 'kg')"/>
         <Riga v-else titolo="Nessuna lettura del deposito" class="secondario"/>
@@ -628,7 +630,7 @@ const DepositoPellet = {
         statiPiano() { return STATI_PIANO.map(([valore, nome]) => ({ valore, nome })); }
     },
     methods: {
-        puoModificare,
+        puoModificare, quantitaScorta,
         /// Consumo rispetto alla lettura precedente (positivo = pellet bruciato).
         delta(i) { const prima = this.letture[i + 1]; return prima ? Number(prima.kg) - Number(this.letture[i].kg) : null; },
         descriviPiani(l) {
