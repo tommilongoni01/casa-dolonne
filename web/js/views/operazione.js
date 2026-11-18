@@ -599,6 +599,7 @@ const DepositoPellet = {
       <Gruppo v-if="letture.length > 1" titolo="Andamento del deposito"
               :nota="Number(prodotto.scorta_minima) > 0 ? 'La linea tratteggiata è la scorta minima.' : ''" nota-sempre>
         <Grafico :serie="[{ nome: 'Deposito', colore: 'var(--arancione)', punti: punti }]" :formato-y="v => f.numero(v) + ' kg'"
+                 :min-y="0" :max-y="3600"
                  :riferimento="Number(prodotto.scorta_minima) > 0 ? prodotto.scorta_minima * 100 : null" valori/>
       </Gruppo>
       <Gruppo v-if="letture.length" titolo="Letture del deposito">

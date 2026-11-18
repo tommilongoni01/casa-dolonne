@@ -378,7 +378,8 @@ export const Grafico = {
         formatoY: { type: Function, default: v => String(Math.round(v * 10) / 10).replace('.', ',') },
         gradini: Boolean,
         valori: Boolean,           // scrive il valore misurato accanto a ogni punto
-        perAnno: Boolean           // asse orizzontale con un'etichetta per anno (un punto per anno)
+        perAnno: Boolean           // asse orizzontale con un'etichetta per anno (un punto per anno),
+        minY: Number, maxY: Number // estremi fissi dell'asse verticale (es. deposito pellet 0 – 3.600 kg)
     },
     template: `
       <div class="grafico">
@@ -420,6 +421,8 @@ export const Grafico = {
         sx() { return 14 + Math.max(...this.tacche.map(t => this.formatoY(t).length)) * 6.6; },
         /// Valori "tondi" per l'asse Y (es. -10, -5, 0 oppure 6,8 · 7 · 7,2…).
         passo() {
+            // Estremi fissi: 6 tacche uguali (0 – 3.600 → ogni 600).
+            if (this.minY != null && this.maxY != null) return { passo: (this.maxY - this.minY) / 6, min: this.minY, max: this.maxY };
             const valori = this.tutti.map(p => p.y);
             if (this.fascia) valori.push(this.fascia.min, this.fascia.max);
             if (this.riferimento !== undefined && this.riferimento !== null) valori.push(this.riferimento);
