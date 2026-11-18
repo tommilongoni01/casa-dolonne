@@ -493,7 +493,11 @@ export const ImpiantoPagina = {
                          :opzioni="[{ valore: null, nome: 'Scegli' }, ...daCollegare]" @update:model-value="collega"/>
             <Riga v-if="puoModificare()" azione icona="piuCerchio" titolo="Nuovo contatto" @click="nuovoContatto = true"/>
           </Gruppo>
-          <Gruppo v-if="contratti.length || puoModificare()" titolo="Contratti">
+        </template>
+
+        <!-- Contratti dell'impianto -->
+        <template v-if="schedaAttiva === 'contratti'">
+          <Gruppo v-if="contratti.length || puoModificare()">
             <Riga v-if="!contratti.length" titolo="Nessun contratto" class="secondario"/>
             <RigaContratto v-for="c in contratti" :key="c.id" :contratto="c" @click="apri({ nome: 'contratto', id: c.id })"/>
             <Riga v-if="puoModificare()" azione icona="documento" titolo="Aggiungi contratto" @click="nuovoContratto = true"/>
@@ -534,7 +538,8 @@ export const ImpiantoPagina = {
             const tutte = [
                 { id: 'operazioni', nome: 'Operazioni', numero: this.operazioni.length },
                 { id: 'manuale', nome: 'Manuale', numero: this.guide.length + this.documenti.length },
-                { id: 'contatti', nome: 'Contatti', numero: this.contatti.length + this.contratti.length }
+                { id: 'contratti', nome: 'Contratti', numero: this.contratti.length },
+                { id: 'contatti', nome: 'Contatti', numero: this.contatti.length }
             ];
             // Chi ha sola lettura non vede le schede vuote.
             return puoModificare() ? tutte : tutte.filter(s => s.numero > 0);
