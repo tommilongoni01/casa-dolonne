@@ -2,7 +2,7 @@
 // con operazioni, manuale (guide e documenti) e contatti.
 import { computed } from 'vue';
 import { db, salva, elimina, caricaFile, puoModificare } from '../store.js';
-import { nav, pila, apri, apriDaElenco, stessaPagina } from '../nav.js';
+import { nav, pila, apri, apriDaElenco, stessaPagina, cambiaScheda } from '../nav.js';
 import * as f from '../format.js';
 import { COLORE_SEZIONE, ICONE_SEZIONE } from '../icone.js';
 import {
@@ -255,6 +255,7 @@ export const CasaHome = {
       <Pagina titolo="Casa Dolonne" grande :con-indietro="false">
         <template #azioni>
           <button v-if="sezioni.length" class="pulsante-barra" @click="apriRicerca" aria-label="Cerca"><Icona nome="ricerca" :dimensione="20"/></button>
+          <button class="pulsante-barra" @click="cambiaScheda('impostazioni')" aria-label="Impostazioni"><Icona nome="ingranaggio" :dimensione="20"/></button>
           <button v-if="puoModificare() && sezioni.length" class="pulsante-barra" @click="modificaImpianti = !modificaImpianti">{{ modificaImpianti ? 'Fine' : 'Modifica' }}</button>
           <button v-if="puoModificare()" class="pulsante-barra" @click="nuova = { nome: '', icona: 'chiave' }" aria-label="Nuovo impianto"><Icona nome="piu"/></button>
         </template>
@@ -380,7 +381,7 @@ export const CasaHome = {
         }
     },
     methods: {
-        puoModificare, apriDaElenco, iconaOperazione,
+        puoModificare, apriDaElenco, iconaOperazione, cambiaScheda,
         tipo: o => TIPI_OPERAZIONE[o.tipo] ?? TIPI_OPERAZIONE.generica,
         nomeImpianto: id => sezioneDi(id)?.nome ?? '',
         selezionata(p) { return nav.largo && stessaPagina(pila()[0], p); },

@@ -1,12 +1,15 @@
 // Impostazioni: aspetto, account, familiari e contenuti iniziali.
 import { db, stato, salva, elimina, esci, puoModificare } from '../store.js';
-import { nav, pila, apriDaElenco, stessaPagina } from '../nav.js';
+import { nav, pila, apriDaElenco, stessaPagina, cambiaScheda } from '../nav.js';
 import { backend } from '../backend.js';
 import { inizializzaDati } from '../seed.js';
 
 export const Impostazioni = {
     template: `
       <Pagina titolo="Impostazioni" grande :con-indietro="false">
+        <template #azioni>
+          <button class="pulsante-barra" style="font-weight:600" @click="cambiaScheda('casa')">Fine</button>
+        </template>
         <Gruppo nota="Automatico segue l'impostazione chiaro/scuro del dispositivo.">
           <CampoScelta etichetta="Aspetto" :model-value="tema" :opzioni="temi" @update:model-value="cambiaTema"/>
         </Gruppo>
@@ -46,7 +49,7 @@ export const Impostazioni = {
         };
     },
     methods: {
-        puoModificare, apriDaElenco, stessaPagina, pila,
+        puoModificare, apriDaElenco, stessaPagina, pila, cambiaScheda,
         cambiaTema(v) {
             this.tema = v;
             localStorage.setItem('casaDolonne.tema', v);

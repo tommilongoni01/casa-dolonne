@@ -116,7 +116,7 @@ const App = {
             contatti: 'Nessun contatto selezionato', impostazioni: ''
         };
         return {
-            stato, nav, cima, cambiaScheda, diviso, schede: SCHEDE, etichette: ETICHETTE, puoModificare,
+            stato, nav, cima, cambiaScheda, diviso, schede: SCHEDE.filter(s => s !== 'impostazioni'), etichette: ETICHETTE, puoModificare,
             radice: computed(() => RADICI[nav.scheda]),
             chiaveCima: computed(() => `${nav.scheda}-${pila().length}-${cima.value?.nome}-${cima.value?.id ?? ''}`),
             segnaposto: computed(() => segnaposti[nav.scheda]),
