@@ -68,7 +68,7 @@ export const OperazionePagina = {
         </template>
         <Storico v-else :operazione="o"/>
 
-        <template v-if="puoModificare() || avvisiImpostati">
+        <template v-if="o.tipo !== 'storico' && (puoModificare() || avvisiImpostati)">
           <h2 class="sezione-operazione">Avvisi</h2>
           <NotificheOperazione :operazione="o"/>
         </template>
@@ -715,26 +715,18 @@ const Cenere = {
 const Storico = {
     props: { operazione: Object },
     template: `
-      <Gruppo titolo="Scadenze">
-        <Riga v-if="!tipologie.length" titolo="Nessuna tipologia: aggiungila nelle Notifiche qui sotto." class="secondario"/>
-        <Riga v-for="t in tipologie" :key="t.id" :titolo="t.nome" :sottotitolo="sottotitolo(t)">
-          <template #fine><BadgeScadenza v-if="scadenza(t)" :data="scadenza(t)" :stato="stato(t)"/></template>
-        </Riga>
-        <Riga v-if="puoModificare() && tipologie.length" azione icona="piuCerchio" titolo="Registra manutenzione" @click="foglio = {}"/>
-      </Gruppo>
-      <Gruppo v-if="interventi.length" titolo="Interventi">
+      <h2 class="sezione-operazione">Registro interventi</h2>
+      <Gruppo>
+        <Riga v-if="!interventi.length" titolo="Nessun intervento registrato" class="secondario"/>
         <Riga v-for="i in (tutti ? interventi : interventi.slice(0, 1))" :key="i.id" :titolo="f.data(i.data)" :sottotitolo="dettaglioIntervento(i)"
               @click="puoModificare() && (foglio = { voce: i })">
-          <template #fine>
-            <span class="riga-valore">
-              <span v-if="tipologie.length > 1" class="badge ok" style="color:var(--accento);background:var(--riempimento)">{{ nomeTipologia(i) }}</span>
-              <br v-if="Number(i.costo) && tipologie.length > 1"><small v-if="Number(i.costo)">{{ f.euro(i.costo) }}</small>
-            </span>
-          </template>
+          <template #fine><span v-if="Number(i.costo)" class="riga-valore">{{ f.euro(i.costo) }}</span></template>
         </Riga>
         <RigaEspandi :totale="interventi.length" v-model:aperto="tutti"/>
+        <Riga v-if="puoModificare()" azione icona="piuCerchio" titolo="Registra intervento" @click="foglio = {}"/>
       </Gruppo>
-      <Gruppo v-if="contratti.length || puoModificare()" titolo="Contratto di manutenzione" nota="Con una data di scadenza ricevi l'avviso prima che il contratto scada.">
+      <h2 v-if="contratti.length || puoModificare()" class="sezione-operazione">Archivio contratti</h2>
+      <Gruppo v-if="contratti.length || puoModificare()" nota="Le scadenze e gli avvisi si impostano nel contratto.">
         <Riga v-if="!contratti.length" titolo="Nessun contratto" class="secondario"/>
         <RigaContratto v-for="c in contratti" :key="c.id" :contratto="c" @click="apri({ nome: 'contratto', id: c.id })"/>
         <Riga v-if="puoModificare()" azione icona="documento" titolo="Aggiungi contratto" @click="nuovoContratto = true"/>
@@ -762,7 +754,8 @@ const Storico = {
         /// "Termoidraulica Rossi · da contratto · cambio filtri"
         dettaglioIntervento(i) {
             const chi = i.eseguito_da === 'proprio' ? `In proprio${i.esecutore ? ' (' + i.esecutore + ')' : ''}` : i.esecutore;
-            return [chi, i.contratto_id ? 'da contratto' : '', i.note].filter(Boolean).join(' · ');
+            const contratto = db.contratti.find(c => c.id === i.contratto_id);
+            return [chi, contratto ? 'contratto ' + contratto.titolo : '', i.note].filter(Boolean).join(' · ');
         }
     },
     setup() { return { f }; }
@@ -772,11 +765,10 @@ const InterventoFoglio = {
     props: { operazione: Object, intervento: Object },
     emits: ['chiudi'],
     template: `
-      <Foglio :titolo="intervento ? 'Modifica manutenzione' : 'Nuova manutenzione'" @annulla="$emit('chiudi')" @conferma="salvaIntervento">
+      <Foglio :titolo="intervento ? 'Modifica intervento' : 'Nuovo intervento'" @annulla="$emit('chiudi')" @conferma="salvaIntervento">
         <Gruppo>
           <CampoData v-model="b.data" etichetta="Data"/>
-          <CampoScelta v-if="tipologie.length > 1" v-model="b.tipologia_id" etichetta="Tipo" :opzioni="tipologie.map(t => ({ valore: t.id, nome: t.nome }))"/>
-          <CampoScelta v-model="b.contratto_id" etichetta="Da contratto" :opzioni="opzioniContratti"/>
+          <CampoScelta v-model="b.contratto_id" etichetta="Legato al contratto" :opzioni="opzioniContratti"/>
         </Gruppo>
         <Gruppo titolo="Eseguito da">
           <CampoScelta v-model="b.eseguito_da" etichetta="Eseguito da" :opzioni="[{ valore: 'ditta', nome: 'Ditta / fornitore' }, { valore: 'proprio', nome: 'In proprio' }]"/>

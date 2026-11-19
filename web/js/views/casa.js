@@ -400,11 +400,9 @@ export const CasaHome = {
         },
         async salvaImpianto() {
             if (this.nuova) {
-                // Ogni impianto nasce con l'operazione standard "Manutenzioni" (Principale ogni 12 mesi, Cliente).
+                // Ogni impianto nasce con l'operazione standard "Manutenzioni" (registro interventi e contratti).
                 const s = await salva('sezioni', { ...this.nuova, nome: this.nuova.nome.trim(), ordine: this.sezioni.length });
                 const o = await salva('operazioni', { sezione_id: s.id, titolo: 'Manutenzioni', tipo: 'storico', ordine: 0, passaggi: [], descrizione: '' });
-                await salva('tipologie', { operazione_id: o.id, nome: 'Principale', mesi_avviso: 12, ordine: 0 });
-                await salva('tipologie', { operazione_id: o.id, nome: 'Cliente', mesi_avviso: 0, ordine: 1 });
             }
             else await salva('sezioni', { ...this.modifica, nome: this.modifica.nome.trim() });
             this.nuova = this.modifica = null;

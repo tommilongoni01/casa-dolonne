@@ -318,7 +318,7 @@ export function vociCosto(anno) {
         if (!i.data || Number(i.data.slice(0, 4)) !== anno || !(Number(i.costo) > 0)) continue;
         const o = db.operazioni.find(o => o.id === i.operazione_id);
         const t = db.tipologie.find(t => t.id === i.tipologia_id);
-        voci.push({ id: 'i' + i.id, tipo: 'interventi', sezione_id: o?.sezione_id ?? null, titolo: t?.nome ?? 'Manutenzione',
+        voci.push({ id: 'i' + i.id, tipo: 'interventi', sezione_id: o?.sezione_id ?? null, titolo: i.contratto_id ? 'Intervento da contratto' : (t?.nome && t.nome !== 'Principale' ? t.nome : 'Intervento di manutenzione'),
             dettaglio: [i.esecutore, i.note].filter(Boolean).join(' · '), data: i.data, importo: Number(i.costo),
             pagina: o ? { nome: 'operazione', id: o.id } : null });
     }
@@ -378,17 +378,7 @@ export function allarmi(operazione) {
             dettaglio: `Ultimo ${nome} ${giorniTrascorsi(ultimo)} giorni fa`
         });
     }
-    const tipologie = tipologieDi(operazione);
-    const sistema = sezioneDi(operazione.sezione_id)?.nome ?? operazione.titolo;
-    for (const t of tipologie) {
-        const data = prossimaScadenza(t);
-        if (!data) continue;
-        elenco.push({
-            id: t.id, data, preavviso: 14,
-            titolo: tipologie.length > 1 ? `${t.nome} · ${sistema}` : `Manutenzione ${sistema}`,
-            dettaglio: `Ultima il ${dataBreve(ultimoInterventoDi(t).data)}`
-        });
-    }
+    // Le manutenzioni non hanno scadenze proprie: gli avvisi arrivano dai contratti.
     for (const a of elenco) a.stato = statoScadenza(a.data, a.preavviso);
     return elenco.sort((a, b) => a.data - b.data);
 }

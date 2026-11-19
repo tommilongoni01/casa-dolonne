@@ -68,10 +68,10 @@ export const DESCRIZIONI = {
             ]
         },
         storico: {
-            descrizione: "Manutenzione annuale della caldaia a pellet da parte del tecnico ETA (pulizia, controllo e analisi fumi) e interventi del cliente.",
+            descrizione: "Interventi di manutenzione della caldaia a pellet (pulizia, controllo e analisi fumi), fatti dal tecnico ETA o da voi.",
             passaggi: [
                 "Fissa la manutenzione prima dell'inverno.",
-                "Registra data e tipo: Principale (tecnico, ogni 12 mesi) o Cliente (interventi fatti da voi).",
+                "Registra l'intervento con data, chi l'ha eseguito, costo ed eventuale contratto.",
                 "Fai annotare la manutenzione sul libretto d'impianto e allega il rapporto.",
                 "Segnala al tecnico eventuali messaggi di errore comparsi sul pannello o su meinETA."
             ]
