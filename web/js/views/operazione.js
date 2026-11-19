@@ -7,7 +7,7 @@ import {
     statoScadenza, analisiProcesso, calcoliCarico, carichiOrdinati, svuotamentiOrdinati, consumoCenere,
     prodottoDi, prodottiOperazione, operazioneDiProdotto, categoriaPerOperazione, sezioneDi, nomeMovimento, nomeEsecuzione,
     coloreImpianto, fornitoreContratto, lettureDeposito, PIANI, STATI_PIANO, analisiScorta, sottoScorta,
-    unitaScorta, quantitaScorta
+    unitaScorta, quantitaScorta, movimentiDi
 } from '../logic.js';
 
 // ---------------------------------------------------------------------
@@ -50,16 +50,19 @@ export const OperazionePagina = {
             <div v-if="prodottiScorta.length > 1" class="segmenti">
               <button v-for="p in prodottiScorta" :key="p.id" :class="{ attivo: p.id === prodottoScelto.id }" @click="scelto = p.id">{{ p.nome }}</button>
             </div>
-            <DepositoPellet v-if="o.tipo === 'pellet' && prodottoScelto.categoria === 'pellet'" :prodotto="prodottoScelto" :key="'d' + prodottoScelto.id"/>
+            <template v-if="o.tipo === 'pellet' && prodottoScelto.categoria === 'pellet'">
+              <DepositoPellet :prodotto="prodottoScelto" :key="'d' + prodottoScelto.id"/>
+              <Pellet :operazione="o"/>
+            </template>
             <SezioniScorta v-else :prodotto="prodottoScelto" :key="prodottoScelto.id" con-grafici/>
           </template>
 
           <!-- Altre operazioni specifiche (misure pH, cambio acqua, carichi pellet, cenere) -->
-          <template v-if="['ph', 'cambioAcqua', 'pellet', 'cenere'].includes(o.tipo)">
+          <template v-if="['ph', 'cambioAcqua', 'cenere'].includes(o.tipo) || (o.tipo === 'pellet' && !prodottoScelto)">
             <h2 class="sezione-operazione">{{ usaProdotti ? 'Altre operazioni' : 'Registro' }}</h2>
             <MisurePH v-if="o.tipo === 'ph'"/>
             <CambioAcqua v-if="o.tipo === 'cambioAcqua'"/>
-            <Pellet v-if="o.tipo === 'pellet'" :operazione="o"/>
+            <Pellet v-if="o.tipo === 'pellet' && !prodottoScelto" :operazione="o"/>
             <Cenere v-if="o.tipo === 'cenere'"/>
           </template>
         </template>
@@ -533,16 +536,6 @@ export const ProcessoPagina = {
 const Pellet = {
     props: { operazione: Object },
     template: `
-      <Gruppo titolo="Ultimo carico">
-        <template v-if="ultimo">
-          <Riga titolo="Data" :valore="f.data(ultimo.data)"/>
-          <Riga titolo="Quantità acquistata" :valore="f.quantita(ultimo.quantita, unita)"/>
-          <Riga titolo="Costo al quintale" :valore="f.euro(calcoliCarico(ultimo).prezzo)"/>
-          <Riga titolo="Spesa (IVA incl.)" :valore="f.euro(ultimo.costo)"/>
-          <Riga v-if="calcoliCarico(ultimo).postcarico !== null" titolo="Deposito dopo il carico" :valore="f.quantita(calcoliCarico(ultimo).postcarico, unita)"/>
-        </template>
-        <Riga v-else titolo="Nessun carico registrato" class="secondario"/>
-      </Gruppo>
       <p v-if="!prodotto" class="gruppo-nota">Collega il prodotto Pellet dal magazzino (sezione Prodotti) per registrare i carichi con “Acquisto”.</p>
       <Gruppo v-if="carichi.length" titolo="Registro carichi" nota="Tocca una riga per modificarla">
         <div class="tabella-scorri">
@@ -593,6 +586,11 @@ const DepositoPellet = {
         </div>
         <Riga v-if="letture[0]" titolo="Ultima lettura" :valore="f.dataOra(letture[0].momento) + ' · ' + f.quantita(letture[0].kg, 'kg')"/>
         <Riga v-else titolo="Nessuna lettura del deposito" class="secondario"/>
+        <template v-if="carico">
+          <Riga titolo="Ultimo carico" :valore="f.data(carico.data) + ' · ' + f.quantita(carico.quantita, prodotto.unita)"/>
+          <Riga titolo="Costo al quintale" :valore="f.euro(calcoliCarico(carico).prezzo)"/>
+          <Riga titolo="Spesa (IVA incl.)" :valore="f.euro(carico.costo)"/>
+        </template>
       </Gruppo>
       <Azioni v-if="puoModificare()" :voci="[{ id: 'acquisto', nome: 'Acquisto', icona: 'carrello' }, { id: 'lettura', nome: 'Nuova lettura', icona: 'righello' }]"
               @scegli="t => t === 'acquisto' ? (acquisto = true) : (lettura = {})"/>
@@ -637,13 +635,14 @@ const DepositoPellet = {
     },
     computed: {
         letture() { return lettureDeposito(this.prodotto); },
+        carico() { return movimentiDi(this.prodotto).find(m => m.tipo === 'acquisto') ?? null; },
         giacenza() { return analisiScorta(this.prodotto).giacenza; },
         basso() { return sottoScorta(this.prodotto); },
         punti() { return [...this.letture].reverse().map(l => ({ x: new Date(l.momento), y: Number(l.kg) })); },
         statiPiano() { return STATI_PIANO.map(([valore, nome]) => ({ valore, nome })); }
     },
     methods: {
-        puoModificare, quantitaScorta,
+        puoModificare, quantitaScorta, calcoliCarico,
         /// Consumo rispetto alla lettura precedente (positivo = pellet bruciato).
         delta(i) { const prima = this.letture[i + 1]; return prima ? Number(prima.kg) - Number(this.letture[i].kg) : null; },
         descriviPiani(l) {
