@@ -298,11 +298,6 @@ export const CasaHome = {
             <div class="cruscotto">
               <div class="cruscotto-stato">
                 <SchedaStato :avvisi="elencoAvvisi" :prossima="prossimaScadenza"/>
-                <button class="scheda-costi" @click="apriDaElenco({ nome: 'costi' })">
-                  <IconaQuadrata nome="carrello" colore="var(--accento)" :dimensione="34"/>
-                  <span class="scheda-costi-testi"><span class="secondario">Costi {{ annoCorrente }}</span><b>{{ f.euro(costiAnno) }}</b></span>
-                  <Icona nome="avanti" :dimensione="16" class="secondario"/>
-                </button>
                 <!-- Avvisi come schede -->
                 <div v-if="elencoAvvisi.length" class="schede-avvisi">
                   <SchedaAvviso v-for="a in elencoAvvisi" :key="a.id" :avviso="a" @apri="apriDaElenco"/>
@@ -325,6 +320,11 @@ export const CasaHome = {
                     </template>
                   </Riga>
                 </Gruppo>
+                <button class="scheda-costi" style="margin-top:14px;width:100%" @click="apriDaElenco({ nome: 'costi' })">
+                  <IconaQuadrata nome="carrello" colore="var(--accento)" :dimensione="34"/>
+                  <span class="scheda-costi-testi"><span class="secondario">Costi {{ annoCorrente }}</span><b>{{ f.euro(costiAnno) }}</b></span>
+                  <Icona nome="avanti" :dimensione="16" class="secondario"/>
+                </button>
               </div>
 
               <!-- Calendario degli interventi -->
