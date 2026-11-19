@@ -34,14 +34,18 @@ function nomeGiorno(d) {
 
 /// Riquadro grande in cima: lo stato della casa in una frase, come nell'app Casa di Apple.
 const SchedaStato = {
-    props: { avvisi: Array, prossima: Object },
+    props: { avvisi: Array, prossima: Object, impianti: Number, inArrivo: Number },
     template: `
       <div class="scheda-stato" :class="'stato-' + stato">
-        <span class="scheda-stato-icona"><Icona :nome="icona" :dimensione="30"/></span>
-        <span class="scheda-stato-testi">
+        <div class="scheda-stato-testa">
+          <span class="scheda-stato-icona"><Icona :nome="icona" :dimensione="28"/></span>
           <span class="scheda-stato-titolo">{{ titolo }}</span>
-          <span class="scheda-stato-dettaglio">{{ dettaglio }}</span>
-        </span>
+        </div>
+        <div class="scheda-stato-valori">
+          <span><b>{{ impianti }}</b>impianti</span>
+          <span><b>{{ inArrivo }}</b>scadenze in 30 giorni</span>
+          <span><b>{{ prossima ? dataProssima : '–' }}</b>{{ prossima ? prossima.titolo : 'prossima scadenza' }}</span>
+        </div>
       </div>`,
     computed: {
         conteggio() {
@@ -52,17 +56,13 @@ const SchedaStato = {
         icona() { return { scaduto: 'avviso', inScadenza: 'orologio', ok: 'sigillo' }[this.stato]; },
         titolo() {
             const { scaduti, inScadenza, inCorso } = this.conteggio;
-            if (scaduti) return scaduti === 1 ? '1 cosa da fare' : `${scaduti} cose da fare`;
-            if (inScadenza) return inScadenza === 1 ? '1 scadenza vicina' : `${inScadenza} scadenze vicine`;
-            if (inCorso) return 'Operazione in corso';
-            return 'Tutto in regola';
+            const parti = [];
+            if (scaduti) parti.push(scaduti === 1 ? '1 cosa da fare' : `${scaduti} cose da fare`);
+            if (inScadenza) parti.push(inScadenza === 1 ? '1 in scadenza' : `${inScadenza} in scadenza`);
+            if (!parti.length && inCorso) parti.push('Operazione in corso');
+            return parti.join(' · ') || 'Tutto in regola';
         },
-        dettaglio() {
-            const altri = [];
-            if (this.conteggio.scaduti && this.conteggio.inScadenza) altri.push(`${this.conteggio.inScadenza} in scadenza`);
-            if (this.prossima) altri.push(`Prossimo: ${this.prossima.titolo} · ${nomeGiorno(this.prossima.data).toLowerCase()}`);
-            return altri.join(' · ') || 'Nessuna scadenza in programma';
-        }
+        dataProssima() { return new Intl.DateTimeFormat('it-IT', { day: 'numeric', month: 'short' }).format(this.prossima.data); }
     }
 };
 
@@ -297,7 +297,8 @@ export const CasaHome = {
           <template v-else>
             <div class="cruscotto">
               <div class="cruscotto-stato">
-                <SchedaStato :avvisi="elencoAvvisi" :prossima="prossimaScadenza"/>
+                <SchedaStato :avvisi="elencoAvvisi" :prossima="prossimaScadenza" :impianti="sezioni.length"
+                             :in-arrivo="scadenze.filter(v => v.data >= oggi && v.data <= fra30).length"/>
                 <!-- Avvisi come schede -->
                 <div v-if="elencoAvvisi.length" class="schede-avvisi">
                   <SchedaAvviso v-for="a in elencoAvvisi" :key="a.id" :avviso="a" @apri="apriDaElenco"/>
@@ -360,10 +361,11 @@ export const CasaHome = {
         const sezioni = computed(() => db.sezioni.slice().sort((a, b) => a.ordine - b.ordine));
         const scadenze = computed(() => calendarioScadenze());
         // Prossima scadenza futura non ancora in allarme (per il riquadro dello stato).
-        const prossimaScadenza = computed(() => scadenze.value.find(v => v.gravita === 'info' && v.data >= f.giorno(new Date())) ?? null);
+        const prossimaScadenza = computed(() => scadenze.value.find(v => v.data >= f.giorno(new Date())) ?? null);
+        const oggi = f.giorno(new Date()), fra30 = f.aggiungiGiorni(oggi, 30);
         const annoCorrente = new Date().getFullYear();
         const costiAnno = computed(() => totale(vociCosto(annoCorrente)));
-        return { elencoAvvisi, elencoProssime, conteggi, sezioni, scadenze, prossimaScadenza, annoCorrente, costiAnno, f };
+        return { elencoAvvisi, elencoProssime, conteggi, sezioni, scadenze, prossimaScadenza, annoCorrente, costiAnno, f, oggi, fra30 };
     },
     computed: {
         risultati() {
@@ -474,6 +476,15 @@ export const ImpiantoPagina = {
                   :sottotitolo="'Aggiornata il ' + f.dataBreve(g.aggiornata)" freccia @click="apri({ nome: 'guida', id: g.id })"/>
             <Riga v-if="puoModificare()" azione icona="piuCerchio" titolo="Nuova guida" @click="nuovaGuida"/>
           </Gruppo>
+        </template>
+
+        <!-- Documenti: contratti, documenti del fornitore e contatti dell'impianto -->
+        <template v-if="schedaAttiva === 'documenti'">
+          <Gruppo v-if="contratti.length || puoModificare()" titolo="Contratti">
+            <Riga v-if="!contratti.length" titolo="Nessun contratto" class="secondario"/>
+            <RigaContratto v-for="c in contratti" :key="c.id" :contratto="c" @click="apri({ nome: 'contratto', id: c.id })"/>
+            <Riga v-if="puoModificare()" azione icona="documento" titolo="Aggiungi contratto" @click="nuovoContratto = true"/>
+          </Gruppo>
           <Gruppo v-if="documenti.length || puoModificare()" titolo="Documenti del fornitore">
             <Riga v-if="!documenti.length" titolo="Nessun documento" class="secondario"/>
             <RigaDocumento v-for="d in documenti" :key="d.id" :documento="d"/>
@@ -482,10 +493,6 @@ export const ImpiantoPagina = {
               <input type="file" multiple accept="application/pdf,image/*,.doc,.docx,.xls,.xlsx" hidden @change="importa">
             </label>
           </Gruppo>
-        </template>
-
-        <!-- Contatti e contratti -->
-        <template v-if="schedaAttiva === 'contatti'">
           <Gruppo v-if="contatti.length || puoModificare()" titolo="Contatti">
             <Riga v-if="!contatti.length" titolo="Nessun contatto" class="secondario"/>
             <Riga v-for="c in contatti" :key="c.id" icona="persona" :titolo="nomeContatto(c)" :sottotitolo="sottotitoloContatto(c)" freccia
@@ -497,15 +504,6 @@ export const ImpiantoPagina = {
             <CampoScelta v-if="puoModificare() && daCollegare.length" etichetta="Collega dalla rubrica" :model-value="null"
                          :opzioni="[{ valore: null, nome: 'Scegli' }, ...daCollegare]" @update:model-value="collega"/>
             <Riga v-if="puoModificare()" azione icona="piuCerchio" titolo="Nuovo contatto" @click="nuovoContatto = true"/>
-          </Gruppo>
-        </template>
-
-        <!-- Contratti dell'impianto -->
-        <template v-if="schedaAttiva === 'contratti'">
-          <Gruppo v-if="contratti.length || puoModificare()">
-            <Riga v-if="!contratti.length" titolo="Nessun contratto" class="secondario"/>
-            <RigaContratto v-for="c in contratti" :key="c.id" :contratto="c" @click="apri({ nome: 'contratto', id: c.id })"/>
-            <Riga v-if="puoModificare()" azione icona="documento" titolo="Aggiungi contratto" @click="nuovoContratto = true"/>
           </Gruppo>
         </template>
 
@@ -542,9 +540,8 @@ export const ImpiantoPagina = {
         schede() {
             const tutte = [
                 { id: 'operazioni', nome: 'Operazioni', numero: this.operazioni.length },
-                { id: 'manuale', nome: 'Manuale', numero: this.guide.length + this.documenti.length },
-                { id: 'contratti', nome: 'Contratti', numero: this.contratti.length },
-                { id: 'contatti', nome: 'Contatti', numero: this.contatti.length }
+                { id: 'manuale', nome: 'Manuale', numero: this.guide.length },
+                { id: 'documenti', nome: 'Documenti', numero: this.contratti.length + this.documenti.length + this.contatti.length }
             ];
             // Chi ha sola lettura non vede le schede vuote.
             return puoModificare() ? tutte : tutte.filter(s => s.numero > 0);

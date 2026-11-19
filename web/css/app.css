@@ -565,3 +565,11 @@ table.tabella { border-collapse: collapse; width: 100%; font-size: 14px; font-va
 .segmenti-anni { overflow-x: auto; }
 .segmenti-anni button { flex: 0 0 auto; min-width: 64px; }
 .totale-costi { border-radius: var(--raggio); box-shadow: var(--ombra); margin-top: 6px; }
+/* Scheda di stato con tre valori */
+.scheda-stato { flex-direction: column; align-items: stretch; gap: 14px; }
+.scheda-stato-testa { display: flex; align-items: center; gap: 12px; }
+.scheda-stato-testa .scheda-stato-icona { width: 44px; height: 44px; border-radius: 13px; }
+.scheda-stato-valori { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.scheda-stato-valori span { display: flex; flex-direction: column; gap: 2px; font-size: 12px; opacity: .92; min-width: 0;
+    background: rgba(255,255,255,.16); border-radius: 12px; padding: 8px 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.scheda-stato-valori b { font-size: 20px; font-weight: 700; letter-spacing: -0.3px; opacity: 1; }
