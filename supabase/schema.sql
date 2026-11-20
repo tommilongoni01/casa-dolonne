@@ -233,6 +233,9 @@ alter table interventi add column if not exists contratto_id uuid references con
 alter table interventi add column if not exists eseguito_da text not null default 'ditta';
 alter table interventi add column if not exists esecutore text not null default '';
 alter table interventi add column if not exists costo numeric not null default 0;
+alter table sezioni add column if not exists speciale text not null default '';
+alter table interventi add column if not exists titolo text not null default '';
+alter table interventi add column if not exists allegati jsonb not null default '[]';
 
 -- ---------------------------------------------------------------------
 -- Regole di accesso: i familiari leggono, gli editor modificano.

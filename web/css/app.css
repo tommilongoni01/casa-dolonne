@@ -565,11 +565,19 @@ table.tabella { border-collapse: collapse; width: 100%; font-size: 14px; font-va
 .segmenti-anni { overflow-x: auto; }
 .segmenti-anni button { flex: 0 0 auto; min-width: 64px; }
 .totale-costi { border-radius: var(--raggio); box-shadow: var(--ombra); margin-top: 6px; }
-/* Scheda di stato con tre valori */
+/* Scheda di stato con tre indicatori */
 .scheda-stato { flex-direction: column; align-items: stretch; gap: 14px; }
 .scheda-stato-testa { display: flex; align-items: center; gap: 12px; }
 .scheda-stato-testa .scheda-stato-icona { width: 44px; height: 44px; border-radius: 13px; }
-.scheda-stato-valori { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-.scheda-stato-valori span { display: flex; flex-direction: column; gap: 2px; font-size: 12px; opacity: .92; min-width: 0;
-    background: rgba(255,255,255,.16); border-radius: 12px; padding: 8px 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.scheda-stato-valori b { font-size: 20px; font-weight: 700; letter-spacing: -0.3px; opacity: 1; }
+.scheda-stato-valori { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 10px; }
+.scheda-stato-valori button { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; min-width: 0; color: #fff; text-align: left;
+    background: rgba(255,255,255,.16); border-radius: 14px; padding: 10px 12px; transition: background-color .15s; }
+.scheda-stato-valori button:disabled { opacity: 1; cursor: default; }
+.scheda-stato-valori button:not(:disabled):active { background: rgba(255,255,255,.26); }
+.scheda-stato-valori small { font-size: 12px; opacity: .9; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.scheda-stato-valori b { font-size: 20px; font-weight: 700; letter-spacing: -0.3px; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.barra-livello { width: 100%; height: 5px; border-radius: 3px; background: rgba(255,255,255,.3); overflow: hidden; margin-top: 3px; }
+.barra-livello i { display: block; height: 100%; background: #fff; border-radius: 3px; }
+.pallino { width: 9px; height: 9px; border-radius: 50%; display: inline-block; border: 1.5px solid #fff; }
+.pallino.verde { background: #34C759; } .pallino.arancione { background: #FFCC00; } .pallino.rosso { background: #FF3B30; }
+@media (hover: hover) and (pointer: fine) { .scheda-stato-valori button:not(:disabled):hover { background: rgba(255,255,255,.24); } }

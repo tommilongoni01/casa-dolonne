@@ -8,6 +8,16 @@ export const GUIDE_EXTRA = [{
     html: '<h3>Carico del pellet</h3><ol>' + ["Prima del carico leggi sul pannello ETA i kg presenti nel deposito.", "Usa pellet certificato ENplus A1, asciutto e con pochi residui di polvere.", "Registra l'acquisto (pulsante Acquisto) con quantità, prezzo al quintale, sconto, trasporto, IVA e fornitore.", "Dopo il carico registra una nuova lettura del deposito con i kg indicati dal pannello.", "Durante la stagione registra le letture del deposito con lo stato dei piani (Spa, P-1, P0, P1): così si vede quanto consuma ogni configurazione.", "Sotto i 5 q compare l'avviso di scorta minima.", "Se il pellet finisce, la pompa di calore può scaldare al posto della caldaia (vedi guida \"Gestione priorità\")."].map(p => `<li>${p}</li>`).join('') + '</ol>'
 }];
 
+/// Categorie iniziali dell'impianto speciale "Manutenzioni Generali" (lavori della casa non legati a un impianto).
+export const CATEGORIE_LAVORI = [
+    ['Verniciature', 'pennello', 'Pitturazione di pareti, soffitti, legno e ferro: garage, balconi, persiane, ringhiere.'],
+    ['Recinzioni e staccionate', 'forbici', 'Staccionate, cancelli, reti e muretti di confine: riparazioni, trattamento del legno, rifacimenti.'],
+    ['Tetto e grondaie', 'goccia', 'Controllo e pulizia di tetto, grondaie e pluviali, sostituzione di tegole e scossaline.'],
+    ['Serramenti e porte', 'casa', 'Finestre, porte, persiane e scuri: regolazioni, guarnizioni, verniciatura, sostituzioni.'],
+    ['Esterni e pavimentazioni', 'scopa', 'Vialetti, scale esterne, terrazzi, pavimentazioni e muretti: pulizia, riparazioni, rifacimenti.'],
+    ['Piccole riparazioni', 'chiave', 'Lavori occasionali in casa non legati a un impianto: mobili, maniglie, sigillature, montaggi.']
+];
+
 export const DESCRIZIONI = {
     Piscina: {
         ph: {

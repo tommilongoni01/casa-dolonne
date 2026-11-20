@@ -13,6 +13,7 @@ export const TIPI_OPERAZIONE = {
     pellet: { nome: 'Pellet', icona: 'fiamma' },
     cenere: { nome: 'Svuotamento cenere', icona: 'cestino' },
     storico: { nome: 'Manutenzioni', icona: 'chiave' },
+    lavori: { nome: 'Lavori', icona: 'pennello' },
     generica: { nome: 'Operazione', icona: 'lista' }
 };
 
@@ -21,6 +22,9 @@ export const iconaOperazione = o => o?.icona || TIPI_OPERAZIONE[o?.tipo]?.icona 
 
 /// Colore di un impianto (quello della sua icona), usato per i simboli di operazioni e prodotti.
 export const coloreImpianto = sezioneId => COLORE_SEZIONE[db.sezioni.find(s => s.id === sezioneId)?.icona] ?? 'var(--accento)';
+
+/// Impianto speciale "Manutenzioni Generali": lavori della casa non legati a un impianto, divisi per categoria.
+export const eGenerale = sezione => sezione?.speciale === 'generale';
 
 export const CATEGORIE = {
     ossigeno: 'Ossigeno', ph: 'Correttore pH', flocculante: 'Flocculante', pellet: 'Pellet', altro: 'Altro'
@@ -318,7 +322,8 @@ export function vociCosto(anno) {
         if (!i.data || Number(i.data.slice(0, 4)) !== anno || !(Number(i.costo) > 0)) continue;
         const o = db.operazioni.find(o => o.id === i.operazione_id);
         const t = db.tipologie.find(t => t.id === i.tipologia_id);
-        voci.push({ id: 'i' + i.id, tipo: 'interventi', sezione_id: o?.sezione_id ?? null, titolo: i.contratto_id ? 'Intervento da contratto' : (t?.nome && t.nome !== 'Principale' ? t.nome : 'Intervento di manutenzione'),
+        voci.push({ id: 'i' + i.id, tipo: 'interventi', sezione_id: o?.sezione_id ?? null,
+            titolo: i.titolo?.trim() || (o?.tipo === 'lavori' ? o.titolo : i.contratto_id ? 'Intervento da contratto' : (t?.nome && t.nome !== 'Principale' ? t.nome : 'Intervento di manutenzione')),
             dettaglio: [i.esecutore, i.note].filter(Boolean).join(' · '), data: i.data, importo: Number(i.costo),
             pagina: o ? { nome: 'operazione', id: o.id } : null });
     }

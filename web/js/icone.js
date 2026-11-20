@@ -19,6 +19,7 @@ const P = {
     forbici: '<circle cx="6" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M8.5 7.5 20 18M8.5 16.5 20 6"/>',
     scopa: '<path d="M15 3l-3 8"/><path d="M7 11h9l2 10H5z"/><path d="M9 15v6M13 15v6"/>',
     occhio: '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+    pennello: '<rect x="3" y="3" width="14" height="6" rx="1.5"/><path d="M17 6h2.5a1 1 0 0 1 1 1v3.5a1 1 0 0 1-1 1H12V14"/><rect x="10.5" y="14" width="3" height="7" rx="1"/>',
     ventola: '<circle cx="12" cy="12" r="1.5"/><path d="M12 10.5c0-4 1-7 4-7 2 0 2.5 3-1 5.5M13.5 12c4 0 7 1 7 4 0 2-3 2.5-5.5-1M12 13.5c0 4-1 7-4 7-2 0-2.5-3 1-5.5M10.5 12c-4 0-7-1-7-4 0-2 3-2.5 5.5 1"/>',
     vento: '<path d="M3 8h11a3 3 0 1 0-3-3M3 12h15a3 3 0 1 1-3 3M3 16h8"/>',
     casa: '<path d="M3 11 12 4l9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',
@@ -76,18 +77,18 @@ const P = {
 };
 
 export const ICONE_SEZIONE = ['goccia', 'fulmine', 'fiamma', 'libro', 'sole', 'piscina', 'ascensore', 'ventola',
-    'vento', 'scudo', 'germoglio', 'casa', 'chiave'];
+    'vento', 'scudo', 'germoglio', 'pennello', 'casa', 'chiave'];
 
 /// Simboli tra cui scegliere per operazioni e prodotti (lo sfondo prende il colore dell'impianto).
 export const ICONE_SIMBOLI = ['lista', 'chiave', 'occhio', 'spunta', 'provetta', 'bolle', 'goccia', 'ciclo', 'filtro',
     'termometro', 'fiamma', 'cestino', 'scopa', 'tanica', 'sacco', 'scatola', 'righello', 'lampadina', 'batteria', 'fulmine',
-    'sole', 'ventola', 'vento', 'scudo', 'germoglio', 'forbici', 'calendario'];
+    'sole', 'ventola', 'vento', 'scudo', 'germoglio', 'forbici', 'pennello', 'calendario'];
 
 /// Colore dell'icona di ogni sistema, come nell'app Impostazioni di iOS.
 export const COLORE_SEZIONE = {
     goccia: '#0A84FF', fulmine: '#FFB800', fiamma: '#FF9500', libro: '#8E8E93', sole: '#34C759',
     piscina: '#32ADE6', ascensore: '#5856D6', ventola: '#30B0C7', vento: '#00C7BE', casa: '#A2845E',
-    scudo: '#FF3B30', germoglio: '#30A14E',
+    scudo: '#FF3B30', germoglio: '#30A14E', pennello: '#AF52DE',
     chiave: 'var(--accento)'
 };
 

@@ -1,5 +1,6 @@
 // Scheda di un'operazione (pH, ossigeno, cambio acqua, pellet, cenere, storico manutenzioni, generica).
-import { db, stato, salva, elimina, caricaFile, puoModificare } from '../store.js';
+import { db, stato, salva, elimina, caricaFile, urlFile, puoModificare } from '../store.js';
+import { riduciFoto } from './manuale.js';
 import { nav, apri, apriDaElenco, indietro } from '../nav.js';
 import * as f from '../format.js';
 import {
@@ -34,7 +35,7 @@ export const OperazionePagina = {
                 :titolo="a.stato === 'scaduta' ? a.titolo + ': da fare' : a.titolo + ': entro il ' + f.data(a.data)" :sottotitolo="a.dettaglio"/>
         </Gruppo>
 
-        <template v-if="o.tipo !== 'storico'">
+        <template v-if="!registro">
           <!-- Prodotti: quelli del magazzino usati in questa operazione (si collegano dal Magazzino) -->
           <template v-if="usaProdotti && (prodottiScorta.length || puoModificare())">
             <h2 class="sezione-operazione">Prodotti</h2>
@@ -68,7 +69,7 @@ export const OperazionePagina = {
         </template>
         <Storico v-else :operazione="o"/>
 
-        <template v-if="o.tipo !== 'storico' && (puoModificare() || avvisiImpostati)">
+        <template v-if="!registro && (puoModificare() || avvisiImpostati)">
           <h2 class="sezione-operazione">Avvisi</h2>
           <NotificheOperazione :operazione="o"/>
         </template>
@@ -88,7 +89,9 @@ export const OperazionePagina = {
     computed: {
         o() { return db.operazioni.find(o => o.id === this.id); },
         /// Cambio acqua e svuotamento cenere sono operazioni manuali, senza prodotti.
-        usaProdotti() { return !['storico', 'cambioAcqua', 'cenere'].includes(this.o.tipo); },
+        /// Manutenzioni e categorie di lavori: solo registro (niente prodotti, scorte e avvisi).
+        registro() { return ['storico', 'lavori'].includes(this.o.tipo); },
+        usaProdotti() { return !['storico', 'lavori', 'cambioAcqua', 'cenere'].includes(this.o.tipo); },
         /// Per chi ha sola lettura la sezione Avvisi compare solo se c'è almeno un avviso impostato.
         avvisiImpostati() {
             return this.o.giorni_allarme > 0 || this.prodottiScorta.some(p => Number(p.scorta_minima) > 0)
@@ -715,18 +718,24 @@ const Cenere = {
 const Storico = {
     props: { operazione: Object },
     template: `
-      <h2 class="sezione-operazione">Registro interventi</h2>
+      <h2 class="sezione-operazione">{{ lavori ? 'Registro lavori' : 'Registro interventi' }}</h2>
       <Gruppo>
-        <Riga v-if="!interventi.length" titolo="Nessun intervento registrato" class="secondario"/>
-        <Riga v-for="i in (tutti ? interventi : interventi.slice(0, 1))" :key="i.id" :titolo="f.data(i.data)" :sottotitolo="dettaglioIntervento(i)"
-              @click="puoModificare() && (foglio = { voce: i })">
-          <template #fine><span v-if="Number(i.costo)" class="riga-valore">{{ f.euro(i.costo) }}</span></template>
+        <Riga v-if="!interventi.length" :titolo="lavori ? 'Nessun lavoro registrato' : 'Nessun intervento registrato'" class="secondario"/>
+        <Riga v-for="i in (tutti ? interventi : interventi.slice(0, 3))" :key="i.id" :titolo="i.titolo || f.data(i.data)"
+              :sottotitolo="(i.titolo ? f.dataBreve(i.data) + ' · ' : '') + dettaglioIntervento(i)"
+              @click="puoModificare() ? (foglio = { voce: i }) : (dettaglio = i)">
+          <template #fine>
+            <span class="riga-valore"><span v-if="Number(i.costo)">{{ f.euro(i.costo) }}</span><br v-if="Number(i.costo) && (i.allegati ?? []).length">
+              <small v-if="(i.allegati ?? []).length" class="secondario">{{ i.allegati.length }} allegat{{ i.allegati.length === 1 ? 'o' : 'i' }}</small></span>
+          </template>
         </Riga>
-        <RigaEspandi :totale="interventi.length" v-model:aperto="tutti"/>
-        <Riga v-if="puoModificare()" azione icona="piuCerchio" titolo="Registra intervento" @click="foglio = {}"/>
+        <Riga v-if="interventi.length > 3" azione :icona="tutti ? 'frecciaSu' : 'frecciaGiu'" :titolo="tutti ? 'Mostra meno' : 'Mostra tutti (' + interventi.length + ')'" @click="tutti = !tutti"/>
+        <Riga v-if="puoModificare()" azione icona="piuCerchio" :titolo="lavori ? 'Registra lavoro' : 'Registra intervento'" @click="foglio = {}"/>
       </Gruppo>
-      <h2 v-if="contratti.length || puoModificare()" class="sezione-operazione">Archivio contratti</h2>
-      <Gruppo v-if="contratti.length || puoModificare()" nota="Le scadenze e gli avvisi si impostano nel contratto.">
+      <Gruppo v-if="lavori && interventi.some(i => Number(i.costo))"><Riga titolo="Spesa totale" :valore="f.euro(spesa)" style="font-weight:600"/></Gruppo>
+      <AllegatiFoglio v-if="dettaglio" :intervento="dettaglio" @chiudi="dettaglio = null"/>
+      <h2 v-if="!lavori && (contratti.length || puoModificare())" class="sezione-operazione">Archivio contratti</h2>
+      <Gruppo v-if="!lavori && (contratti.length || puoModificare())" nota="Le scadenze e gli avvisi si impostano nel contratto.">
         <Riga v-if="!contratti.length" titolo="Nessun contratto" class="secondario"/>
         <RigaContratto v-for="c in contratti" :key="c.id" :contratto="c" @click="apri({ nome: 'contratto', id: c.id })"/>
         <Riga v-if="puoModificare()" azione icona="documento" titolo="Aggiungi contratto" @click="nuovoContratto = true"/>
@@ -734,10 +743,12 @@ const Storico = {
       <Gruppo v-if="operazione.note" titolo="Note"><div class="riga testo-descrizione">{{ operazione.note }}</div></Gruppo>
       <InterventoFoglio v-if="foglio" :operazione="operazione" :intervento="foglio.voce" @chiudi="foglio = null"/>
       <ContrattoFoglio v-if="nuovoContratto" :sezione-id="operazione.sezione_id" @chiudi="nuovoContratto = false"/>`,
-    data() { return { foglio: null, nuovoContratto: false, tutti: false }; },
+    data() { return { foglio: null, nuovoContratto: false, tutti: false, dettaglio: null }; },
     computed: {
         tipologie() { return tipologieDi(this.operazione); },
         interventi() { return interventiDi(this.operazione); },
+        lavori() { return this.operazione.tipo === 'lavori'; },
+        spesa() { return this.interventi.reduce((t, i) => t + (Number(i.costo) || 0), 0); },
         sezione() { return sezioneDi(this.operazione.sezione_id); },
         contratti() { return db.contratti.filter(c => c.sezione_id === this.operazione.sezione_id); }
     },
@@ -765,10 +776,12 @@ const InterventoFoglio = {
     props: { operazione: Object, intervento: Object },
     emits: ['chiudi'],
     template: `
-      <Foglio :titolo="intervento ? 'Modifica intervento' : 'Nuovo intervento'" @annulla="$emit('chiudi')" @conferma="salvaIntervento">
+      <Foglio :titolo="lavori ? (intervento ? 'Modifica lavoro' : 'Nuovo lavoro') : (intervento ? 'Modifica intervento' : 'Nuovo intervento')"
+              :conferma-disabilitata="caricamento || (lavori && !b.titolo.trim())" @annulla="$emit('chiudi')" @conferma="salvaIntervento">
         <Gruppo>
           <CampoData v-model="b.data" etichetta="Data"/>
-          <CampoScelta v-model="b.contratto_id" etichetta="Legato al contratto" :opzioni="opzioniContratti"/>
+          <CampoTesto v-model="b.titolo" etichetta="Titolo" :segnaposto="lavori ? 'es. Riverniciatura garage' : 'facoltativo'"/>
+          <CampoScelta v-if="!lavori" v-model="b.contratto_id" etichetta="Legato al contratto" :opzioni="opzioniContratti"/>
         </Gruppo>
         <Gruppo titolo="Eseguito da">
           <CampoScelta v-model="b.eseguito_da" etichetta="Eseguito da" :opzioni="[{ valore: 'ditta', nome: 'Ditta / fornitore' }, { valore: 'proprio', nome: 'In proprio' }]"/>
@@ -779,7 +792,17 @@ const InterventoFoglio = {
         <Gruppo titolo="Costo" :nota="b.contratto_id ? 'Coperto dal contratto: indica solo eventuali costi extra (es. consumabili).' : ''">
           <CampoNumero v-model="b.costo" etichetta="Costo" unita="€" segnaposto="0"/>
         </Gruppo>
-        <Gruppo v-if="intervento"><Riga distruttiva titolo="Elimina intervento" @click="eliminaIntervento"/></Gruppo>
+        <Gruppo titolo="Foto e fatture">
+          <Riga v-for="(a, k) in b.allegati" :key="a.percorso" :icona="a.nome && /\.pdf$/i.test(a.nome) ? 'documento' : 'foto'" :titolo="a.nome" freccia
+                @click="apriAllegato(a)">
+            <template #fine><button type="button" class="scollega" @click.stop="b.allegati.splice(k, 1)" aria-label="Togli allegato">−</button></template>
+          </Riga>
+          <label class="riga toccabile azione"><span class="riga-icona"><Icona nome="graffetta"/></span>
+            <span class="riga-testi">{{ caricamento ? 'Caricamento…' : 'Allega foto o fattura' }}</span>
+            <input type="file" multiple accept="image/*,application/pdf" hidden @change="allega">
+          </label>
+        </Gruppo>
+        <Gruppo v-if="intervento"><Riga distruttiva :titolo="lavori ? 'Elimina lavoro' : 'Elimina intervento'" @click="eliminaIntervento"/></Gruppo>
       </Foglio>`,
     data() {
         const i = this.intervento ?? {};
@@ -788,8 +811,8 @@ const InterventoFoglio = {
             data: i.data ?? f.oggiISO(), tipologia_id: i.tipologia_id ?? tipologieDi(this.operazione)[0]?.id ?? null, note: i.note ?? '',
             contratto_id: i.id ? (i.contratto_id ?? null) : (contratti.length === 1 ? contratti[0].id : null),
             eseguito_da: i.eseguito_da ?? 'ditta', esecutore: i.esecutore ?? (contratti.length === 1 && !i.id ? fornitoreContratto(contratti[0]) : ''),
-            costo: i.costo ? Number(i.costo) : null
-        } };
+            costo: i.costo ? Number(i.costo) : null, titolo: i.titolo ?? '', allegati: [...(i.allegati ?? [])]
+        }, caricamento: false };
     },
     watch: {
         // Scegliendo il contratto, il fornitore è quello del contratto.
@@ -800,6 +823,7 @@ const InterventoFoglio = {
         'b.eseguito_da'(v) { this.b.esecutore = v === 'proprio' ? (stato.membro?.nome || '') : ''; }
     },
     computed: {
+        lavori() { return this.operazione.tipo === 'lavori'; },
         tipologie() { return tipologieDi(this.operazione); },
         opzioniContratti() {
             return [{ valore: null, nome: 'No' }, ...db.contratti.filter(c => c.sezione_id === this.operazione.sezione_id)
@@ -812,17 +836,59 @@ const InterventoFoglio = {
         }
     },
     methods: {
+        async allega(e) {
+            this.caricamento = true;
+            try {
+                for (const file of e.target.files) {
+                    const daCaricare = file.type.startsWith('image/') ? await riduciFoto(file) : file;
+                    this.b.allegati.push({ percorso: await caricaFile(daCaricare, 'interventi'), nome: file.name });
+                }
+            } catch (err) { alert('Caricamento non riuscito: ' + (err?.message ?? err)); }
+            finally { this.caricamento = false; e.target.value = ''; }
+        },
+        async apriAllegato(a) {
+            const finestra = window.open('', '_blank');
+            const url = await urlFile(a.percorso);
+            if (finestra) finestra.location = url; else location.href = url;
+        },
         async salvaIntervento() {
             await salva('interventi', { ...(this.intervento ?? {}), ...this.b, id: this.intervento?.id, operazione_id: this.operazione.id,
-                                       esecutore: (this.b.esecutore ?? '').trim(), costo: this.b.costo ?? 0 });
+                                       esecutore: (this.b.esecutore ?? '').trim(), costo: this.b.costo ?? 0, titolo: this.b.titolo.trim(),
+                                       contratto_id: this.lavori ? null : this.b.contratto_id });
             this.$emit('chiudi');
         },
         async eliminaIntervento() { if (confirm("Eliminare l'intervento?")) { await elimina('interventi', this.intervento.id); this.$emit('chiudi'); } }
     }
 };
 
+/// Intervento o lavoro in sola lettura: dati e allegati da aprire.
+const AllegatiFoglio = {
+    props: { intervento: Object },
+    emits: ['chiudi'],
+    template: `
+      <Foglio :titolo="intervento.titolo || 'Intervento'" solo-chiudi @annulla="$emit('chiudi')">
+        <Gruppo>
+          <Riga titolo="Data" :valore="f.data(intervento.data)"/>
+          <Riga titolo="Eseguito da" :valore="intervento.eseguito_da === 'proprio' ? 'In proprio' + (intervento.esecutore ? ' (' + intervento.esecutore + ')' : '') : (intervento.esecutore || '–')"/>
+          <Riga v-if="Number(intervento.costo)" titolo="Costo" :valore="f.euro(intervento.costo)"/>
+        </Gruppo>
+        <Gruppo v-if="intervento.note" titolo="Descrizione"><div class="riga testo-descrizione">{{ intervento.note }}</div></Gruppo>
+        <Gruppo v-if="(intervento.allegati ?? []).length" titolo="Foto e fatture">
+          <Riga v-for="a in intervento.allegati" :key="a.percorso" :icona="/\.pdf$/i.test(a.nome) ? 'documento' : 'foto'" :titolo="a.nome" freccia @click="apri(a)"/>
+        </Gruppo>
+      </Foglio>`,
+    methods: {
+        async apri(a) {
+            const finestra = window.open('', '_blank');
+            const url = await urlFile(a.percorso);
+            if (finestra) finestra.location = url; else location.href = url;
+        }
+    },
+    setup() { return { f }; }
+};
+
 // Le sezioni vengono registrate come componenti locali della pagina operazione.
 OperazionePagina.components = { MisurePH, CambioAcqua, Pellet, Cenere, Storico, NotificheOperazione, DescrizioneFoglio, DepositoPellet };
 CambioAcqua.components = { AvvioFoglio };
 MisurePH.components = { MisuraFoglio };
-Storico.components = { InterventoFoglio };
+Storico.components = { InterventoFoglio, AllegatiFoglio };

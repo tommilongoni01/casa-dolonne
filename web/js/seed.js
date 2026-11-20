@@ -2,12 +2,12 @@
 // Gli stessi dati dell'app iOS. Si caricano una sola volta, da un account editor.
 import { backend } from './backend.js';
 import { db, salva, salvaMolti, caricaTutto } from './store.js';
-import { DESCRIZIONI, GUIDE_EXTRA } from './descrizioni.js';
+import { DESCRIZIONI, GUIDE_EXTRA, CATEGORIE_LAVORI } from './descrizioni.js';
 
 const SEZIONI = [
     ['Impianto idraulico', 'goccia'], ['Impianto elettrico', 'fulmine'], ['Caldaia', 'fiamma'],
     ['Impianto fotovoltaico', 'sole'], ['Piscina', 'piscina'],
-    ['Ascensore', 'ascensore'], ['UTA', 'ventola'], ['VMC', 'vento'], ['Antifurto', 'scudo'], ['Giardino', 'germoglio']
+    ['Ascensore', 'ascensore'], ['UTA', 'ventola'], ['VMC', 'vento'], ['Antifurto', 'scudo'], ['Giardino', 'germoglio'], ['Manutenzioni Generali', 'pennello', 'generale']
 ];
 
 const PRINCIPALE_CLIENTE = [['Principale', 12], ['Cliente', 0]];
@@ -46,7 +46,7 @@ export async function inizializzaDati(avanzamento = () => {}) {
     }
 
     avanzamento('Sistemi…');
-    const sezioni = await salvaMolti('sezioni', SEZIONI.map(([nome, icona], ordine) => ({ nome, icona, ordine })));
+    const sezioni = await salvaMolti('sezioni', SEZIONI.map(([nome, icona, speciale], ordine) => ({ nome, icona, ordine, speciale: speciale ?? '' })));
     const id = nome => sezioni.find(s => s.nome === nome).id;
 
     avanzamento('Operazioni…');
@@ -84,6 +84,11 @@ export async function inizializzaDati(avanzamento = () => {}) {
                                nome_file: 'unioxypool_t_it_1_0.pdf', percorso: 'statico/schede/unioxypool_t_it_1_0.pdf', dimensione: 225148 });
     for (const [nome, ordine] of [['pH-', 1], ['pH+', 2]]) {
         await salva('prodotti', { nome, categoria: 'ph', stato: 'Polvere', unita: 'kg', scorta_minima: 0, ordine, operazione_id: create.ph.id });
+    }
+
+    // Manutenzioni Generali: una categoria di lavori per ogni tipo di intervento.
+    for (const [i, [titolo, icona, descrizione]] of CATEGORIE_LAVORI.entries()) {
+        await salva('operazioni', { sezione_id: id('Manutenzioni Generali'), titolo, tipo: 'lavori', ordine: i, icona: icona === 'pennello' ? '' : icona, descrizione, passaggi: [] });
     }
 
     avanzamento('Guide e documenti della Caldaia…');

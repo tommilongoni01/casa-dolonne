@@ -7,7 +7,7 @@ import * as f from '../format.js';
 import { COLORE_SEZIONE, ICONE_SEZIONE } from '../icone.js';
 import {
     avvisi, prossime, operazioniDi, statoOperazione, TIPI_OPERAZIONE, sezioneDi, nomeContatto, sottotitoloContatto, calendarioScadenze,
-    iconaOperazione, coloreImpianto, vociCosto, anniCosti, totale
+    iconaOperazione, coloreImpianto, vociCosto, anniCosti, totale, eGenerale, prodottiOperazione, analisiScorta
 } from '../logic.js';
 import { riassuntoImpianto, riepilogoOperazione, TesseraImpianto, RigaAvviso } from './manutenzione.js';
 import { ContattoFoglio } from './contatti.js';
@@ -34,7 +34,8 @@ function nomeGiorno(d) {
 
 /// Riquadro grande in cima: lo stato della casa in una frase, come nell'app Casa di Apple.
 const SchedaStato = {
-    props: { avvisi: Array, prossima: Object, impianti: Number, inArrivo: Number },
+    props: { avvisi: Array, prossima: Object },
+    emits: ['apri'],
     template: `
       <div class="scheda-stato" :class="'stato-' + stato">
         <div class="scheda-stato-testa">
@@ -42,9 +43,18 @@ const SchedaStato = {
           <span class="scheda-stato-titolo">{{ titolo }}</span>
         </div>
         <div class="scheda-stato-valori">
-          <span><b>{{ impianti }}</b>impianti</span>
-          <span><b>{{ inArrivo }}</b>scadenze in 30 giorni</span>
-          <span><b>{{ prossima ? dataProssima : '–' }}</b>{{ prossima ? prossima.titolo : 'prossima scadenza' }}</span>
+          <button v-if="pellet" type="button" @click="$emit('apri', pellet.pagine)">
+            <small>Pellet</small><b>{{ f.quantita(pellet.kg, 'kg') }}</b>
+            <span class="barra-livello"><i :style="{ width: pellet.percento + '%' }"></i></span>
+          </button>
+          <button v-if="ph" type="button" @click="$emit('apri', ph.pagine)">
+            <small>pH piscina</small><b>{{ f.ph(ph.valore) }} <i class="pallino" :class="ph.colore"></i></b>
+            <small>{{ ph.quando }}</small>
+          </button>
+          <button type="button" :disabled="!prossima" @click="prossima && $emit('apri', [prossima.pagina])">
+            <small>Prossima scadenza</small><b>{{ prossima ? dataProssima : '–' }}</b>
+            <small>{{ prossima ? prossima.titolo : 'Nessuna in programma' }}</small>
+          </button>
         </div>
       </div>`,
     computed: {
@@ -62,9 +72,31 @@ const SchedaStato = {
             if (!parti.length && inCorso) parti.push('Operazione in corso');
             return parti.join(' · ') || 'Tutto in regola';
         },
+        /// Pellet nel deposito (kg) e riempimento rispetto al silo pieno (3.600 kg).
+        pellet() {
+            const o = db.operazioni.find(o => o.tipo === 'pellet');
+            const p = o && prodottiOperazione(o).find(p => p.categoria === 'pellet');
+            if (!p) return null;
+            const kg = analisiScorta(p).giacenza * 100;
+            return { kg, percento: Math.max(0, Math.min(100, kg / 3600 * 100)), pagine: pagineOperazione(o) };
+        },
+        /// Ultima misura del pH (dosimetro, altrimenti scuba) con il colore della fascia ideale 6,8 – 7,8.
+        ph() {
+            const o = db.operazioni.find(o => o.tipo === 'ph');
+            const m = db.misure_ph.slice().sort((a, b) => b.data.localeCompare(a.data))[0];
+            if (!o || !m) return null;
+            const v = Number(m.dosimetro ?? m.scuba);
+            const colore = v >= 6.8 && v <= 7.8 ? 'verde' : v >= 6.6 && v <= 8 ? 'arancione' : 'rosso';
+            const giorni = f.giorniTrascorsi(m.data);
+            return { valore: v, colore, quando: giorni === 0 ? 'oggi' : giorni === 1 ? 'ieri' : `${giorni} giorni fa`, pagine: pagineOperazione(o) };
+        },
         dataProssima() { return new Intl.DateTimeFormat('it-IT', { day: 'numeric', month: 'short' }).format(this.prossima.data); }
-    }
+    },
+    setup() { return { f }; }
 };
+
+/// Pagine da aprire per arrivare a un'operazione: impianto, poi operazione.
+const pagineOperazione = o => [{ nome: 'impianto', id: o.sezione_id }, { nome: 'operazione', id: o.id }];
 
 /// Avviso come scheda (in fila orizzontale su iPhone, in griglia su schermi larghi).
 const SchedaAvviso = {
@@ -297,8 +329,7 @@ export const CasaHome = {
           <template v-else>
             <div class="cruscotto">
               <div class="cruscotto-stato">
-                <SchedaStato :avvisi="elencoAvvisi" :prossima="prossimaScadenza" :impianti="sezioni.length"
-                             :in-arrivo="scadenze.filter(v => v.data >= oggi && v.data <= fra30).length"/>
+                <SchedaStato :avvisi="elencoAvvisi" :prossima="prossimaScadenza" @apri="apriPagine"/>
                 <!-- Avvisi come schede -->
                 <div v-if="elencoAvvisi.length" class="schede-avvisi">
                   <SchedaAvviso v-for="a in elencoAvvisi" :key="a.id" :avviso="a" @apri="apriDaElenco"/>
@@ -393,6 +424,8 @@ export const CasaHome = {
             this.$refs.ricerca?.focus();
         },
         chiudiRicerca() { this.ricerca = ''; this.cercando = false; },
+        /// Apre una sequenza di pagine (es. impianto → operazione) dalla scheda di stato.
+        apriPagine(pagine) { if (!pagine?.[0]) return; apriDaElenco(pagine[0]); for (const p of pagine.slice(1)) apri(p); },
         apriOperazione(o) { apriDaElenco({ nome: 'impianto', id: o.sezione_id }); apri({ nome: 'operazione', id: o.id }); },
         async sposta(i, d) {
             const elenco = [...this.sezioni];
@@ -458,10 +491,10 @@ export const ImpiantoPagina = {
         <!-- Operazioni -->
         <template v-if="schedaAttiva === 'operazioni'">
           <Gruppo>
-            <Riga v-if="!operazioni.length" titolo="Nessuna operazione per questo impianto" class="secondario"/>
+            <Riga v-if="!operazioni.length" :titolo="generale ? 'Nessuna categoria' : 'Nessuna operazione per questo impianto'" class="secondario"/>
             <Riga v-for="o in operazioni" :key="o.id" :icona="iconaOperazione(o)" quadrata :colore="coloreOperazione(o)"
                   :titolo="o.titolo" :sottotitolo="riepilogoOperazione(o)" freccia @click="apri({ nome: 'operazione', id: o.id })"/>
-            <Riga v-if="puoModificare()" azione icona="piuCerchio" titolo="Nuova operazione" @click="nuova = { titolo: '', icona: '' }"/>
+            <Riga v-if="puoModificare()" azione icona="piuCerchio" :titolo="generale ? 'Nuova categoria' : 'Nuova operazione'" @click="nuova = { titolo: '', icona: '' }"/>
           </Gruppo>
           <Gruppo>
             <Riga icona="carrello" titolo="Costi dell'impianto" :valore="f.euro(costiImpianto)" freccia @click="apri({ nome: 'costi', id: sezione.id })"/>
@@ -511,13 +544,13 @@ export const ImpiantoPagina = {
           </Gruppo>
         </template>
 
-        <Foglio v-if="nuova" titolo="Nuova operazione" :conferma-disabilitata="!nuova.titolo.trim()"
+        <Foglio v-if="nuova" :titolo="generale ? 'Nuova categoria' : 'Nuova operazione'" :conferma-disabilitata="!nuova.titolo.trim()"
                 @annulla="nuova = null" @conferma="creaOperazione">
-          <Gruppo nota="Un'operazione con descrizione, prodotti, gestione scorte, avvisi e collegamento al manuale.">
-            <CampoTesto v-model="nuova.titolo" segnaposto="Titolo (es. Controllo filtri)"/>
+          <Gruppo :nota="notaNuova">
+            <CampoTesto v-model="nuova.titolo" :segnaposto="generale ? 'Nome (es. Verniciature)' : 'Titolo (es. Controllo filtri)'"/>
           </Gruppo>
           <Gruppo titolo="Simbolo">
-            <SceltaIcona v-model="nuova.icona" :colore="coloreImpianto(sezione.id)" predefinita="lista"/>
+            <SceltaIcona v-model="nuova.icona" :colore="coloreImpianto(sezione.id)" :predefinita="generale ? 'pennello' : 'lista'"/>
           </Gruppo>
         </Foglio>
         <ContrattoFoglio v-if="nuovoContratto" :sezione-id="sezione.id" @chiudi="nuovoContratto = false"/>
@@ -529,6 +562,12 @@ export const ImpiantoPagina = {
     computed: {
         sezione() { return sezioneDi(this.id); },
         r() { return riassuntoImpianto(this.sezione); },
+        generale() { return eGenerale(this.sezione); },
+        notaNuova() {
+            return this.generale
+                ? "Una categoria di lavori (es. Verniciature): dentro registri ogni lavoro con descrizione, costo, chi l'ha eseguito, foto e fatture."
+                : "Un'operazione con descrizione, prodotti, gestione scorte, avvisi e collegamento al manuale.";
+        },
         costiImpianto() { return totale(vociCosto(new Date().getFullYear()).filter(v => v.sezione_id === this.id)); },
         operazioni() { return this.sezione ? operazioniDi(this.sezione) : []; },
         elencoAvvisi() { return this.sezione ? avvisi({ sezione: this.sezione }) : []; },
@@ -543,7 +582,7 @@ export const ImpiantoPagina = {
         },
         schede() {
             const tutte = [
-                { id: 'operazioni', nome: 'Operazioni', numero: this.operazioni.length },
+                { id: 'operazioni', nome: this.generale ? 'Categorie' : 'Operazioni', numero: this.operazioni.length },
                 { id: 'manuale', nome: 'Manuale', numero: this.guide.length },
                 { id: 'documenti', nome: 'Documenti', numero: this.contratti.length + this.documenti.length },
                 { id: 'contatti', nome: 'Contatti', numero: this.contatti.length }
@@ -575,8 +614,8 @@ export const ImpiantoPagina = {
         },
         async creaOperazione() {
             const ordine = Math.max(-1, ...this.operazioni.map(o => o.ordine)) + 1;
-            const icona = this.nuova.icona && this.nuova.icona !== 'lista' ? this.nuova.icona : '';
-            const o = await salva('operazioni', { sezione_id: this.id, titolo: this.nuova.titolo.trim(), tipo: 'generica', ordine, passaggi: [], icona });
+            const icona = this.nuova.icona && this.nuova.icona !== (this.generale ? 'pennello' : 'lista') ? this.nuova.icona : '';
+            const o = await salva('operazioni', { sezione_id: this.id, titolo: this.nuova.titolo.trim(), tipo: this.generale ? 'lavori' : 'generica', ordine, passaggi: [], icona });
             this.nuova = null;
             apri({ nome: 'operazione', id: o.id });
         },

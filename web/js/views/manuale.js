@@ -165,7 +165,7 @@ export const GuidaPagina = {
 };
 
 /// Riduce le foto a un lato massimo di 2000 px in JPEG, per contenere lo spazio occupato.
-async function riduciFoto(file) {
+export async function riduciFoto(file) {
     try {
         const immagine = await createImageBitmap(file);
         const fattore = Math.min(1, 2000 / Math.max(immagine.width, immagine.height));

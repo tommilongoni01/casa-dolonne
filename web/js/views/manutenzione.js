@@ -194,6 +194,13 @@ export function riepilogoOperazione(o) {
             if (ultimo) parti.push(`Ultimo svuotamento ${f.giorniTrascorsi(ultimo.data)} giorni fa`);
             break;
         }
+        case 'lavori': {
+            const ultimo = interventiDi(o)[0];
+            const n = interventiDi(o).length;
+            parti.push(ultimo ? `${ultimo.titolo || 'Ultimo lavoro'} · ${f.dataBreve(ultimo.data)}` : 'Nessun lavoro registrato');
+            if (n > 1) parti.push(`${n} lavori`);
+            break;
+        }
         case 'storico': {
             const ultimo = interventiDi(o)[0];
             parti.push(ultimo ? `Ultima il ${f.dataBreve(ultimo.data)}` : 'Nessuna manutenzione registrata');
