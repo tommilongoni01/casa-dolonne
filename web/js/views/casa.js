@@ -478,7 +478,7 @@ export const ImpiantoPagina = {
           </Gruppo>
         </template>
 
-        <!-- Documenti: contratti, documenti del fornitore e contatti dell'impianto -->
+        <!-- Documenti: contratti e documenti del fornitore dell'impianto -->
         <template v-if="schedaAttiva === 'documenti'">
           <Gruppo v-if="contratti.length || puoModificare()" titolo="Contratti">
             <Riga v-if="!contratti.length" titolo="Nessun contratto" class="secondario"/>
@@ -493,7 +493,11 @@ export const ImpiantoPagina = {
               <input type="file" multiple accept="application/pdf,image/*,.doc,.docx,.xls,.xlsx" hidden @change="importa">
             </label>
           </Gruppo>
-          <Gruppo v-if="contatti.length || puoModificare()" titolo="Contatti">
+        </template>
+
+        <!-- Contatti dell'impianto -->
+        <template v-if="schedaAttiva === 'contatti'">
+          <Gruppo v-if="contatti.length || puoModificare()">
             <Riga v-if="!contatti.length" titolo="Nessun contatto" class="secondario"/>
             <Riga v-for="c in contatti" :key="c.id" icona="persona" :titolo="nomeContatto(c)" :sottotitolo="sottotitoloContatto(c)" freccia
                   @click="apri({ nome: 'contatto', id: c.id })">
@@ -541,7 +545,8 @@ export const ImpiantoPagina = {
             const tutte = [
                 { id: 'operazioni', nome: 'Operazioni', numero: this.operazioni.length },
                 { id: 'manuale', nome: 'Manuale', numero: this.guide.length },
-                { id: 'documenti', nome: 'Documenti', numero: this.contratti.length + this.documenti.length + this.contatti.length }
+                { id: 'documenti', nome: 'Documenti', numero: this.contratti.length + this.documenti.length },
+                { id: 'contatti', nome: 'Contatti', numero: this.contatti.length }
             ];
             // Chi ha sola lettura non vede le schede vuote.
             return puoModificare() ? tutte : tutte.filter(s => s.numero > 0);
