@@ -34,7 +34,7 @@ function nomeGiorno(d) {
 
 /// Riquadro grande in cima: lo stato della casa in una frase, come nell'app Casa di Apple.
 const SchedaStato = {
-    props: { avvisi: Array, prossima: Object },
+    props: { avvisi: Array },
     emits: ['apri'],
     template: `
       <div class="scheda-stato" :class="'stato-' + stato">
@@ -51,9 +51,9 @@ const SchedaStato = {
             <small>pH piscina</small><b>{{ f.ph(ph.valore) }} <i class="pallino" :class="ph.colore"></i></b>
             <small>{{ ph.quando }}</small>
           </button>
-          <button type="button" :disabled="!prossima" @click="prossima && $emit('apri', [prossima.pagina])">
-            <small>Prossima scadenza</small><b>{{ prossima ? dataProssima : '–' }}</b>
-            <small>{{ prossima ? prossima.titolo : 'Nessuna in programma' }}</small>
+          <button v-if="ossigeno" type="button" @click="$emit('apri', ossigeno.pagine)">
+            <small>Ossigeno piscina</small><b>{{ f.quantita(ossigeno.litri, ossigeno.unita) }} <i class="pallino" :class="ossigeno.basso ? 'rosso' : 'verde'"></i></b>
+            <small>{{ ossigeno.minimo ? 'Scorta minima ' + f.quantita(ossigeno.minimo, ossigeno.unita) : 'In magazzino' }}</small>
           </button>
         </div>
       </div>`,
@@ -90,7 +90,14 @@ const SchedaStato = {
             const giorni = f.giorniTrascorsi(m.data);
             return { valore: v, colore, quando: giorni === 0 ? 'oggi' : giorni === 1 ? 'ieri' : `${giorni} giorni fa`, pagine: pagineOperazione(o) };
         },
-        dataProssima() { return new Intl.DateTimeFormat('it-IT', { day: 'numeric', month: 'short' }).format(this.prossima.data); }
+        /// Scorta di ossigeno attivo della piscina, confrontata con la scorta minima.
+        ossigeno() {
+            const o = db.operazioni.find(o => o.tipo === 'ossigeno');
+            const p = o && prodottiOperazione(o).find(p => p.categoria === 'ossigeno');
+            if (!p) return null;
+            const litri = analisiScorta(p).giacenza, minimo = Number(p.scorta_minima) || 0;
+            return { litri, minimo, unita: p.unita || 'l', basso: minimo > 0 && litri <= minimo, pagine: pagineOperazione(o) };
+        }
     },
     setup() { return { f }; }
 };
@@ -185,7 +192,8 @@ const InProgramma = {
             <span>{{ titoloPeriodo }}</span>
             <button type="button" class="pulsante-testo" @click="mese = !mese">{{ mese ? 'Settimana' : 'Mese' }}</button>
           </div>
-          <div class="calendario-griglia">
+          <Transition name="dissolvenza" mode="out-in">
+          <div class="calendario-griglia" :key="chiavePeriodo">
             <span v-for="g in ['L', 'M', 'M', 'G', 'V', 'S', 'D']" class="calendario-settimana">{{ g }}</span>
             <button v-for="c in celle" :key="c.chiave" type="button" class="calendario-giorno"
                     :class="{ fuori: mese && !c.delMese, oggi: c.oggi, scelto: c.chiave === scelto }" @click="scegli(c)">
@@ -193,6 +201,7 @@ const InProgramma = {
               <span class="calendario-pallini"><i v-for="v in c.voci.slice(0, 3)" :key="v.id" :style="{ background: coloreImpianto(v.sezione_id) }"></i></span>
             </button>
           </div>
+          </Transition>
         </div>
         <template v-for="g in gruppi" :key="g.nome">
           <h4 class="programma-periodo">{{ g.nome }}</h4>
@@ -220,6 +229,7 @@ const InProgramma = {
                 return { data, chiave, delMese: data.getMonth() === this.riferimento.getMonth(), oggi: chiave === oggi, voci: this.perGiorno[chiave] ?? [] };
             });
         },
+        chiavePeriodo() { return (this.mese ? 'm' : 's') + chiaveGiorno(this.riferimento); },
         titoloPeriodo() {
             const fm = o => new Intl.DateTimeFormat('it-IT', o);
             if (this.mese) { const t = fm({ month: 'long', year: 'numeric' }).format(this.riferimento); return t.charAt(0).toUpperCase() + t.slice(1); }
@@ -357,7 +367,7 @@ export const CostiPagina = {
 export const CasaHome = {
     components: { RigaAvviso, TesseraImpianto, SchedaStato, SchedaAvviso, InProgramma, AttivitaRecenti },
     template: `
-      <Pagina titolo="Casa Dolonne" grande :con-indietro="false">
+      <Pagina titolo="Casa Dolonne" grande :sottotitolo="sottotitolo" :con-indietro="false" class="pagina-casa">
         <template #azioni>
           <button v-if="sezioni.length" class="pulsante-barra" @click="apriRicerca" aria-label="Cerca"><Icona nome="ricerca" :dimensione="20"/></button>
           <button class="pulsante-barra" @click="cambiaScheda('impostazioni')" aria-label="Impostazioni"><Icona nome="ingranaggio" :dimensione="20"/></button>
@@ -402,18 +412,18 @@ export const CasaHome = {
           <template v-else>
             <div class="cruscotto">
               <div class="cruscotto-stato">
-                <SchedaStato :avvisi="elencoAvvisi" :prossima="prossimaScadenza" @apri="apriPagine"/>
+                <SchedaStato :avvisi="elencoAvvisi" @apri="apriPagine"/>
                 <!-- Avvisi come schede -->
                 <!-- Solo ciò che è urgente: ritardi, operazioni in corso, scorte basse. Le scadenze future sono in "In programma". -->
-                <div v-if="urgenti.length" class="schede-avvisi">
+                <TransitionGroup v-if="urgenti.length" tag="div" name="dissolvenza" class="schede-avvisi">
                   <SchedaAvviso v-for="a in urgenti" :key="a.id" :avviso="a" @apri="apriDaElenco"/>
-                </div>
+                </TransitionGroup>
               </div>
 
               <!-- Impianti -->
               <div class="cruscotto-impianti">
                 <div v-if="!modificaImpianti" class="griglia-impianti">
-                  <TesseraImpianto v-for="s in sezioni" :key="s.id" :sezione="s"
+                  <TesseraImpianto v-for="(s, i) in sezioni" :key="s.id" :sezione="s" :style="{ '--i': i }"
                                    :selezionata="selezionata({ nome: 'impianto', id: s.id })" @click="apriDaElenco({ nome: 'impianto', id: s.id })"/>
                 </div>
                 <Gruppo v-else titolo="Impianti" nota="Tocca un impianto per rinominarlo, cambiarne l'icona o eliminarlo; con le frecce cambi l'ordine.">
@@ -428,7 +438,16 @@ export const CasaHome = {
                 </Gruppo>
                 <button class="scheda-costi" style="margin-top:14px;width:100%" @click="apriDaElenco({ nome: 'costi' })">
                   <IconaQuadrata nome="carrello" colore="var(--accento)" :dimensione="34"/>
-                  <span class="scheda-costi-testi"><span class="secondario">Costi {{ annoCorrente }}</span><b>{{ f.euro(costiAnno) }}</b></span>
+                  <span class="scheda-costi-testi">
+                    <span class="secondario">Costi {{ annoCorrente }}</span><b>{{ f.euro(costiAnno) }}</b>
+                    <span v-if="costiAnnoPrima" class="secondario">{{ confrontoCosti }}</span>
+                  </span>
+                  <!-- Spesa mese per mese (i contratti cadono nel mese in cui si rinnovano) -->
+                  <span class="costi-mesi" aria-hidden="true">
+                    <span v-for="m in costiMesi" :key="m.mese" class="costi-mese" :class="{ futuro: m.futuro }">
+                      <i :style="{ height: m.altezza + '%' }"></i><small>{{ m.lettera }}</small>
+                    </span>
+                  </span>
                   <Icona nome="avanti" :dimensione="16" class="secondario"/>
                 </button>
               </div>
@@ -468,11 +487,27 @@ export const CasaHome = {
         const sezioni = computed(() => db.sezioni.slice().sort((a, b) => a.ordine - b.ordine));
         const scadenze = computed(() => calendarioScadenze());
         // Prossima scadenza futura non ancora in allarme (per il riquadro dello stato).
-        const prossimaScadenza = computed(() => scadenze.value.find(v => v.data >= f.giorno(new Date())) ?? null);
         const oggi = f.giorno(new Date()), fra30 = f.aggiungiGiorni(oggi, 30);
         const annoCorrente = new Date().getFullYear();
         const costiAnno = computed(() => totale(vociCosto(annoCorrente)));
-        return { elencoAvvisi, elencoProssime, conteggi, sezioni, scadenze, prossimaScadenza, annoCorrente, costiAnno, f, oggi, fra30, urgenti };
+        const costiAnnoPrima = computed(() => totale(vociCosto(annoCorrente - 1)));
+        const confrontoCosti = computed(() => `${f.euro(costiAnnoPrima.value)} in tutto il ${annoCorrente - 1}`);
+        /// Spesa per mese dell'anno in corso, in percentuale del mese più caro.
+        const costiMesi = computed(() => {
+            const mesi = Array(12).fill(0), adesso = new Date().getMonth();
+            for (const v of vociCosto(annoCorrente)) if (v.data) mesi[Number(v.data.slice(5, 7)) - 1] += v.importo;
+            const massimo = Math.max(...mesi, 1);
+            return mesi.map((x, i) => ({ mese: i, lettera: 'GFMAMGLASOND'[i], futuro: i > adesso, altezza: x > 0 ? Math.max(8, x / massimo * 100) : 0 }));
+        });
+        /// Sotto il titolo: la data di oggi e quante scadenze ci sono in settimana, come nell'app Casa.
+        const sottotitolo = computed(() => {
+            const oggiG = f.giorno(new Date()), fine = new Date(lunedi(oggiG).getTime() + 7 * GIORNO_MS);
+            const n = scadenze.value.filter(v => v.data >= oggiG && v.data < fine).length;
+            const data = new Intl.DateTimeFormat('it-IT', { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date());
+            const settimana = n === 0 ? 'Niente in programma questa settimana' : n === 1 ? '1 scadenza questa settimana' : `${n} scadenze questa settimana`;
+            return `${data.charAt(0).toUpperCase() + data.slice(1)} · ${settimana}`;
+        });
+        return { elencoAvvisi, elencoProssime, conteggi, sezioni, scadenze, annoCorrente, costiAnno, costiAnnoPrima, confrontoCosti, costiMesi, sottotitolo, f, oggi, fra30, urgenti };
     },
     computed: {
         risultati() {

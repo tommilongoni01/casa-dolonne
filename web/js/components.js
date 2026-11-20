@@ -28,20 +28,26 @@ export const IconaQuadrata = {
 export const Pagina = {
     components: { Icona },
     // titoloSottile: il titolo è già grande nella pagina e compare nella barra solo scorrendo (come nelle app Apple).
-    props: { titolo: String, grande: Boolean, conIndietro: { type: Boolean, default: true }, titoloSottile: Boolean },
+    // grande: titolo grande in cima al contenuto, che scorrendo lascia il posto al titolo piccolo nella barra.
+    props: { titolo: String, grande: Boolean, conIndietro: { type: Boolean, default: true }, titoloSottile: Boolean, sottotitolo: String },
     template: `
       <div class="pagina">
-        <header class="barra" :class="{ grande }">
+        <header class="barra" :class="{ grande, scorsa }">
           <div class="barra-riga">
             <button v-if="mostraIndietro" class="pulsante-barra indietro" @click="vaiIndietro" aria-label="Indietro">
               <Icona nome="indietro"/>
             </button>
-            <div class="barra-titolo" v-if="!grande" :class="{ nascosto: titoloSottile && !scorsa }">{{ titolo }}</div>
+            <div class="barra-titolo" :class="{ nascosto: (titoloSottile || grande) && !scorsa }">{{ titolo }}</div>
             <div class="barra-azioni"><slot name="azioni"/></div>
           </div>
-          <h1 v-if="grande" class="titolo-grande">{{ titolo }}</h1>
         </header>
-        <main class="contenuto" @scroll.passive="e => scorsa = e.target.scrollTop > 56"><slot/></main>
+        <main class="contenuto" @scroll.passive="e => scorsa = e.target.scrollTop > (grande ? 30 : 56)">
+          <div v-if="grande" class="testa-grande">
+            <h1 class="titolo-grande">{{ titolo }}</h1>
+            <p v-if="sottotitolo" class="sottotitolo-grande">{{ sottotitolo }}</p>
+          </div>
+          <slot/>
+        </main>
       </div>`,
     data() { return { scorsa: false }; },
     computed: {

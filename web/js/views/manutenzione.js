@@ -89,19 +89,14 @@ export function riassuntoImpianto(sezione) {
     return { stato, etichetta, dati, prossima: prossima ? `${prossima.titolo.replace(` · ${sezione.nome}`, '').replace(` ${sezione.nome}`, '')} ${traQuanto(prossima.data)}` : '' };
 }
 
+/// Riquadro compatto di un impianto nella home: solo icona e nome (stato e scadenze sono nel cruscotto).
 export const TesseraImpianto = {
     props: { sezione: Object, selezionata: Boolean },
     template: `
-      <button class="tessera-impianto" :class="['stato-' + r.stato, { selezionata }]">
-        <span class="ti-testa">
-          <IconaQuadrata :nome="sezione.icona" :dimensione="34"/>
-          <span v-if="r.stato === 'scaduto' || r.stato === 'inScadenza'" class="ti-stato"><i></i>{{ r.etichetta }}</span>
-        </span>
+      <button class="tessera-impianto" :class="{ selezionata }">
+        <IconaQuadrata :nome="sezione.icona" :dimensione="32"/>
         <span class="ti-nome">{{ sezione.nome }}</span>
-        <span v-for="d in r.dati" :key="d" class="ti-dato">{{ d }}</span>
-        <span v-if="r.prossima" class="ti-prossima"><Icona nome="calendario" :dimensione="13"/>{{ r.prossima }}</span>
-      </button>`,
-    computed: { r() { return riassuntoImpianto(this.sezione); } }
+      </button>`
 };
 
 // ---------------------------------------------------------------------
