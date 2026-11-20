@@ -581,3 +581,15 @@ table.tabella { border-collapse: collapse; width: 100%; font-size: 14px; font-va
 .pallino { width: 9px; height: 9px; border-radius: 50%; display: inline-block; border: 1.5px solid #fff; }
 .pallino.verde { background: #34C759; } .pallino.arancione { background: #FFCC00; } .pallino.rosso { background: #FF3B30; }
 @media (hover: hover) and (pointer: fine) { .scheda-stato-valori button:not(:disabled):hover { background: rgba(255,255,255,.24); } }
+/* In programma e attività recenti */
+.calendario-intestazione { display: flex; justify-content: space-between; align-items: center; padding: 0 8px 8px; font-size: 15px; font-weight: 600; }
+.calendario-intestazione .pulsante-testo { font-size: 14px; font-weight: 500; padding: 0; }
+.programma-periodo { margin: 18px 16px 6px; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: .3px; color: var(--secondario); }
+.riga-programma { position: relative; }
+.riga-programma::after { content: ""; position: absolute; left: 0; top: 10px; bottom: 10px; width: 3px; border-radius: 0 3px 3px 0; background: var(--colore-riga); }
+.programma-quando { flex: none; font-size: 14px; color: var(--secondario); font-variant-numeric: tabular-nums; }
+.programma-quando.vicino { color: var(--arancione); font-weight: 600; }
+.programma-tutto { display: block; margin: 6px auto 0; font-size: 14px; }
+.attivita-recenti { margin-top: 26px; }
+.segmenti-piccoli { margin: 0; width: 170px; }
+.segmenti-piccoli button { padding: 4px 6px; font-size: 12px; }

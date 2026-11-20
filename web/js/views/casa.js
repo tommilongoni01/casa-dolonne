@@ -7,7 +7,7 @@ import * as f from '../format.js';
 import { COLORE_SEZIONE, ICONE_SEZIONE } from '../icone.js';
 import {
     avvisi, prossime, operazioniDi, statoOperazione, TIPI_OPERAZIONE, sezioneDi, nomeContatto, sottotitoloContatto, calendarioScadenze,
-    iconaOperazione, coloreImpianto, vociCosto, anniCosti, totale, eGenerale, prodottiOperazione, analisiScorta
+    iconaOperazione, coloreImpianto, vociCosto, anniCosti, totale, eGenerale, prodottiOperazione, analisiScorta, attivitaRecenti
 } from '../logic.js';
 import { riassuntoImpianto, riepilogoOperazione, TesseraImpianto, RigaAvviso } from './manutenzione.js';
 import { ContattoFoglio } from './contatti.js';
@@ -128,88 +128,161 @@ const SchedaAvviso = {
     }
 };
 
-/// Calendario del mese con i pallini sulle scadenze e, sotto, l'agenda (del giorno scelto o dei prossimi giorni).
-const CalendarioCasa = {
-    components: { RigaAvviso },
+/// "oggi", "domani", "tra 3 giorni", "12 dic" (o "3 giorni fa" per il passato).
+function quandoRelativo(d) {
+    const giorni = Math.round((f.giorno(d) - f.giorno(new Date())) / GIORNO_MS);
+    if (giorni === 0) return 'oggi';
+    if (giorni === 1) return 'domani';
+    if (giorni === -1) return 'ieri';
+    if (giorni < 0) return `${-giorni} giorni fa`;
+    if (giorni < 7) return `tra ${giorni} giorni`;
+    return new Intl.DateTimeFormat('it-IT', { day: 'numeric', month: 'short' }).format(d);
+}
+
+/// Riga in stile Promemoria: barra nel colore dell'impianto, icona, titolo, impianto e tempo.
+const RigaProgramma = {
+    props: { voce: Object, passato: Boolean },
+    emits: ['apri'],
+    template: `
+      <button class="riga toccabile riga-programma" :style="{ '--colore-riga': colore }" @click="voce.pagina && $emit('apri', voce.pagina)">
+        <IconaQuadrata :nome="voce.icona" :colore="colore" :dimensione="30"/>
+        <span class="riga-testi">
+          <span class="riga-titolo">{{ voce.titolo }}</span>
+          <span class="riga-sottotitolo">{{ [sezione?.nome, voce.dettaglio].filter(Boolean).join(' · ') }}</span>
+        </span>
+        <span class="programma-quando" :class="{ vicino: !passato && vicino }">{{ quando }}</span>
+      </button>`,
+    computed: {
+        sezione() { return sezioneDi(this.voce.sezione_id); },
+        colore() { return coloreImpianto(this.voce.sezione_id); },
+        quando() {
+            if (!this.passato) return quandoRelativo(this.voce.data);
+            const d = this.voce.data, oggi = f.giorno(new Date());
+            const ora = d.getHours() || d.getMinutes() ? ' ' + new Intl.DateTimeFormat('it-IT', { hour: '2-digit', minute: '2-digit' }).format(d) : '';
+            return f.giorno(d).getTime() === oggi.getTime() ? 'oggi' + ora : quandoRelativo(d);
+        },
+        vicino() { return (f.giorno(this.voce.data) - f.giorno(new Date())) / GIORNO_MS <= 7; }
+    }
+};
+
+/// In programma: striscia della settimana (espandibile al mese) ed elenco delle prossime scadenze per periodo.
+const InProgramma = {
+    components: { RigaProgramma },
     props: { voci: Array },
     emits: ['apri'],
     template: `
-      <section class="gruppo calendario-casa">
-        <h3 class="gruppo-titolo calendario-agenda-titolo" style="margin-top:0">
-          {{ scelto ? nomeGiorno(dataScelta) : 'Prossimi interventi' }}
-          <button v-if="scelto" type="button" class="pulsante-testo" @click="scelto = null">Mostra i prossimi</button>
-        </h3>
-        <div class="gruppo-celle">
-          <Riga v-if="!agenda.length" :titolo="scelto ? 'Niente in programma' : 'Nessuna scadenza in programma'" class="secondario"/>
-          <template v-for="g in agenda" :key="g.chiave">
-            <div v-if="!scelto" class="agenda-giorno">{{ nomeGiorno(g.data) }}</div>
-            <RigaAvviso v-for="v in g.voci" :key="v.id" :avviso="v" @apri="p => $emit('apri', p)"/>
-          </template>
-        </div>
-        <div class="calendario-testa" style="margin-top:18px">
-          <h3 class="gruppo-titolo" style="margin:0">{{ titoloMese }}</h3>
+      <section class="gruppo in-programma">
+        <div class="calendario-testa">
+          <h3 class="gruppo-titolo" style="margin:0">In programma</h3>
           <span class="calendario-frecce">
-            <button v-if="!meseCorrente" type="button" class="pulsante-testo" @click="vaiOggi">Oggi</button>
-            <button type="button" class="pulsante-barra" @click="sposta(-1)" aria-label="Mese precedente"><Icona nome="indietro" :dimensione="18"/></button>
-            <button type="button" class="pulsante-barra" @click="sposta(1)" aria-label="Mese successivo"><Icona nome="avanti" :dimensione="18"/></button>
+            <button v-if="!corrente" type="button" class="pulsante-testo" @click="vaiOggi">Oggi</button>
+            <button type="button" class="pulsante-barra" @click="sposta(-1)" :aria-label="mese ? 'Mese precedente' : 'Settimana precedente'"><Icona nome="indietro" :dimensione="18"/></button>
+            <button type="button" class="pulsante-barra" @click="sposta(1)" :aria-label="mese ? 'Mese successivo' : 'Settimana successiva'"><Icona nome="avanti" :dimensione="18"/></button>
           </span>
         </div>
         <div class="gruppo-celle calendario-corpo">
+          <div class="calendario-intestazione">
+            <span>{{ titoloPeriodo }}</span>
+            <button type="button" class="pulsante-testo" @click="mese = !mese">{{ mese ? 'Settimana' : 'Mese' }}</button>
+          </div>
           <div class="calendario-griglia">
             <span v-for="g in ['L', 'M', 'M', 'G', 'V', 'S', 'D']" class="calendario-settimana">{{ g }}</span>
             <button v-for="c in celle" :key="c.chiave" type="button" class="calendario-giorno"
-                    :class="{ fuori: !c.delMese, oggi: c.oggi, scelto: c.chiave === scelto }" @click="scegli(c)">
+                    :class="{ fuori: mese && !c.delMese, oggi: c.oggi, scelto: c.chiave === scelto }" @click="scegli(c)">
               <span class="calendario-numero">{{ c.data.getDate() }}</span>
-              <span class="calendario-pallini"><i v-for="v in c.voci.slice(0, 3)" :key="v.id" :class="'gravita-' + v.gravita"></i></span>
+              <span class="calendario-pallini"><i v-for="v in c.voci.slice(0, 3)" :key="v.id" :style="{ background: coloreImpianto(v.sezione_id) }"></i></span>
             </button>
           </div>
         </div>
+        <template v-for="g in gruppi" :key="g.nome">
+          <h4 class="programma-periodo">{{ g.nome }}</h4>
+          <div class="gruppo-celle">
+            <RigaProgramma v-for="v in g.voci" :key="v.id" :voce="v" @apri="p => $emit('apri', p)"/>
+          </div>
+        </template>
+        <div v-if="!gruppi.length" class="gruppo-celle" style="margin-top:12px">
+          <Riga :titolo="scelto ? 'Niente in programma in questo giorno' : 'Nessuna scadenza in programma'" class="secondario"/>
+        </div>
+        <button v-if="scelto" type="button" class="pulsante-testo programma-tutto" @click="scelto = null">Mostra tutto</button>
       </section>`,
-    data() { const oggi = new Date(); return { mese: new Date(oggi.getFullYear(), oggi.getMonth(), 1), scelto: null }; },
+    data() { return { inizio: lunedi(new Date()), mese: false, scelto: null }; },
     computed: {
-        perGiorno() {
-            const mappa = {};
-            for (const v of this.voci) (mappa[chiaveGiorno(v.data)] ??= []).push(v);
-            return mappa;
-        },
-        titoloMese() {
-            const t = new Intl.DateTimeFormat('it-IT', { month: 'long', year: 'numeric' }).format(this.mese);
-            return t.charAt(0).toUpperCase() + t.slice(1);
-        },
-        meseCorrente() { const o = new Date(); return this.mese.getMonth() === o.getMonth() && this.mese.getFullYear() === o.getFullYear(); },
-        /// 6 settimane da lunedì, con i giorni dei mesi vicini in grigio.
+        futuri() { const oggi = f.giorno(new Date()); return this.voci.filter(v => v.data >= oggi); },
+        perGiorno() { const m = {}; for (const v of this.voci) (m[chiaveGiorno(v.data)] ??= []).push(v); return m; },
+        /// Primo giorno mostrato: lunedì della settimana, oppure primo del mese.
+        riferimento() { return this.mese ? new Date(this.inizio.getFullYear(), this.inizio.getMonth(), 1) : this.inizio; },
         celle() {
-            const inizio = new Date(this.mese), scarto = (inizio.getDay() + 6) % 7;
-            inizio.setDate(1 - scarto);
             const oggi = chiaveGiorno(new Date());
-            return Array.from({ length: 42 }, (_, i) => {
-                const data = new Date(inizio.getFullYear(), inizio.getMonth(), inizio.getDate() + i), chiave = chiaveGiorno(data);
-                return { data, chiave, delMese: data.getMonth() === this.mese.getMonth(), oggi: chiave === oggi, voci: this.perGiorno[chiave] ?? [] };
+            const primo = this.mese ? lunedi(this.riferimento) : this.riferimento;
+            const quanti = this.mese ? 42 : 7;
+            return Array.from({ length: quanti }, (_, i) => {
+                const data = new Date(primo.getFullYear(), primo.getMonth(), primo.getDate() + i), chiave = chiaveGiorno(data);
+                return { data, chiave, delMese: data.getMonth() === this.riferimento.getMonth(), oggi: chiave === oggi, voci: this.perGiorno[chiave] ?? [] };
             });
         },
-        dataScelta() { return this.celle.find(c => c.chiave === this.scelto)?.data ?? null; },
-        /// Giorno scelto, oppure le prossime scadenze (comprese quelle in ritardo) raggruppate per giorno.
-        agenda() {
-            if (this.scelto) return [{ chiave: this.scelto, data: this.dataScelta, voci: this.perGiorno[this.scelto] ?? [] }];
-            const oggi = f.giorno(new Date());
-            const voci = this.voci.filter(v => v.data >= oggi || v.gravita === 'scaduto').slice(0, 8);
-            const gruppi = [];
-            for (const v of voci) {
-                const chiave = chiaveGiorno(v.data);
-                if (gruppi.at(-1)?.chiave === chiave) gruppi.at(-1).voci.push(v); else gruppi.push({ chiave, data: v.data, voci: [v] });
+        titoloPeriodo() {
+            const fm = o => new Intl.DateTimeFormat('it-IT', o);
+            if (this.mese) { const t = fm({ month: 'long', year: 'numeric' }).format(this.riferimento); return t.charAt(0).toUpperCase() + t.slice(1); }
+            const fine = new Date(this.inizio.getFullYear(), this.inizio.getMonth(), this.inizio.getDate() + 6);
+            return `${fm({ day: 'numeric', month: 'short' }).format(this.inizio)} – ${fm({ day: 'numeric', month: 'short', year: 'numeric' }).format(fine)}`;
+        },
+        corrente() {
+            const oggi = new Date();
+            return this.mese ? this.riferimento.getMonth() === oggi.getMonth() && this.riferimento.getFullYear() === oggi.getFullYear()
+                : chiaveGiorno(this.inizio) === chiaveGiorno(lunedi(oggi));
+        },
+        /// Elenco: il giorno scelto, oppure le prossime scadenze divise in questa settimana, questo mese e più avanti.
+        gruppi() {
+            if (this.scelto) {
+                const voci = this.perGiorno[this.scelto] ?? [];
+                return voci.length ? [{ nome: nomeGiorno(voci[0].data), voci }] : [];
             }
-            return gruppi;
+            const oggi = f.giorno(new Date()), fineSettimana = new Date(lunedi(oggi).getTime() + 7 * GIORNO_MS);
+            const fineMese = new Date(oggi.getFullYear(), oggi.getMonth() + 1, 1);
+            const gruppi = [
+                { nome: 'Questa settimana', voci: this.futuri.filter(v => v.data < fineSettimana) },
+                { nome: 'Questo mese', voci: this.futuri.filter(v => v.data >= fineSettimana && v.data < fineMese) },
+                { nome: 'Più avanti', voci: this.futuri.filter(v => v.data >= fineMese && v.data >= fineSettimana).slice(0, 8) }
+            ];
+            return gruppi.filter(g => g.voci.length);
         }
     },
     methods: {
-        nomeGiorno,
-        sposta(d) { this.mese = new Date(this.mese.getFullYear(), this.mese.getMonth() + d, 1); },
-        vaiOggi() { const o = new Date(); this.mese = new Date(o.getFullYear(), o.getMonth(), 1); this.scelto = null; },
-        scegli(c) {
-            this.scelto = this.scelto === c.chiave ? null : c.chiave;
-            if (!c.delMese) this.mese = new Date(c.data.getFullYear(), c.data.getMonth(), 1);
-        }
+        coloreImpianto,
+        sposta(d) {
+            const r = this.riferimento;
+            this.inizio = this.mese ? new Date(r.getFullYear(), r.getMonth() + d, 1) : new Date(r.getFullYear(), r.getMonth(), r.getDate() + 7 * d);
+            if (!this.mese) this.inizio = lunedi(this.inizio);
+        },
+        vaiOggi() { this.inizio = lunedi(new Date()); this.scelto = null; },
+        scegli(c) { this.scelto = this.scelto === c.chiave ? null : c.chiave; }
     }
+};
+
+/// Lunedì della settimana di una data.
+function lunedi(d) { const g = new Date(d.getFullYear(), d.getMonth(), d.getDate()); g.setDate(g.getDate() - (g.getDay() + 6) % 7); return g; }
+
+/// Attività recenti: cosa è stato registrato in casa negli ultimi 7 o 30 giorni.
+const AttivitaRecenti = {
+    components: { RigaProgramma },
+    emits: ['apri'],
+    template: `
+      <section class="gruppo attivita-recenti">
+        <div class="calendario-testa">
+          <h3 class="gruppo-titolo" style="margin:0">Attività recenti</h3>
+          <div class="segmenti segmenti-piccoli">
+            <button :class="{ attivo: giorni === 7 }" @click="giorni = 7">7 giorni</button>
+            <button :class="{ attivo: giorni === 30 }" @click="giorni = 30">30 giorni</button>
+          </div>
+        </div>
+        <div class="gruppo-celle">
+          <Riga v-if="!voci.length" :titolo="'Niente registrato negli ultimi ' + giorni + ' giorni'" class="secondario"/>
+          <RigaProgramma v-for="v in (tutte ? voci : voci.slice(0, 5))" :key="v.id" :voce="v" passato @apri="p => $emit('apri', p)"/>
+          <Riga v-if="voci.length > 5" azione :icona="tutte ? 'frecciaSu' : 'frecciaGiu'" :titolo="tutte ? 'Mostra meno' : 'Mostra tutte (' + voci.length + ')'" @click="tutte = !tutte"/>
+        </div>
+      </section>`,
+    data() { return { giorni: 7, tutte: false }; },
+    computed: { voci() { return attivitaRecenti(this.giorni); } }
 };
 
 // ---------------------------------------------------------------------
@@ -282,7 +355,7 @@ export const CostiPagina = {
 // Home
 // ---------------------------------------------------------------------
 export const CasaHome = {
-    components: { RigaAvviso, TesseraImpianto, SchedaStato, SchedaAvviso, CalendarioCasa },
+    components: { RigaAvviso, TesseraImpianto, SchedaStato, SchedaAvviso, InProgramma, AttivitaRecenti },
     template: `
       <Pagina titolo="Casa Dolonne" grande :con-indietro="false">
         <template #azioni>
@@ -331,8 +404,9 @@ export const CasaHome = {
               <div class="cruscotto-stato">
                 <SchedaStato :avvisi="elencoAvvisi" :prossima="prossimaScadenza" @apri="apriPagine"/>
                 <!-- Avvisi come schede -->
-                <div v-if="elencoAvvisi.length" class="schede-avvisi">
-                  <SchedaAvviso v-for="a in elencoAvvisi" :key="a.id" :avviso="a" @apri="apriDaElenco"/>
+                <!-- Solo ciò che è urgente: ritardi, operazioni in corso, scorte basse. Le scadenze future sono in "In programma". -->
+                <div v-if="urgenti.length" class="schede-avvisi">
+                  <SchedaAvviso v-for="a in urgenti" :key="a.id" :avviso="a" @apri="apriDaElenco"/>
                 </div>
               </div>
 
@@ -361,7 +435,8 @@ export const CasaHome = {
 
               <!-- Calendario degli interventi -->
               <div class="cruscotto-calendario">
-                <CalendarioCasa :voci="scadenze" @apri="apriDaElenco"/>
+                <InProgramma :voci="scadenze" @apri="apriPagina"/>
+                <AttivitaRecenti @apri="apriPagina"/>
               </div>
             </div>
           </template>
@@ -384,6 +459,7 @@ export const CasaHome = {
     data() { return { ricerca: '', cercando: false, nuova: null, modifica: null, modificaImpianti: false, icone: ICONE_SEZIONE }; },
     setup() {
         const elencoAvvisi = computed(() => avvisi());
+        const urgenti = computed(() => elencoAvvisi.value.filter(a => a.gravita === 'scaduto' || a.gravita === 'inCorso' || !a.data));
         const elencoProssime = computed(() => prossime());
         const conteggi = computed(() => ({
             scaduti: elencoAvvisi.value.filter(a => a.gravita === 'scaduto').length,
@@ -396,7 +472,7 @@ export const CasaHome = {
         const oggi = f.giorno(new Date()), fra30 = f.aggiungiGiorni(oggi, 30);
         const annoCorrente = new Date().getFullYear();
         const costiAnno = computed(() => totale(vociCosto(annoCorrente)));
-        return { elencoAvvisi, elencoProssime, conteggi, sezioni, scadenze, prossimaScadenza, annoCorrente, costiAnno, f, oggi, fra30 };
+        return { elencoAvvisi, elencoProssime, conteggi, sezioni, scadenze, prossimaScadenza, annoCorrente, costiAnno, f, oggi, fra30, urgenti };
     },
     computed: {
         risultati() {
@@ -425,6 +501,11 @@ export const CasaHome = {
         },
         chiudiRicerca() { this.ricerca = ''; this.cercando = false; },
         /// Apre una sequenza di pagine (es. impianto → operazione) dalla scheda di stato.
+        /// Pagina di un'operazione aperta dentro il suo impianto (così "indietro" porta all'impianto).
+        apriPagina(p) {
+            const o = p.nome === 'operazione' ? db.operazioni.find(o => o.id === p.id) : null;
+            if (o) { apriDaElenco({ nome: 'impianto', id: o.sezione_id }); apri(p); } else apriDaElenco(p);
+        },
         apriPagine(pagine) { if (!pagine?.[0]) return; apriDaElenco(pagine[0]); for (const p of pagine.slice(1)) apri(p); },
         apriOperazione(o) { apriDaElenco({ nome: 'impianto', id: o.sezione_id }); apri({ nome: 'operazione', id: o.id }); },
         async sposta(i, d) {

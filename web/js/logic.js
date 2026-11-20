@@ -472,6 +472,51 @@ export function prossime(giorniAvanti = 30) {
     return elenco.sort((a, b) => a.data - b.data);
 }
 
+/// Ultime cose registrate in casa (letture, misure, acquisti, interventi, lavori…) negli ultimi N giorni, dalla più recente.
+export function attivitaRecenti(giorni = 7) {
+    const limite = aggiungiGiorni(giorno(new Date()), -giorni);
+    const voci = [];
+    const op = tipo => db.operazioni.find(o => o.tipo === tipo);
+    const aggiungi = (data, v) => { const d = new Date(data); if (!isNaN(d) && d >= limite) voci.push({ ...v, data: d }); };
+    for (const m of db.movimenti) {
+        const p = db.prodotti.find(p => p.id === m.prodotto_id);
+        const o = p ? operazioneDiProdotto(p) : null;
+        const nome = { acquisto: 'Acquisto', consumo: nomeMovimento('consumo', p?.categoria), rettifica: 'Rettifica giacenza' }[m.tipo];
+        aggiungi(m.data, { id: 'm' + m.id, icona: m.tipo === 'acquisto' ? 'carrello' : 'meno', titolo: `${nome} ${p?.nome ?? ''}`.trim(),
+            dettaglio: quantita(m.quantita, p?.unita ?? ''), sezione_id: o?.sezione_id, pagina: o && { nome: 'operazione', id: o.id } });
+    }
+    for (const l of db.letture_deposito) {
+        const p = db.prodotti.find(p => p.id === l.prodotto_id), o = p ? operazioneDiProdotto(p) : op('pellet');
+        aggiungi(l.momento, { id: 'l' + l.id, icona: 'righello', titolo: 'Lettura deposito pellet', dettaglio: quantita(l.kg, 'kg'),
+            sezione_id: o?.sezione_id, pagina: o && { nome: 'operazione', id: o.id } });
+    }
+    const ph = op('ph');
+    for (const m of db.misure_ph) {
+        aggiungi(m.data, { id: 'p' + m.id, icona: 'provetta', titolo: 'Misura pH',
+            dettaglio: [m.dosimetro != null ? `dosimetro ${String(m.dosimetro).replace('.', ',')}` : '', m.scuba != null ? `scuba ${String(m.scuba).replace('.', ',')}` : ''].filter(Boolean).join(' · '),
+            sezione_id: ph?.sezione_id, pagina: ph && { nome: 'operazione', id: ph.id } });
+    }
+    const cenere = op('cenere');
+    for (const c of db.svuotamenti_cenere) {
+        aggiungi(c.data, { id: 'c' + c.id, icona: 'cestino', titolo: 'Svuotamento cenere', dettaglio: c.note,
+            sezione_id: cenere?.sezione_id, pagina: cenere && { nome: 'operazione', id: cenere.id } });
+    }
+    const acqua = op('cambioAcqua');
+    for (const pr of db.processi_acqua) {
+        aggiungi(pr.fine ?? pr.inizio, { id: 'a' + pr.id, icona: pr.tipo === 'svuotamento' ? 'giu' : 'su',
+            titolo: `${pr.tipo === 'svuotamento' ? 'Svuotamento' : 'Riempimento'} piscina${pr.fine ? '' : ' (in corso)'}`, dettaglio: '',
+            sezione_id: acqua?.sezione_id, pagina: { nome: 'processo', id: pr.id } });
+    }
+    for (const i of db.interventi) {
+        const o = db.operazioni.find(o => o.id === i.operazione_id);
+        const chi = i.eseguito_da === 'proprio' ? `in proprio${i.esecutore ? ' (' + i.esecutore + ')' : ''}` : i.esecutore;
+        aggiungi(i.data, { id: 'i' + i.id, icona: o?.tipo === 'lavori' ? 'pennello' : 'chiave',
+            titolo: i.titolo || (o?.tipo === 'lavori' ? o.titolo : 'Intervento di manutenzione'), dettaglio: chi,
+            sezione_id: o?.sezione_id, pagina: o && { nome: 'operazione', id: o.id } });
+    }
+    return voci.sort((a, b) => b.data - a.data);
+}
+
 /// Tutte le scadenze con una data (passate in ritardo, imminenti e future), per il calendario della casa.
 export function calendarioScadenze() {
     const elenco = [];
