@@ -367,7 +367,7 @@ export const CostiPagina = {
 export const CasaHome = {
     components: { RigaAvviso, TesseraImpianto, SchedaStato, SchedaAvviso, InProgramma, AttivitaRecenti },
     template: `
-      <Pagina titolo="Casa Dolonne" grande :sottotitolo="sottotitolo" :con-indietro="false" class="pagina-casa">
+      <Pagina titolo="Casa Dolonne" grande :sottotitolo="sottotitolo" :con-indietro="false">
         <template #azioni>
           <button v-if="sezioni.length" class="pulsante-barra" @click="apriRicerca" aria-label="Cerca"><Icona nome="ricerca" :dimensione="20"/></button>
           <button class="pulsante-barra" @click="cambiaScheda('impostazioni')" aria-label="Impostazioni"><Icona nome="ingranaggio" :dimensione="20"/></button>
