@@ -592,9 +592,6 @@ table.tabella { border-collapse: collapse; width: 100%; font-size: 14px; font-va
 .programma-quando { flex: none; font-size: 14px; color: var(--secondario); font-variant-numeric: tabular-nums; }
 .programma-quando.vicino { color: var(--arancione); font-weight: 600; }
 .programma-tutto { display: block; margin: 6px auto 0; font-size: 14px; }
-.attivita-recenti { margin-top: 26px; }
-.segmenti-piccoli { margin: 0; width: 170px; }
-.segmenti-piccoli button { padding: 4px 6px; font-size: 12px; }
 
 /* Riquadri compatti degli impianti: icona e nome su una riga, tutti della stessa altezza */
 .tessera-impianto { flex-direction: row; align-items: center; gap: 11px; min-height: 0; height: 60px; padding: 0 14px; }

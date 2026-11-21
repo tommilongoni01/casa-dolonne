@@ -7,7 +7,7 @@ import * as f from '../format.js';
 import { COLORE_SEZIONE, ICONE_SEZIONE } from '../icone.js';
 import {
     avvisi, prossime, operazioniDi, statoOperazione, TIPI_OPERAZIONE, sezioneDi, nomeContatto, sottotitoloContatto, calendarioScadenze,
-    iconaOperazione, coloreImpianto, vociCosto, anniCosti, totale, eGenerale, prodottiOperazione, analisiScorta, attivitaRecenti
+    iconaOperazione, coloreImpianto, vociCosto, anniCosti, totale, eGenerale, prodottiOperazione, analisiScorta
 } from '../logic.js';
 import { riassuntoImpianto, riepilogoOperazione, TesseraImpianto, RigaAvviso } from './manutenzione.js';
 import { ContattoFoglio } from './contatti.js';
@@ -135,7 +135,7 @@ const SchedaAvviso = {
     }
 };
 
-/// "oggi", "domani", "tra 3 giorni", "12 dic" (o "3 giorni fa" per il passato).
+/// "oggi", "domani", "tra 3 giorni", "12 dic".
 function quandoRelativo(d) {
     const giorni = Math.round((f.giorno(d) - f.giorno(new Date())) / GIORNO_MS);
     if (giorni === 0) return 'oggi';
@@ -148,7 +148,7 @@ function quandoRelativo(d) {
 
 /// Riga in stile Promemoria: barra nel colore dell'impianto, icona, titolo, impianto e tempo.
 const RigaProgramma = {
-    props: { voce: Object, passato: Boolean },
+    props: { voce: Object },
     emits: ['apri'],
     template: `
       <button class="riga toccabile riga-programma" :style="{ '--colore-riga': colore }" @click="voce.pagina && $emit('apri', voce.pagina)">
@@ -157,17 +157,12 @@ const RigaProgramma = {
           <span class="riga-titolo">{{ voce.titolo }}</span>
           <span class="riga-sottotitolo">{{ [sezione?.nome, voce.dettaglio].filter(Boolean).join(' · ') }}</span>
         </span>
-        <span class="programma-quando" :class="{ vicino: !passato && vicino }">{{ quando }}</span>
+        <span class="programma-quando" :class="{ vicino }">{{ quando }}</span>
       </button>`,
     computed: {
         sezione() { return sezioneDi(this.voce.sezione_id); },
         colore() { return coloreImpianto(this.voce.sezione_id); },
-        quando() {
-            if (!this.passato) return quandoRelativo(this.voce.data);
-            const d = this.voce.data, oggi = f.giorno(new Date());
-            const ora = d.getHours() || d.getMinutes() ? ' ' + new Intl.DateTimeFormat('it-IT', { hour: '2-digit', minute: '2-digit' }).format(d) : '';
-            return f.giorno(d).getTime() === oggi.getTime() ? 'oggi' + ora : quandoRelativo(d);
-        },
+        quando() { return quandoRelativo(this.voce.data); },
         vicino() { return (f.giorno(this.voce.data) - f.giorno(new Date())) / GIORNO_MS <= 7; }
     }
 };
@@ -272,29 +267,6 @@ const InProgramma = {
 /// Lunedì della settimana di una data.
 function lunedi(d) { const g = new Date(d.getFullYear(), d.getMonth(), d.getDate()); g.setDate(g.getDate() - (g.getDay() + 6) % 7); return g; }
 
-/// Attività recenti: cosa è stato registrato in casa negli ultimi 7 o 30 giorni.
-const AttivitaRecenti = {
-    components: { RigaProgramma },
-    emits: ['apri'],
-    template: `
-      <section class="gruppo attivita-recenti">
-        <div class="calendario-testa">
-          <h3 class="gruppo-titolo" style="margin:0">Attività recenti</h3>
-          <div class="segmenti segmenti-piccoli">
-            <button :class="{ attivo: giorni === 7 }" @click="giorni = 7">7 giorni</button>
-            <button :class="{ attivo: giorni === 30 }" @click="giorni = 30">30 giorni</button>
-          </div>
-        </div>
-        <div class="gruppo-celle">
-          <Riga v-if="!voci.length" :titolo="'Niente registrato negli ultimi ' + giorni + ' giorni'" class="secondario"/>
-          <RigaProgramma v-for="v in (tutte ? voci : voci.slice(0, 5))" :key="v.id" :voce="v" passato @apri="p => $emit('apri', p)"/>
-          <Riga v-if="voci.length > 5" azione :icona="tutte ? 'frecciaSu' : 'frecciaGiu'" :titolo="tutte ? 'Mostra meno' : 'Mostra tutte (' + voci.length + ')'" @click="tutte = !tutte"/>
-        </div>
-      </section>`,
-    data() { return { giorni: 7, tutte: false }; },
-    computed: { voci() { return attivitaRecenti(this.giorni); } }
-};
-
 // ---------------------------------------------------------------------
 // Costi della casa e degli impianti
 // ---------------------------------------------------------------------
@@ -365,7 +337,7 @@ export const CostiPagina = {
 // Home
 // ---------------------------------------------------------------------
 export const CasaHome = {
-    components: { RigaAvviso, TesseraImpianto, SchedaStato, SchedaAvviso, InProgramma, AttivitaRecenti },
+    components: { RigaAvviso, TesseraImpianto, SchedaStato, SchedaAvviso, InProgramma },
     template: `
       <Pagina titolo="Casa Dolonne" grande :sottotitolo="sottotitolo" :con-indietro="false">
         <template #azioni>
@@ -455,7 +427,6 @@ export const CasaHome = {
               <!-- Calendario degli interventi -->
               <div class="cruscotto-calendario">
                 <InProgramma :voci="scadenze" @apri="apriPagina"/>
-                <AttivitaRecenti @apri="apriPagina"/>
               </div>
             </div>
           </template>
