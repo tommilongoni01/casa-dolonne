@@ -611,12 +611,11 @@ table.tabella { border-collapse: collapse; width: 100%; font-size: 14px; font-va
 .costi-mese small { font-size: 10px; color: var(--secondario); line-height: 1; }
 .costi-mese.futuro i { opacity: .25; }
 .costi-mese.futuro small { opacity: .5; }
-/* Schermo largo: la colonna degli impianti è alta quanto quella del calendario e la scheda dei costi riempie lo spazio */
-.pieno .cruscotto { align-items: stretch; }
-.pieno .cruscotto-calendario { align-self: start; }
-.pieno .cruscotto-impianti { display: flex; flex-direction: column; }
-.pieno .cruscotto .scheda-costi { flex: 1; min-height: 200px; }
-.pieno .costi-mesi { flex: 1; height: auto; min-height: 90px; }
+/* Schermo largo: la colonna degli impianti è alta almeno quanto quella del calendario (altezza misurata in CasaHome)
+   e la scheda dei costi riempie lo spazio rimasto */
+.pieno .cruscotto-impianti { display: flex; flex-direction: column; min-height: var(--altezza-calendario, 0px); }
+.pieno .cruscotto .scheda-costi { flex: 1; gap: 10px; padding: 12px 16px 10px; }
+.pieno .costi-mesi { flex: 1; height: auto; min-height: 40px; }
 
 /* Animazioni */
 @keyframes compare { from { opacity: 0; transform: translateY(8px); } }

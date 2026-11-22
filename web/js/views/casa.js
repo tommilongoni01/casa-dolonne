@@ -498,7 +498,21 @@ export const CasaHome = {
             return r;
         }
     },
+    // Su schermo largo la colonna degli impianti prende l'altezza di quella del calendario (vedi --altezza-calendario nel CSS).
+    mounted() {
+        this.osservatore = new ResizeObserver(([e]) => e.target.parentElement?.style.setProperty('--altezza-calendario', `${e.target.offsetHeight}px`));
+        this.collegaCalendario();
+    },
+    updated() { this.collegaCalendario(); },
+    unmounted() { this.osservatore.disconnect(); },
     methods: {
+        collegaCalendario() {
+            const el = this.$el.querySelector?.('.cruscotto-calendario') ?? null;
+            if (el === this.calendarioOsservato) return;
+            this.osservatore.disconnect();
+            if (el) this.osservatore.observe(el);
+            this.calendarioOsservato = el;
+        },
         puoModificare, apriDaElenco, iconaOperazione, cambiaScheda,
         tipo: o => TIPI_OPERAZIONE[o.tipo] ?? TIPI_OPERAZIONE.generica,
         nomeImpianto: id => sezioneDi(id)?.nome ?? '',
