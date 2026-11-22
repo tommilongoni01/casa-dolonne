@@ -421,7 +421,7 @@ export const CasaHome = {
                   <!-- Spesa mese per mese (i contratti cadono nel mese in cui si rinnovano) -->
                   <span class="costi-mesi" aria-hidden="true">
                     <span v-for="m in costiMesi" :key="m.mese" class="costi-mese" :class="{ futuro: m.futuro }">
-                      <i :style="{ height: m.altezza + '%' }"></i><small>{{ m.lettera }}</small>
+                      <span class="costi-colonna"><i :class="{ zero: !m.altezza }" :style="m.altezza ? { height: m.altezza + '%' } : null"></i></span><small>{{ m.lettera }}</small>
                     </span>
                   </span>
                 </button>
