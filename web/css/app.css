@@ -599,16 +599,24 @@ table.tabella { border-collapse: collapse; width: 100%; font-size: 14px; font-va
 .tessera-impianto::after { display: none; }
 .griglia-impianti { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; }
 
-/* Grafico dei costi per mese */
-.scheda-costi-testi { flex: 0 1 auto; min-width: 0; }
+/* Scheda dei costi con il grafico per mese */
+.cruscotto .scheda-costi { flex-direction: column; align-items: stretch; gap: 14px; width: 100%; margin-top: 14px; padding: 14px 16px 12px; }
+.scheda-costi-testa { display: flex; align-items: center; gap: 12px; }
+.scheda-costi-testa .scheda-costi-testi { flex: 1; }
 .scheda-costi-testi .secondario:last-child { font-size: 12px; }
-.costi-mesi { flex: 1; display: flex; justify-content: flex-end; align-items: flex-end; gap: 4px; height: 46px; margin-left: 8px; }
-.costi-mese { flex: 0 1 14px; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 3px; height: 100%; }
-.costi-mese i { display: block; width: 100%; border-radius: 3px; background: var(--accento); min-height: 2px; opacity: .9; }
-.costi-mese i[style*="height: 0%"] { background: var(--riempimento); opacity: 1; }
-.costi-mese small { font-size: 9px; color: var(--secondario); line-height: 1; }
+.costi-mesi { display: flex; align-items: flex-end; gap: 6px; height: 72px; }
+.costi-mese { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px; height: 100%; }
+.costi-mese i { display: block; width: 100%; max-width: 28px; border-radius: 4px; background: var(--accento); min-height: 3px; }
+.costi-mese i[style*="height: 0%"] { background: var(--riempimento); }
+.costi-mese small { font-size: 10px; color: var(--secondario); line-height: 1; }
 .costi-mese.futuro i { opacity: .25; }
 .costi-mese.futuro small { opacity: .5; }
+/* Schermo largo: la colonna degli impianti è alta quanto quella del calendario e la scheda dei costi riempie lo spazio */
+.pieno .cruscotto { align-items: stretch; }
+.pieno .cruscotto-calendario { align-self: start; }
+.pieno .cruscotto-impianti { display: flex; flex-direction: column; }
+.pieno .cruscotto .scheda-costi { flex: 1; min-height: 200px; }
+.pieno .costi-mesi { flex: 1; height: auto; min-height: 90px; }
 
 /* Animazioni */
 @keyframes compare { from { opacity: 0; transform: translateY(8px); } }

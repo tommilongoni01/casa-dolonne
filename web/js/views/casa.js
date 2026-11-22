@@ -408,11 +408,15 @@ export const CasaHome = {
                     </template>
                   </Riga>
                 </Gruppo>
-                <button class="scheda-costi" style="margin-top:14px;width:100%" @click="apriDaElenco({ nome: 'costi' })">
-                  <IconaQuadrata nome="carrello" colore="var(--accento)" :dimensione="34"/>
-                  <span class="scheda-costi-testi">
-                    <span class="secondario">Costi {{ annoCorrente }}</span><b>{{ f.euro(costiAnno) }}</b>
-                    <span v-if="costiAnnoPrima" class="secondario">{{ confrontoCosti }}</span>
+                <!-- Su schermo largo la scheda si allunga fino in fondo alla colonna del calendario -->
+                <button class="scheda-costi" @click="apriDaElenco({ nome: 'costi' })">
+                  <span class="scheda-costi-testa">
+                    <IconaQuadrata nome="carrello" colore="var(--accento)" :dimensione="34"/>
+                    <span class="scheda-costi-testi">
+                      <span class="secondario">Costi {{ annoCorrente }}</span><b>{{ f.euro(costiAnno) }}</b>
+                      <span v-if="costiAnnoPrima" class="secondario">{{ confrontoCosti }}</span>
+                    </span>
+                    <Icona nome="avanti" :dimensione="16" class="secondario"/>
                   </span>
                   <!-- Spesa mese per mese (i contratti cadono nel mese in cui si rinnovano) -->
                   <span class="costi-mesi" aria-hidden="true">
@@ -420,7 +424,6 @@ export const CasaHome = {
                       <i :style="{ height: m.altezza + '%' }"></i><small>{{ m.lettera }}</small>
                     </span>
                   </span>
-                  <Icona nome="avanti" :dimensione="16" class="secondario"/>
                 </button>
               </div>
 
