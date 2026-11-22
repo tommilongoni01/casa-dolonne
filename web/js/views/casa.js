@@ -40,13 +40,13 @@ const PilloleStato = {
     emits: ['apri'],
     template: `
       <div v-if="pillole.length" class="pillole-stato">
-        <button v-for="p in pillole" :key="p.id" type="button" class="pillola" :class="p.stato" @click="$emit('apri', p.pagine)">
+        <button v-for="p in pillole" :key="p.id" type="button" class="voce-stato" :class="p.stato" @click="$emit('apri', p.pagine)">
           <IconaQuadrata :nome="p.icona" :colore="p.colore" :dimensione="32"/>
-          <span class="pillola-testi">
+          <span class="voce-stato-testi">
             <small>{{ p.nome }}</small>
             <b>{{ p.valore }} <i v-if="p.pallino" class="pallino" :class="p.pallino"></i></b>
             <span v-if="p.livello != null" class="barra-livello"><i :style="{ width: p.livello + '%' }"></i></span>
-            <small v-else-if="p.nota" class="pillola-nota">{{ p.nota }}</small>
+            <small v-else-if="p.nota" class="voce-stato-nota">{{ p.nota }}</small>
           </span>
         </button>
       </div>`,
