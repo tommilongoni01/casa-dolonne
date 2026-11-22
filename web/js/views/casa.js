@@ -7,7 +7,7 @@ import * as f from '../format.js';
 import { COLORE_SEZIONE, ICONE_SEZIONE } from '../icone.js';
 import {
     avvisi, prossime, operazioniDi, statoOperazione, TIPI_OPERAZIONE, sezioneDi, nomeContatto, sottotitoloContatto, calendarioScadenze,
-    iconaOperazione, coloreImpianto, vociCosto, anniCosti, totale, eGenerale, prodottiOperazione, analisiScorta
+    iconaOperazione, coloreImpianto, vociCosto, anniCosti, totale, eGenerale, prodottiOperazione, analisiScorta, sottoScorta
 } from '../logic.js';
 import { riassuntoImpianto, riepilogoOperazione, TesseraImpianto, RigaAvviso } from './manutenzione.js';
 import { ContattoFoglio } from './contatti.js';
@@ -19,6 +19,8 @@ const testoDaHtml = html => new DOMParser().parseFromString(html ?? '', 'text/ht
 // Dashboard: stato, avvisi e calendario
 // ---------------------------------------------------------------------
 const GIORNO_MS = 86_400_000;
+/// Iniziale maiuscola (i titoli scritti a mano possono iniziare in minuscolo).
+const maiuscola = t => t ? t.charAt(0).toUpperCase() + t.slice(1) : t;
 const chiaveGiorno = d => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
 
 /// "Oggi", "Domani", "Ieri", "Lun 24 nov"
@@ -32,74 +34,55 @@ function nomeGiorno(d) {
     return testo.charAt(0).toUpperCase() + testo.slice(1);
 }
 
-/// Riquadro grande in cima: lo stato della casa in una frase, come nell'app Casa di Apple.
-const SchedaStato = {
-    props: { avvisi: Array },
+/// Pillole in cima alla home: i valori da tenere d'occhio (pellet, pH, ossigeno), come i riepiloghi dell'app Casa.
+/// Si colorano solo quando c'è qualcosa da fare.
+const PilloleStato = {
     emits: ['apri'],
     template: `
-      <div class="scheda-stato" :class="'stato-' + stato">
-        <div class="scheda-stato-testa">
-          <span class="scheda-stato-icona"><Icona :nome="icona" :dimensione="28"/></span>
-          <span class="scheda-stato-titolo">{{ titolo }}</span>
-        </div>
-        <div class="scheda-stato-valori">
-          <button v-if="pellet" type="button" @click="$emit('apri', pellet.pagine)">
-            <small>Pellet</small><b>{{ f.quantita(pellet.kg, 'kg') }}</b>
-            <span class="barra-livello"><i :style="{ width: pellet.percento + '%' }"></i></span>
-          </button>
-          <button v-if="ph" type="button" @click="$emit('apri', ph.pagine)">
-            <small>pH piscina</small><b>{{ f.ph(ph.valore) }} <i class="pallino" :class="ph.colore"></i></b>
-            <small>{{ ph.quando }}</small>
-          </button>
-          <button v-if="ossigeno" type="button" @click="$emit('apri', ossigeno.pagine)">
-            <small>Ossigeno piscina</small><b>{{ f.quantita(ossigeno.litri, ossigeno.unita) }} <i class="pallino" :class="ossigeno.basso ? 'rosso' : 'verde'"></i></b>
-            <small>{{ ossigeno.minimo ? 'Scorta minima ' + f.quantita(ossigeno.minimo, ossigeno.unita) : 'In magazzino' }}</small>
-          </button>
-        </div>
+      <div v-if="pillole.length" class="pillole-stato">
+        <button v-for="p in pillole" :key="p.id" type="button" class="pillola" :class="p.stato" @click="$emit('apri', p.pagine)">
+          <IconaQuadrata :nome="p.icona" :colore="p.colore" :dimensione="32"/>
+          <span class="pillola-testi">
+            <small>{{ p.nome }}</small>
+            <b>{{ p.valore }} <i v-if="p.pallino" class="pallino" :class="p.pallino"></i></b>
+            <span v-if="p.livello != null" class="barra-livello"><i :style="{ width: p.livello + '%' }"></i></span>
+            <small v-else-if="p.nota" class="pillola-nota">{{ p.nota }}</small>
+          </span>
+        </button>
       </div>`,
     computed: {
-        conteggio() {
-            const n = g => this.avvisi.filter(a => g.includes(a.gravita)).length;
-            return { scaduti: n(['scaduto']), inScadenza: n(['inScadenza']), inCorso: n(['inCorso']) };
-        },
-        stato() { return this.conteggio.scaduti ? 'scaduto' : this.conteggio.inScadenza || this.conteggio.inCorso ? 'inScadenza' : 'ok'; },
-        icona() { return { scaduto: 'avviso', inScadenza: 'orologio', ok: 'sigillo' }[this.stato]; },
-        titolo() {
-            const { scaduti, inScadenza, inCorso } = this.conteggio;
-            const parti = [];
-            if (scaduti) parti.push(scaduti === 1 ? '1 cosa da fare' : `${scaduti} cose da fare`);
-            if (inScadenza) parti.push(inScadenza === 1 ? '1 in scadenza' : `${inScadenza} in scadenza`);
-            if (!parti.length && inCorso) parti.push('Operazione in corso');
-            return parti.join(' · ') || 'Tutto in regola';
-        },
-        /// Pellet nel deposito (kg) e riempimento rispetto al silo pieno (3.600 kg).
-        pellet() {
-            const o = db.operazioni.find(o => o.tipo === 'pellet');
-            const p = o && prodottiOperazione(o).find(p => p.categoria === 'pellet');
-            if (!p) return null;
-            const kg = analisiScorta(p).giacenza * 100;
-            return { kg, percento: Math.max(0, Math.min(100, kg / 3600 * 100)), pagine: pagineOperazione(o) };
-        },
-        /// Ultima misura del pH (dosimetro, altrimenti scuba) con il colore della fascia ideale 6,8 – 7,8.
-        ph() {
-            const o = db.operazioni.find(o => o.tipo === 'ph');
-            const m = db.misure_ph.slice().sort((a, b) => b.data.localeCompare(a.data))[0];
-            if (!o || !m) return null;
-            const v = Number(m.dosimetro ?? m.scuba);
-            const colore = v >= 6.8 && v <= 7.8 ? 'verde' : v >= 6.6 && v <= 8 ? 'arancione' : 'rosso';
-            const giorni = f.giorniTrascorsi(m.data);
-            return { valore: v, colore, quando: giorni === 0 ? 'oggi' : giorni === 1 ? 'ieri' : `${giorni} giorni fa`, pagine: pagineOperazione(o) };
-        },
-        /// Scorta di ossigeno attivo della piscina, confrontata con la scorta minima.
-        ossigeno() {
-            const o = db.operazioni.find(o => o.tipo === 'ossigeno');
-            const p = o && prodottiOperazione(o).find(p => p.categoria === 'ossigeno');
-            if (!p) return null;
-            const litri = analisiScorta(p).giacenza, minimo = Number(p.scorta_minima) || 0;
-            return { litri, minimo, unita: p.unita || 'l', basso: minimo > 0 && litri <= minimo, pagine: pagineOperazione(o) };
+        pillole() {
+            const elenco = [];
+            const operazione = tipo => db.operazioni.find(o => o.tipo === tipo);
+            const prodotto = (o, categoria) => o && prodottiOperazione(o).find(p => p.categoria === categoria);
+            // Pellet nel deposito (kg), con il riempimento rispetto al silo pieno (3.600 kg).
+            const op = operazione('pellet'), pel = prodotto(op, 'pellet');
+            if (pel) {
+                const kg = analisiScorta(pel).giacenza * 100;
+                elenco.push({ id: 'pellet', nome: 'Pellet', icona: iconaOperazione(op), colore: coloreImpianto(op.sezione_id), valore: f.quantita(kg, 'kg'),
+                    livello: Math.max(0, Math.min(100, kg / 3600 * 100)), stato: sottoScorta(pel) ? 'attenzione' : '', pagine: pagineOperazione(op) });
+            }
+            // Ultima misura del pH (dosimetro, altrimenti scuba), con la fascia ideale 6,8 – 7,8.
+            const oph = operazione('ph'), m = db.misure_ph.slice().sort((a, b) => b.data.localeCompare(a.data))[0];
+            if (oph && m) {
+                const v = Number(m.dosimetro ?? m.scuba);
+                const pallino = v >= 6.8 && v <= 7.8 ? 'verde' : v >= 6.6 && v <= 8 ? 'arancione' : 'rosso';
+                const giorni = f.giorniTrascorsi(m.data);
+                elenco.push({ id: 'ph', nome: 'pH piscina', icona: iconaOperazione(oph), colore: coloreImpianto(oph.sezione_id), valore: f.ph(v), pallino,
+                    nota: giorni === 0 ? 'Misurato oggi' : giorni === 1 ? 'Misurato ieri' : `Misurato ${giorni} giorni fa`,
+                    stato: pallino === 'rosso' ? 'problema' : pallino === 'arancione' ? 'attenzione' : '', pagine: pagineOperazione(oph) });
+            }
+            // Ossigeno attivo della piscina, confrontato con la scorta minima.
+            const oo = operazione('ossigeno'), oss = prodotto(oo, 'ossigeno');
+            if (oss) {
+                const litri = analisiScorta(oss).giacenza, minimo = Number(oss.scorta_minima) || 0;
+                elenco.push({ id: 'ossigeno', nome: 'Ossigeno piscina', icona: iconaOperazione(oo), colore: coloreImpianto(oo.sezione_id),
+                    valore: f.quantita(litri, oss.unita || 'l'), nota: minimo ? `Scorta minima ${f.quantita(minimo, oss.unita || 'l')}` : '',
+                    stato: minimo > 0 && litri <= minimo ? 'attenzione' : '', pagine: pagineOperazione(oo) });
+            }
+            return elenco;
         }
-    },
-    setup() { return { f }; }
+    }
 };
 
 /// Pagine da aprire per arrivare a un'operazione: impianto, poi operazione.
@@ -117,9 +100,10 @@ const SchedaAvviso = {
           <Cronometro v-if="avviso.gravita === 'inCorso'" :da="avviso.data" class="scheda-avviso-quando"/>
           <span v-else-if="avviso.data" class="scheda-avviso-quando">{{ quando }}</span>
         </span>
-        <span class="scheda-avviso-titolo">{{ titolo }}</span>
+        <span class="scheda-avviso-titolo">{{ maiuscola(titolo) }}</span>
         <span class="scheda-avviso-dettaglio">{{ avviso.dettaglio }}</span>
       </button>`,
+    methods: { maiuscola },
     computed: {
         sezione() { return sezioneDi(this.avviso.sezione_id); },
         /// Senza il nome dell'impianto, già scritto in alto nella scheda.
@@ -154,11 +138,12 @@ const RigaProgramma = {
       <button class="riga toccabile riga-programma" :style="{ '--colore-riga': colore }" @click="voce.pagina && $emit('apri', voce.pagina)">
         <IconaQuadrata :nome="voce.icona" :colore="colore" :dimensione="30"/>
         <span class="riga-testi">
-          <span class="riga-titolo">{{ voce.titolo }}</span>
+          <span class="riga-titolo">{{ maiuscola(voce.titolo) }}</span>
           <span class="riga-sottotitolo">{{ [sezione?.nome, voce.dettaglio].filter(Boolean).join(' · ') }}</span>
         </span>
         <span class="programma-quando" :class="{ vicino }">{{ quando }}</span>
       </button>`,
+    methods: { maiuscola },
     computed: {
         sezione() { return sezioneDi(this.voce.sezione_id); },
         colore() { return coloreImpianto(this.voce.sezione_id); },
@@ -337,7 +322,7 @@ export const CostiPagina = {
 // Home
 // ---------------------------------------------------------------------
 export const CasaHome = {
-    components: { RigaAvviso, TesseraImpianto, SchedaStato, SchedaAvviso, InProgramma },
+    components: { RigaAvviso, TesseraImpianto, PilloleStato, SchedaAvviso, InProgramma },
     template: `
       <Pagina titolo="Casa Dolonne" grande :sottotitolo="sottotitolo" :con-indietro="false">
         <template #azioni>
@@ -384,7 +369,7 @@ export const CasaHome = {
           <template v-else>
             <div class="cruscotto">
               <div class="cruscotto-stato">
-                <SchedaStato :avvisi="elencoAvvisi" @apri="apriPagine"/>
+                <PilloleStato @apri="apriPagine"/>
                 <!-- Avvisi come schede -->
                 <!-- Solo ciò che è urgente: ritardi, operazioni in corso, scorte basse. Le scadenze future sono in "In programma". -->
                 <TransitionGroup v-if="urgenti.length" tag="div" name="dissolvenza" class="schede-avvisi">
@@ -418,10 +403,19 @@ export const CasaHome = {
                     </span>
                     <Icona nome="avanti" :dimensione="16" class="secondario"/>
                   </span>
-                  <!-- Spesa mese per mese (i contratti cadono nel mese in cui si rinnovano) -->
-                  <span class="costi-mesi" aria-hidden="true">
-                    <span v-for="m in costiMesi" :key="m.mese" class="costi-mese" :class="{ futuro: m.futuro }">
-                      <span class="costi-colonna"><i :class="{ zero: !m.altezza }" :style="m.altezza ? { height: m.altezza + '%' } : null"></i></span><small>{{ m.lettera }}</small>
+                  <!-- Dove vanno i soldi: per tipo di spesa e per impianto -->
+                  <span v-if="costiAnno" class="costi-tipi">
+                    <span class="costi-barra"><i v-for="t in costiPerTipo" :key="t.tipo" :style="{ width: t.percento + '%', background: t.colore }"></i></span>
+                    <span class="costi-legenda">
+                      <span v-for="t in costiPerTipo" :key="t.tipo"><i :style="{ background: t.colore }"></i>{{ t.nome }} <b>{{ f.euro(t.importo) }}</b></span>
+                    </span>
+                  </span>
+                  <span v-if="costiImpianti.length" class="costi-impianti">
+                    <span v-for="c in costiImpianti" :key="c.id" class="costi-impianto">
+                      <IconaQuadrata :nome="c.icona" :colore="c.colore" :dimensione="24"/>
+                      <span class="costi-impianto-nome">{{ c.nome }}</span>
+                      <span class="costi-impianto-barra"><i :style="{ width: c.percento + '%', background: c.colore }"></i></span>
+                      <b>{{ f.euro(c.importo) }}</b>
                     </span>
                   </span>
                 </button>
@@ -466,22 +460,43 @@ export const CasaHome = {
         const costiAnno = computed(() => totale(vociCosto(annoCorrente)));
         const costiAnnoPrima = computed(() => totale(vociCosto(annoCorrente - 1)));
         const confrontoCosti = computed(() => `${f.euro(costiAnnoPrima.value)} in tutto il ${annoCorrente - 1}`);
-        /// Spesa per mese dell'anno in corso, in percentuale del mese più caro.
-        const costiMesi = computed(() => {
-            const mesi = Array(12).fill(0), adesso = new Date().getMonth();
-            for (const v of vociCosto(annoCorrente)) if (v.data) mesi[Number(v.data.slice(5, 7)) - 1] += v.importo;
-            const massimo = Math.max(...mesi, 1);
-            return mesi.map((x, i) => ({ mese: i, lettera: 'GFMAMGLASOND'[i], futuro: i > adesso, altezza: x > 0 ? Math.max(8, x / massimo * 100) : 0 }));
+        const vociAnno = computed(() => vociCosto(annoCorrente));
+        /// Spesa dell'anno divisa per tipo (contratti, interventi, prodotti), in percentuale del totale.
+        const costiPerTipo = computed(() => {
+            const colori = { contratti: 'var(--blu)', interventi: 'var(--arancione)', prodotti: 'var(--verde)' };
+            const nomi = { contratti: 'Contratti', interventi: 'Interventi', prodotti: 'Prodotti' };
+            const tot = totale(vociAnno.value) || 1;
+            return Object.keys(nomi).map(tipo => {
+                const importo = totale(vociAnno.value.filter(v => v.tipo === tipo));
+                return { tipo, nome: nomi[tipo], colore: colori[tipo], importo, percento: importo / tot * 100 };
+            }).filter(t => t.importo > 0);
         });
-        /// Sotto il titolo: la data di oggi e quante scadenze ci sono in settimana, come nell'app Casa.
+        /// I quattro impianti che sono costati di più quest'anno.
+        const costiImpianti = computed(() => {
+            const perImpianto = {};
+            for (const v of vociAnno.value) perImpianto[v.sezione_id ?? ''] = (perImpianto[v.sezione_id ?? ''] ?? 0) + v.importo;
+            const righe = Object.entries(perImpianto).map(([id, importo]) => {
+                const sez = sezioneDi(id);
+                return { id: id || 'nessuno', nome: sez?.nome ?? 'Senza impianto', icona: sez?.icona ?? 'lista', colore: sez ? coloreImpianto(id) : '#8E8E93', importo };
+            }).sort((a, b) => b.importo - a.importo).slice(0, 4);
+            const massimo = righe[0]?.importo || 1;
+            return righe.map(r => ({ ...r, percento: r.importo / massimo * 100 }));
+        });
+        /// Sotto il titolo: la data di oggi e lo stato della casa in una frase, come nell'app Casa.
         const sottotitolo = computed(() => {
-            const oggiG = f.giorno(new Date()), fine = new Date(lunedi(oggiG).getTime() + 7 * GIORNO_MS);
-            const n = scadenze.value.filter(v => v.data >= oggiG && v.data < fine).length;
             const data = new Intl.DateTimeFormat('it-IT', { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date());
-            const settimana = n === 0 ? 'Niente in programma questa settimana' : n === 1 ? '1 scadenza questa settimana' : `${n} scadenze questa settimana`;
-            return `${data.charAt(0).toUpperCase() + data.slice(1)} · ${settimana}`;
+            const { scaduti, inScadenza } = conteggi.value;
+            const parti = [];
+            if (scaduti) parti.push(scaduti === 1 ? '1 cosa da fare' : `${scaduti} cose da fare`);
+            if (inScadenza) parti.push(`${inScadenza} in scadenza`);
+            if (!parti.length) {
+                parti.push('Tutto in regola');
+                const prossima = scadenze.value.find(v => v.data >= f.giorno(new Date()));
+                if (prossima) parti.push(`prossima scadenza ${quandoRelativo(prossima.data)}`);
+            }
+            return [data.charAt(0).toUpperCase() + data.slice(1), ...parti].join(' · ');
         });
-        return { elencoAvvisi, elencoProssime, conteggi, sezioni, scadenze, annoCorrente, costiAnno, costiAnnoPrima, confrontoCosti, costiMesi, sottotitolo, f, oggi, fra30, urgenti };
+        return { elencoAvvisi, elencoProssime, conteggi, sezioni, scadenze, annoCorrente, costiAnno, costiAnnoPrima, confrontoCosti, costiPerTipo, costiImpianti, sottotitolo, f, oggi, fra30, urgenti };
     },
     computed: {
         risultati() {

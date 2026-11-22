@@ -442,15 +442,6 @@ table.tabella { border-collapse: collapse; width: 100%; font-size: 14px; font-va
     #stampa .icona-quadrata { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
 
-/* Home Casa: stato in breve */
-.stato-casa { display: flex; gap: 8px; flex-wrap: wrap; margin: 4px 0 6px; }
-.pillola {
-    display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 999px; font-size: 14px; font-weight: 500;
-    background: var(--cella); box-shadow: var(--ombra); color: var(--secondario); font-variant-numeric: tabular-nums;
-}
-.pillola.rosso { color: var(--rosso); background: color-mix(in srgb, var(--rosso) 10%, var(--cella)); }
-.pillola.arancione { color: var(--arancione); background: color-mix(in srgb, var(--arancione) 10%, var(--cella)); }
-.pillola.blu { color: var(--blu); background: color-mix(in srgb, var(--blu) 10%, var(--cella)); }
 
 /* Pagina dell'impianto */
 .testata-impianto { display: flex; align-items: center; gap: 16px; padding: 8px 4px 4px; }
@@ -478,7 +469,6 @@ table.tabella { border-collapse: collapse; width: 100%; font-size: 14px; font-va
     font-size: 18px; font-weight: 600; line-height: 1; display: inline-flex; align-items: center; justify-content: center; flex: none; }
 .barra-titolo { transition: opacity .2s; }
 .barra-titolo.nascosto { opacity: 0; }
-.pillola.verde { color: var(--verde); background: color-mix(in srgb, var(--verde) 10%, var(--cella)); }
 .campo-data-ora { display: inline-flex; gap: 8px; justify-content: flex-end; flex: 1; min-width: 0; }
 .campo-data-ora { align-items: center; }
 .campo .campo-data-ora input.data { flex: none; width: 7.4em; text-align: right; color: var(--testo); font-variant-numeric: tabular-nums; }
@@ -499,19 +489,6 @@ table.tabella { border-collapse: collapse; width: 100%; font-size: 14px; font-va
 .pieno .cruscotto-impianti { grid-area: impianti; }
 .pieno .cruscotto-calendario { grid-area: calendario; position: sticky; top: 8px; }
 .pieno .cruscotto .griglia-impianti { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; }
-
-/* Stato della casa */
-.scheda-stato {
-    display: flex; align-items: center; gap: 16px; padding: 18px 20px; border-radius: 20px; color: #fff;
-    background: linear-gradient(135deg, var(--c1), var(--c2)); box-shadow: 0 10px 28px color-mix(in srgb, var(--c2) 35%, transparent);
-}
-.scheda-stato.stato-ok { --c1: #34C759; --c2: #1E9E48; }
-.scheda-stato.stato-inScadenza { --c1: #FFAE2B; --c2: #F07C00; }
-.scheda-stato.stato-scaduto { --c1: #FF5A4E; --c2: #D92D20; }
-.scheda-stato-icona { width: 52px; height: 52px; border-radius: 16px; background: rgba(255,255,255,.22); display: inline-flex; align-items: center; justify-content: center; flex: none; }
-.scheda-stato-testi { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
-.scheda-stato-titolo { font-size: 24px; font-weight: 700; letter-spacing: -0.4px; }
-.scheda-stato-dettaglio { font-size: 14px; opacity: .92; }
 
 /* Avvisi come schede */
 .schede-avvisi { display: flex; gap: 12px; overflow-x: auto; scroll-snap-type: x mandatory; padding: 2px 2px 6px; margin: 0 -2px; scrollbar-width: none; }
@@ -567,22 +544,23 @@ table.tabella { border-collapse: collapse; width: 100%; font-size: 14px; font-va
 .segmenti-anni { overflow-x: auto; }
 .segmenti-anni button { flex: 0 0 auto; min-width: 64px; }
 .totale-costi { border-radius: var(--raggio); box-shadow: var(--ombra); margin-top: 6px; }
-/* Scheda di stato con tre indicatori */
-.scheda-stato { flex-direction: column; align-items: stretch; gap: 14px; }
-.scheda-stato-testa { display: flex; align-items: center; gap: 12px; }
-.scheda-stato-testa .scheda-stato-icona { width: 44px; height: 44px; border-radius: 13px; }
-.scheda-stato-valori { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 10px; }
-.scheda-stato-valori button { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; min-width: 0; color: #fff; text-align: left;
-    background: rgba(255,255,255,.16); border-radius: 14px; padding: 10px 12px; transition: background-color .15s; }
-.scheda-stato-valori button:disabled { opacity: 1; cursor: default; }
-.scheda-stato-valori button:not(:disabled):active { background: rgba(255,255,255,.26); }
-.scheda-stato-valori small { font-size: 12px; opacity: .9; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.scheda-stato-valori b { font-size: 20px; font-weight: 700; letter-spacing: -0.3px; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
-.barra-livello { width: 100%; height: 5px; border-radius: 3px; background: rgba(255,255,255,.3); overflow: hidden; margin-top: 3px; }
-.barra-livello i { display: block; height: 100%; background: #fff; border-radius: 3px; }
-.pallino { width: 9px; height: 9px; border-radius: 50%; display: inline-block; border: 1.5px solid #fff; }
-.pallino.verde { background: #34C759; } .pallino.arancione { background: #FFCC00; } .pallino.rosso { background: #FF3B30; }
-@media (hover: hover) and (pointer: fine) { .scheda-stato-valori button:not(:disabled):hover { background: rgba(255,255,255,.24); } }
+/* Pillole di stato in cima alla home */
+.pillole-stato { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+.pillola { display: flex; align-items: center; gap: 11px; min-width: 0; padding: 10px 14px; text-align: left; color: var(--testo);
+    background: var(--cella); border-radius: var(--raggio); box-shadow: var(--ombra); transition: transform .15s, background-color .15s; }
+.pillola:active { transform: scale(0.98); }
+.pillola-testi { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.pillola-testi small { font-size: 12px; color: var(--secondario); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pillola-testi b { font-size: 17px; font-weight: 700; letter-spacing: -0.2px; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.pillola.attenzione { background: color-mix(in srgb, var(--arancione) 14%, var(--cella)); }
+.pillola.attenzione .pillola-testi small { color: color-mix(in srgb, var(--arancione) 75%, var(--testo)); }
+.pillola.problema { background: color-mix(in srgb, var(--rosso) 14%, var(--cella)); }
+.pillola.problema .pillola-testi small { color: color-mix(in srgb, var(--rosso) 80%, var(--testo)); }
+.barra-livello { width: 100%; height: 4px; border-radius: 2px; background: var(--riempimento); overflow: hidden; margin-top: 4px; }
+.barra-livello i { display: block; height: 100%; background: var(--arancione); border-radius: 2px; }
+.pallino { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+.pallino.verde { background: var(--verde); } .pallino.arancione { background: #FFCC00; } .pallino.rosso { background: var(--rosso); }
+@media (hover: hover) and (pointer: fine) { .pillola:hover { transform: translateY(-2px); } }
 /* In programma e attività recenti */
 .calendario-intestazione { display: flex; justify-content: space-between; align-items: center; padding: 0 8px 8px; font-size: 15px; font-weight: 600; }
 .calendario-intestazione .pulsante-testo { font-size: 14px; font-weight: 500; padding: 0; }
@@ -604,20 +582,23 @@ table.tabella { border-collapse: collapse; width: 100%; font-size: 14px; font-va
 .scheda-costi-testa { display: flex; align-items: center; gap: 12px; }
 .scheda-costi-testa .scheda-costi-testi { flex: 1; }
 .scheda-costi-testi .secondario:last-child { font-size: 12px; }
-.costi-mesi { display: flex; gap: 6px; height: 72px; }
-.costi-mese { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; }
-/* La colonna è posizionata: l'altezza in % della barra si calcola sempre, anche quando la scheda si allunga */
-.costi-colonna { flex: 1; position: relative; width: 100%; max-width: 28px; }
-.costi-colonna i { position: absolute; left: 0; right: 0; bottom: 0; border-radius: 4px; background: var(--accento); min-height: 3px; }
-.costi-colonna i.zero { height: 3px; background: var(--riempimento); }
-.costi-mese small { font-size: 10px; color: var(--secondario); line-height: 1; }
-.costi-mese.futuro i { opacity: .25; }
-.costi-mese.futuro small { opacity: .5; }
+.costi-tipi { display: flex; flex-direction: column; gap: 8px; }
+.costi-barra { display: flex; height: 10px; border-radius: 5px; overflow: hidden; gap: 2px; background: var(--riempimento); }
+.costi-barra i { display: block; height: 100%; min-width: 4px; }
+.costi-legenda { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 13px; color: var(--secondario); }
+.costi-legenda > span { display: inline-flex; align-items: center; gap: 6px; }
+.costi-legenda i { width: 8px; height: 8px; border-radius: 50%; }
+.costi-legenda b { color: var(--testo); font-weight: 600; font-variant-numeric: tabular-nums; }
+.costi-impianti { display: flex; flex-direction: column; gap: 9px; padding-top: 12px; border-top: 0.5px solid var(--separatore); }
+.costi-impianto { display: grid; grid-template-columns: 24px minmax(80px, 160px) 1fr auto; align-items: center; gap: 10px; font-size: 14px; }
+.costi-impianto-nome { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.costi-impianto-barra { height: 6px; border-radius: 3px; background: var(--riempimento); overflow: hidden; }
+.costi-impianto-barra i { display: block; height: 100%; border-radius: 3px; }
+.costi-impianto b { font-weight: 600; font-variant-numeric: tabular-nums; }
 /* Schermo largo: la colonna degli impianti è alta almeno quanto quella del calendario (altezza misurata in CasaHome)
    e la scheda dei costi riempie lo spazio rimasto */
 .pieno .cruscotto-impianti { display: flex; flex-direction: column; min-height: var(--altezza-calendario, 0px); }
 .pieno .cruscotto .scheda-costi { flex: 1; gap: 10px; padding: 12px 16px 10px; }
-.pieno .costi-mesi { flex: 1; height: auto; min-height: 40px; }
 
 /* Animazioni */
 @keyframes compare { from { opacity: 0; transform: translateY(8px); } }
