@@ -485,6 +485,13 @@ table.tabella { border-collapse: collapse; width: 100%; font-size: 14px; font-va
 .campo .campo-data-ora input.data.errata { color: var(--rosso); }
 .adesso { flex: none; font-size: 13px; font-weight: 600; color: var(--accento); background: color-mix(in srgb, var(--accento) 12%, transparent);
     border-radius: 999px; padding: 4px 10px; }
+.barre { background: var(--cella); padding: 12px 12px 8px; }
+.barre-area { display: flex; gap: 4px; padding-top: 16px; }
+.barre-colonna { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.barre-valore { font-size: 10px; font-weight: 600; color: var(--secondario); font-variant-numeric: tabular-nums; white-space: nowrap; height: 12px; line-height: 12px; }
+.barre-coppia { flex: 1; width: 100%; max-width: 44px; display: flex; align-items: flex-end; justify-content: center; gap: 2px; }
+.barre-barra { flex: 1; max-width: 20px; border-radius: 4px 4px 2px 2px; }
+.barre-etichetta { font-size: 11px; color: var(--secondario); line-height: 1; white-space: nowrap; }
 .grafico-valore { font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; paint-order: stroke; stroke: var(--cella); stroke-width: 3px; }
 
 /* =====================================================================

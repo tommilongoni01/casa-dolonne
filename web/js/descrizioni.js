@@ -145,6 +145,10 @@ export const DESCRIZIONI = {
         }
     },
     'Impianto elettrico': {
+        bollette: {
+            descrizione: "Bollette della luce, una ogni due mesi: importo, consumo in kWh e potenza massima prelevata. I grafici mostrano la spesa per bimestre e il consumo mese per mese, a confronto con l'anno prima.",
+            passaggi: []
+        },
         storico: {
             descrizione: "Controlli dell'impianto elettrico: prova dei differenziali (salvavita), stato del quadro e verifica periodica dell'impianto di terra.",
             passaggi: [

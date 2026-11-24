@@ -9,7 +9,8 @@ import {
     ultimoRiempimento, interventiDi, carichiOrdinati, svuotamentiOrdinati, formatiDi, nomeConfezione, descriviConfezioni,
     prodottiOperazione, operazioneDiProdotto, categoriaPerOperazione, STATI_PRODOTTO, UNITA_MISURA, allarmi, coloreImpianto,
     calcoliAcquisto, fornitoriDi, nomeUnita, prezzoProdotto,
-    conAvviso, costoContratto, costoAnnuoContratto, fineContratto, mesiContratto, fornitoreContratto, quantitaScorta
+    conAvviso, costoContratto, costoAnnuoContratto, fineContratto, mesiContratto, fornitoreContratto, quantitaScorta,
+    bolletteOrdinate, nomeBimestre
 } from '../logic.js';
 import { COLORE_SEZIONE } from '../icone.js';
 import { backend } from '../backend.js';
@@ -187,6 +188,11 @@ export function riepilogoOperazione(o) {
         case 'cenere': {
             const ultimo = svuotamentiOrdinati()[0];
             if (ultimo) parti.push(`Ultimo svuotamento ${f.giorniTrascorsi(ultimo.data)} giorni fa`);
+            break;
+        }
+        case 'bollette': {
+            const ultima = bolletteOrdinate()[0];
+            if (ultima) parti.push(`Ultima ${nomeBimestre(ultima.anno, ultima.bimestre)}${Number(ultima.importo) > 0 ? ' · ' + f.euro(ultima.importo) : ''}${Number(ultima.kwh) > 0 ? ' · ' + f.quantita(ultima.kwh, 'kWh') : ''}`);
             break;
         }
         case 'lavori': {

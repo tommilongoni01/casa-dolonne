@@ -255,7 +255,7 @@ function lunedi(d) { const g = new Date(d.getFullYear(), d.getMonth(), d.getDate
 // ---------------------------------------------------------------------
 // Costi della casa e degli impianti
 // ---------------------------------------------------------------------
-const NOMI_VOCE = { contratti: 'Contratti', interventi: 'Interventi', prodotti: 'Prodotti acquistati' };
+const NOMI_VOCE = { contratti: 'Contratti', interventi: 'Interventi', prodotti: 'Prodotti acquistati', bollette: 'Bollette luce' };
 
 export const CostiPagina = {
     components: { RigaAvviso },
@@ -292,8 +292,8 @@ export const CostiPagina = {
           <Riga v-if="voci.length > 5" azione :icona="tutte ? 'frecciaSu' : 'frecciaGiu'" :titolo="tutte ? 'Mostra meno' : 'Mostra tutte (' + voci.length + ')'" @click="tutte = !tutte"/>
         </Gruppo>
       </Pagina>`,
-    data() { return { anno: new Date().getFullYear(), tutte: false, NOMI_VOCE, tipi: ['contratti', 'interventi', 'prodotti'],
-                      ICONE_VOCE: { contratti: 'documento', interventi: 'chiave', prodotti: 'carrello' } }; },
+    data() { return { anno: new Date().getFullYear(), tutte: false, NOMI_VOCE, tipi: ['contratti', 'interventi', 'prodotti', 'bollette'],
+                      ICONE_VOCE: { contratti: 'documento', interventi: 'chiave', prodotti: 'carrello', bollette: 'lampadina' } }; },
     computed: {
         sezione() { return this.id ? sezioneDi(this.id) : null; },
         anni() { return anniCosti(); },
@@ -463,8 +463,8 @@ export const CasaHome = {
         const vociAnno = computed(() => vociCosto(annoCorrente));
         /// Spesa dell'anno divisa per tipo (contratti, interventi, prodotti), in percentuale del totale.
         const costiPerTipo = computed(() => {
-            const colori = { contratti: 'var(--blu)', interventi: 'var(--arancione)', prodotti: 'var(--verde)' };
-            const nomi = { contratti: 'Contratti', interventi: 'Interventi', prodotti: 'Prodotti' };
+            const colori = { contratti: 'var(--blu)', interventi: 'var(--arancione)', prodotti: 'var(--verde)', bollette: '#FFB800' };
+            const nomi = { contratti: 'Contratti', interventi: 'Interventi', prodotti: 'Prodotti', bollette: 'Bollette' };
             const tot = totale(vociAnno.value) || 1;
             return Object.keys(nomi).map(tipo => {
                 const importo = totale(vociAnno.value.filter(v => v.tipo === tipo));

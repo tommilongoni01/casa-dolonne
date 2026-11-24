@@ -221,6 +221,22 @@ create table if not exists letture_deposito (
     note text not null default ''
 );
 
+-- Bollette luce, una per bimestre (vedi aggiornamento-14).
+create table if not exists bollette (
+    id uuid primary key default gen_random_uuid(),
+    operazione_id uuid references operazioni(id) on delete cascade,
+    anno int not null,
+    bimestre int not null check (bimestre between 1 and 6),
+    dal date,
+    al date,
+    importo numeric,
+    kwh numeric,
+    kwh_mese1 numeric,
+    kwh_mese2 numeric,
+    potenza_max numeric,
+    note text not null default ''
+);
+
 -- Campi aggiunti nel 2026 (vedi aggiornamento-10).
 alter table prodotti add column if not exists fornitori jsonb not null default '[]';
 alter table contratti add column if not exists fornitore text not null default '';
@@ -247,7 +263,7 @@ begin
     foreach tabella in array array[
         'membri', 'sezioni', 'contatti', 'guide', 'documenti', 'contratti', 'prodotti', 'movimenti',
         'operazioni', 'tipologie', 'interventi', 'misure_ph', 'processi_acqua', 'carichi_pellet',
-        'svuotamenti_cenere', 'letture_deposito'
+        'svuotamenti_cenere', 'letture_deposito', 'bollette'
     ] loop
         execute format('alter table %I enable row level security', tabella);
         execute format('drop policy if exists "lettura familiari" on %I', tabella);

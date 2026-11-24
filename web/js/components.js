@@ -375,6 +375,43 @@ export const Cronometro = {
     }
 };
 
+/// Grafico a barre: una barra per voce, con accanto (più chiara) quella dello stesso periodo dell'anno prima.
+/// voci: [{ chiave, etichetta, valore, confronto }] (null = dato mancante)
+export const Barre = {
+    props: {
+        voci: Array, colore: { type: String, default: 'var(--accento)' },
+        formato: { type: Function, default: v => String(Math.round(v)) },
+        nome: String, nomeConfronto: String, altezza: { type: Number, default: 170 }
+    },
+    template: `
+      <div class="barre">
+        <div class="barre-area" :style="{ height: altezza + 'px' }">
+          <div v-for="v in voci" :key="v.chiave" class="barre-colonna">
+            <span class="barre-valore">{{ v.valore !== null && v.valore !== undefined ? formato(v.valore) : '' }}</span>
+            <span class="barre-coppia">
+              <i v-if="conConfronto" class="barre-barra confronto" :style="stile(v.confronto, true)"></i>
+              <i class="barre-barra" :style="stile(v.valore)"></i>
+            </span>
+            <small class="barre-etichetta">{{ v.etichetta }}</small>
+          </div>
+        </div>
+        <div v-if="conConfronto" class="grafico-legenda">
+          <span><i :style="{ background: colore }"></i>{{ nome }}</span>
+          <span><i :style="{ background: colore, opacity: .3 }"></i>{{ nomeConfronto }}</span>
+        </div>
+      </div>`,
+    computed: {
+        massimo() { return Math.max(1, ...this.voci.flatMap(v => [Number(v.valore) || 0, Number(v.confronto) || 0])); },
+        conConfronto() { return this.voci.some(v => v.confronto !== null && v.confronto !== undefined); }
+    },
+    methods: {
+        stile(valore, confronto) {
+            const vuoto = valore === null || valore === undefined;
+            return { height: vuoto ? '0' : `max(3px, ${Number(valore) / this.massimo * 100}%)`, background: this.colore, opacity: confronto ? 0.3 : 1 };
+        }
+    }
+};
+
 /// Grafico a linee in SVG. serie: [{ nome, colore, punti: [{ x: Date, y }] }]
 export const Grafico = {
     props: {
@@ -515,5 +552,5 @@ export const ImmagineFile = {
 
 export const componenti = {
     Icona, IconaQuadrata, Pagina, Gruppo, Riga, BadgeScadenza, Vuoto, Foglio, CampoTesto, CampoNumero,
-    CampoData, CampoScelta, Interruttore, Passo, Azioni, Cronometro, Grafico, ImmagineFile, RigaEspandi, SceltaIcona
+    CampoData, CampoScelta, Interruttore, Passo, Azioni, Cronometro, Grafico, Barre, ImmagineFile, RigaEspandi, SceltaIcona
 };

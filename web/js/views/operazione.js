@@ -8,7 +8,8 @@ import {
     statoScadenza, analisiProcesso, calcoliCarico, carichiOrdinati, svuotamentiOrdinati, consumoCenere,
     prodottoDi, prodottiOperazione, operazioneDiProdotto, categoriaPerOperazione, sezioneDi, nomeMovimento, nomeEsecuzione,
     coloreImpianto, fornitoreContratto, lettureDeposito, PIANI, STATI_PIANO, analisiScorta, sottoScorta,
-    unitaScorta, quantitaScorta, movimentiDi
+    unitaScorta, quantitaScorta, movimentiDi, nomeBimestre, mesiBimestre, nomeMese, nomeMeseLungo, periodoBimestre, bolletteOrdinate, bollettaDi,
+    consumiMensili, totaliBollette, ultimoAnnoBollette
 } from '../logic.js';
 
 // ---------------------------------------------------------------------
@@ -67,7 +68,10 @@ export const OperazionePagina = {
             <Cenere v-if="o.tipo === 'cenere'"/>
           </template>
         </template>
-        <Storico v-else :operazione="o"/>
+        <template v-else>
+          <Bollette v-if="o.tipo === 'bollette'" :operazione="o"/>
+          <Storico v-else :operazione="o"/>
+        </template>
 
         <template v-if="!registro && (puoModificare() || avvisiImpostati)">
           <h2 class="sezione-operazione">Avvisi</h2>
@@ -90,8 +94,8 @@ export const OperazionePagina = {
         o() { return db.operazioni.find(o => o.id === this.id); },
         /// Cambio acqua e svuotamento cenere sono operazioni manuali, senza prodotti.
         /// Manutenzioni e categorie di lavori: solo registro (niente prodotti, scorte e avvisi).
-        registro() { return ['storico', 'lavori'].includes(this.o.tipo); },
-        usaProdotti() { return !['storico', 'lavori', 'cambioAcqua', 'cenere'].includes(this.o.tipo); },
+        registro() { return ['storico', 'lavori', 'bollette'].includes(this.o.tipo); },
+        usaProdotti() { return !['storico', 'lavori', 'bollette', 'cambioAcqua', 'cenere'].includes(this.o.tipo); },
         /// Per chi ha sola lettura la sezione Avvisi compare solo se c'è almeno un avviso impostato.
         avvisiImpostati() {
             return this.o.giorni_allarme > 0 || this.prodottiScorta.some(p => Number(p.scorta_minima) > 0)
@@ -713,6 +717,156 @@ const Cenere = {
 };
 
 // ---------------------------------------------------------------------
+// Bollette luce
+// ---------------------------------------------------------------------
+const numeroONull = v => v === null || v === undefined || v === '' ? null : Number(v);
+/// "+12%" / "−5%" rispetto a un valore di confronto.
+const variazione = (v, prima) => {
+    if (v === null || prima === null || !(prima > 0)) return '';
+    const p = Math.round((v - prima) / prima * 100);
+    return p === 0 ? 'uguale' : `${p > 0 ? '+' : '−'}${Math.abs(p)}%`;
+};
+
+const Bollette = {
+    props: { operazione: Object },
+    template: `
+      <Gruppo titolo="Ultimi 12 mesi" :nota="ultimoAnno.bollette.length && !ultimoAnno.completo ? notaIncompleta : ''">
+        <div class="valore-grande">
+          <div class="etichetta">Consumo</div>
+          <div class="numero">{{ f.quantita(Math.round(ultimoAnno.kwh), 'kWh') }}</div>
+          <div v-if="ultimoAnno.euro" class="secondario" style="font-size:15px">Spesa {{ f.euro(ultimoAnno.euro) }}</div>
+        </div>
+        <Riga v-if="ultima" titolo="Ultima bolletta" :valore="nomeBimestre(ultima.anno, ultima.bimestre) + ' · ' + (ultima.importo !== null && ultima.importo !== undefined ? f.euro(ultima.importo) : '–')"/>
+        <Riga v-if="potenzaMassima" titolo="Potenza massima prelevata" :valore="f.numero(potenzaMassima.potenza_max) + ' kW · ' + nomeBimestre(potenzaMassima.anno, potenzaMassima.bimestre)"/>
+        <Riga v-if="!ultima" titolo="Nessuna bolletta registrata" class="secondario"/>
+        <Riga v-if="puoModificare()" azione icona="piuCerchio" titolo="Nuova bolletta" @click="foglio = {}"/>
+      </Gruppo>
+
+      <template v-if="anni.length">
+        <div v-if="anni.length > 1" class="segmenti segmenti-anni">
+          <button v-for="a in anni" :key="a" :class="{ attivo: a === anno }" @click="annoScelto = a">{{ a }}</button>
+        </div>
+        <Gruppo :titolo="'Spesa per bimestre · ' + anno" :nota="confrontoNota" nota-sempre>
+          <Barre :voci="barreSpesa" colore="var(--arancione)" :formato="v => f.numero(Math.round(v)) + ' €'" :nome="String(anno)" :nome-confronto="String(anno - 1)"/>
+        </Gruppo>
+        <Gruppo :titolo="'Consumo mensile · ' + anno" nota="kWh di ogni mese: quelli della bolletta, oppure il consumo del bimestre diviso in base ai giorni." nota-sempre>
+          <Barre :voci="barreConsumo" colore="var(--giallo, #FFB800)" :formato="v => f.numero(Math.round(v))" :nome="String(anno)" :nome-confronto="String(anno - 1)"/>
+        </Gruppo>
+        <Gruppo :titolo="'Totale ' + anno">
+          <Riga titolo="Consumo" :valore="f.quantita(Math.round(totale.kwh), 'kWh')" :sottotitolo="confrontoTesto(totale.kwh, totalePrima.kwh)"/>
+          <Riga titolo="Spesa" :valore="totale.conImporto ? f.euro(totale.euro) : '–'"
+                :sottotitolo="[totale.conImporto < totale.numero ? totale.conImporto + ' bollette su ' + totale.numero + ' con importo' : '', totale.conImporto === totale.numero ? confrontoTesto(totale.euro, totalePrima.conImporto === totalePrima.numero ? totalePrima.euro : null) : ''].filter(Boolean).join(' · ')"/>
+          <Riga v-if="totale.potenza" titolo="Potenza massima prelevata" :valore="f.numero(totale.potenza) + ' kW'"/>
+        </Gruppo>
+        <Gruppo :titolo="'Bollette ' + anno">
+          <Riga v-for="b in bolletteAnno" :key="b.id" :titolo="b.bimestre + '° bimestre · ' + mesiBimestre(b.bimestre)" :sottotitolo="dettaglio(b)"
+                :valore="b.importo !== null && b.importo !== undefined ? f.euro(b.importo) : '–'" :freccia="puoModificare()" @click="puoModificare() && (foglio = { voce: b })"/>
+        </Gruppo>
+      </template>
+
+      <Foglio v-if="foglio" :titolo="foglio.voce ? 'Modifica bolletta' : 'Nuova bolletta'" :conferma-disabilitata="!b.anno || !b.bimestre"
+              @annulla="foglio = null" @conferma="salvaBolletta">
+        <Gruppo :nota="doppione ? 'Esiste già una bolletta per questo bimestre: salvando la sostituisci.' : ''">
+          <CampoScelta :model-value="b.anno" etichetta="Anno" :opzioni="opzioniAnni" @update:model-value="v => cambiaPeriodo(Number(v), b.bimestre)"/>
+          <CampoScelta :model-value="b.bimestre" etichetta="Bimestre" :opzioni="opzioniBimestri" @update:model-value="v => cambiaPeriodo(b.anno, Number(v))"/>
+          <CampoData v-model="b.dal" etichetta="Dal"/>
+          <CampoData v-model="b.al" etichetta="Al"/>
+        </Gruppo>
+        <Gruppo nota="Il totale da pagare in prima pagina.">
+          <CampoNumero v-model="b.importo" etichetta="Importo" unita="€"/>
+        </Gruppo>
+        <Gruppo nota="Consumo totale fatturato del periodo. I kWh dei singoli mesi sono nella tabella “Letture e consumi”: se li lasci vuoti il consumo si divide in base ai giorni.">
+          <CampoNumero v-model="b.kwh" etichetta="Consumo" unita="kWh"/>
+          <CampoNumero v-model="b.kwh_mese1" :etichetta="'Di cui ' + nomeMeseLungo((b.bimestre - 1) * 2)" unita="kWh"/>
+          <CampoNumero v-model="b.kwh_mese2" :etichetta="'Di cui ' + nomeMeseLungo((b.bimestre - 1) * 2 + 1)" unita="kWh"/>
+        </Gruppo>
+        <Gruppo nota="Facoltativa: il valore più alto del bimestre nel grafico “Potenza massima prelevata” della bolletta.">
+          <CampoNumero v-model="b.potenza_max" etichetta="Potenza massima" unita="kW"/>
+        </Gruppo>
+        <Gruppo titolo="Note"><CampoTesto v-model="b.note" multilinea segnaposto="Note"/></Gruppo>
+        <Gruppo v-if="foglio.voce"><Riga distruttiva titolo="Elimina bolletta" @click="eliminaBolletta"/></Gruppo>
+      </Foglio>`,
+    data() { return { foglio: null, b: {}, annoScelto: null, notaIncompleta: 'Alcune bollette degli ultimi 12 mesi non hanno l’importo: la spesa è parziale.' }; },
+    computed: {
+        tutte() { return bolletteOrdinate(); },
+        ultima() { return this.tutte[0] ?? null; },
+        ultimoAnno() { return ultimoAnnoBollette(); },
+        potenzaMassima() {
+            return this.ultimoAnno.bollette.filter(b => Number(b.potenza_max) > 0).sort((a, b) => b.potenza_max - a.potenza_max)[0] ?? null;
+        },
+        anni() { return [...new Set(this.tutte.map(b => b.anno))].sort((a, b) => b - a); },
+        anno() { return this.anni.includes(this.annoScelto) ? this.annoScelto : this.anni[0]; },
+        bolletteAnno() { return this.tutte.filter(b => b.anno === this.anno); },
+        barreSpesa() {
+            return [1, 2, 3, 4, 5, 6].map(n => ({
+                chiave: n, etichetta: mesiBimestre(n).replace(' – ', '–'),
+                valore: numeroONull(bollettaDi(this.anno, n)?.importo), confronto: numeroONull(bollettaDi(this.anno - 1, n)?.importo)
+            }));
+        },
+        barreConsumo() {
+            const mesi = consumiMensili(), k = (a, m) => `${a}-${String(m + 1).padStart(2, '0')}`;
+            return Array.from({ length: 12 }, (_, m) => ({
+                chiave: m, etichetta: 'GFMAMGLASOND'[m], valore: mesi[k(this.anno, m)] ?? null, confronto: mesi[k(this.anno - 1, m)] ?? null
+            }));
+        },
+        confrontoNota() { return this.barreSpesa.some(v => v.valore !== null) ? '' : 'Nessun importo inserito per il ' + this.anno + '.'; },
+        totale() { return totaliBollette(this.anno); },
+        /// Anno prima, solo per i bimestri registrati quest'anno: così il confronto è sullo stesso periodo.
+        totalePrima() { return totaliBollette(this.anno - 1, this.bolletteAnno.map(b => b.bimestre)); },
+        opzioniAnni() {
+            const oggi = new Date().getFullYear();
+            return Array.from({ length: 6 }, (_, i) => oggi + 1 - i).map(a => ({ valore: a, nome: String(a) }));
+        },
+        opzioniBimestri() { return [1, 2, 3, 4, 5, 6].map(n => ({ valore: n, nome: `${n}° · ${mesiBimestre(n)}` })); },
+        doppione() { const d = bollettaDi(this.b.anno, this.b.bimestre); return d && d.id !== this.foglio?.voce?.id; }
+    },
+    watch: {
+        foglio(v) {
+            if (!v) return;
+            const x = v.voce;
+            if (x) { this.b = { ...x, importo: numeroONull(x.importo), kwh: numeroONull(x.kwh), kwh_mese1: numeroONull(x.kwh_mese1), kwh_mese2: numeroONull(x.kwh_mese2), potenza_max: numeroONull(x.potenza_max), note: x.note ?? '' }; return; }
+            // Nuova: il bimestre dopo l'ultima bolletta, altrimenti quello appena concluso.
+            let anno, bim;
+            if (this.ultima) { anno = this.ultima.bimestre === 6 ? this.ultima.anno + 1 : this.ultima.anno; bim = this.ultima.bimestre % 6 + 1; }
+            else { const d = new Date(); const corrente = Math.floor(d.getMonth() / 2) + 1; anno = corrente === 1 ? d.getFullYear() - 1 : d.getFullYear(); bim = corrente === 1 ? 6 : corrente - 1; }
+            this.b = { anno, bimestre: bim, ...periodoBimestre(anno, bim), importo: null, kwh: null, kwh_mese1: null, kwh_mese2: null, potenza_max: null, note: '' };
+        }
+    },
+    methods: {
+        puoModificare, nomeBimestre, mesiBimestre, nomeMese, nomeMeseLungo,
+        cambiaPeriodo(anno, bimestre) { this.b = { ...this.b, anno, bimestre, ...periodoBimestre(anno, bimestre) }; },
+        confrontoTesto(v, prima) {
+            const t = variazione(v, prima);
+            if (!t) return '';
+            return this.bolletteAnno.length < 6 ? `${t} rispetto allo stesso periodo del ${this.anno - 1}` : `${t} rispetto al ${this.anno - 1}`;
+        },
+        dettaglio(b) {
+            const prima = bollettaDi(b.anno - 1, b.bimestre);
+            const kwh = numeroONull(b.kwh);
+            return [kwh !== null ? f.quantita(kwh, 'kWh') : '', Number(b.potenza_max) > 0 ? `max ${f.numero(b.potenza_max)} kW` : '',
+                    prima && kwh !== null ? `${variazione(kwh, numeroONull(prima.kwh))} kWh vs ${b.anno - 1}` : '', b.note].filter(Boolean).join(' · ');
+        },
+        async salvaBolletta() {
+            const b = { ...this.b };
+            // Totale non scritto ma mesi sì: il totale è la loro somma.
+            if (b.kwh === null && (b.kwh_mese1 !== null || b.kwh_mese2 !== null)) b.kwh = (b.kwh_mese1 ?? 0) + (b.kwh_mese2 ?? 0);
+            const esistente = bollettaDi(b.anno, b.bimestre);
+            const id = this.foglio.voce?.id ?? esistente?.id;
+            if (this.foglio.voce && esistente && esistente.id !== this.foglio.voce.id) await elimina('bollette', esistente.id);
+            await salva('bollette', { ...b, id, operazione_id: this.operazione.id, note: (b.note ?? '').trim() });
+            this.annoScelto = b.anno;
+            this.foglio = null;
+        },
+        async eliminaBolletta() {
+            if (!confirm('Eliminare la bolletta?')) return;
+            await elimina('bollette', this.foglio.voce.id);
+            this.foglio = null;
+        }
+    },
+    setup() { return { f }; }
+};
+
+// ---------------------------------------------------------------------
 // Storico manutenzioni
 // ---------------------------------------------------------------------
 const Storico = {
@@ -888,7 +1042,7 @@ const AllegatiFoglio = {
 };
 
 // Le sezioni vengono registrate come componenti locali della pagina operazione.
-OperazionePagina.components = { MisurePH, CambioAcqua, Pellet, Cenere, Storico, NotificheOperazione, DescrizioneFoglio, DepositoPellet };
+OperazionePagina.components = { MisurePH, CambioAcqua, Pellet, Cenere, Storico, Bollette, NotificheOperazione, DescrizioneFoglio, DepositoPellet };
 CambioAcqua.components = { AvvioFoglio };
 MisurePH.components = { MisuraFoglio };
 Storico.components = { InterventoFoglio, AllegatiFoglio };

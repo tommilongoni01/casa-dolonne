@@ -5,7 +5,7 @@ import { CONFIG } from './config.js';
 export const TABELLE = [
     'membri', 'sezioni', 'contatti', 'guide', 'documenti', 'contratti', 'prodotti', 'movimenti',
     'operazioni', 'tipologie', 'interventi', 'misure_ph', 'processi_acqua', 'carichi_pellet',
-    'svuotamenti_cenere', 'letture_deposito'
+    'svuotamenti_cenere', 'letture_deposito', 'bollette'
 ];
 
 const BUCKET = 'file';
@@ -144,7 +144,7 @@ function creaProva() {
             const figli = {
                 sezioni: [['guide', 'sezione_id'], ['documenti', 'sezione_id'], ['operazioni', 'sezione_id']],
                 prodotti: [['movimenti', 'prodotto_id'], ['letture_deposito', 'prodotto_id']],
-                operazioni: [['tipologie', 'operazione_id'], ['interventi', 'operazione_id']]
+                operazioni: [['tipologie', 'operazione_id'], ['interventi', 'operazione_id'], ['bollette', 'operazione_id']]
             }[tabella] ?? [];
             for (const [figlia, campo] of figli) dati[figlia] = righe(figlia).filter(r => r[campo] !== id);
             scrivi();

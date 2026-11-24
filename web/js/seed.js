@@ -60,6 +60,7 @@ export async function inizializzaDati(avanzamento = () => {}) {
         ['Ascensore', 'Manutenzioni', 'storico', {}, [['Manutenzione impianto', 6], ['Verifica periodica', 24]]],
         ['Impianto fotovoltaico', 'Manutenzioni', 'storico', {}, PRINCIPALE_CLIENTE],
         ['Impianto idraulico', 'Manutenzioni', 'storico', {}, PRINCIPALE_CLIENTE],
+        ['Impianto elettrico', 'Bollette luce', 'bollette', { icona: 'lampadina' }],
         ['Impianto elettrico', 'Manutenzioni', 'storico', {}, PRINCIPALE_CLIENTE],
         ['Antifurto', 'Manutenzioni', 'storico', {}, PRINCIPALE_CLIENTE],
         ['Giardino', 'Manutenzioni', 'storico', {}, PRINCIPALE_CLIENTE]
