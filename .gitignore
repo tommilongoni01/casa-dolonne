@@ -12,3 +12,4 @@ xcuserdata/
 # Script con dati reali della famiglia (misure, registri): solo in locale
 supabase/aggiornamento-7-registri.sql
 supabase/aggiornamento-15-storico-bollette.sql
+supabase/aggiornamento-17-storico-energia.sql

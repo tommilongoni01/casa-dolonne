@@ -485,6 +485,17 @@ table.tabella { border-collapse: collapse; width: 100%; font-size: 14px; font-va
 .campo .campo-data-ora input.data.errata { color: var(--rosso); }
 .adesso { flex: none; font-size: 13px; font-weight: 600; color: var(--accento); background: color-mix(in srgb, var(--accento) 12%, transparent);
     border-radius: 999px; padding: 4px 10px; }
+.grafico-borsa { background: var(--cella); padding: 6px 12px 8px; touch-action: pan-y; user-select: none; -webkit-user-select: none; }
+.grafico-borsa svg { width: 100%; display: block; overflow: visible; cursor: crosshair; }
+.grafico-borsa-linea { fill: none; stroke-width: 2.2; stroke-linejoin: round; stroke-linecap: round; }
+.grafico-borsa-media { stroke: var(--secondario); stroke-width: 1; stroke-dasharray: 2 4; opacity: .7; }
+.grafico-borsa-cursore { stroke: var(--secondario); stroke-width: 1; }
+.barre-gruppo { max-width: 56px; gap: 1px; }
+.barre-gruppo .barre-barra { max-width: 12px; }
+button.barre-colonna { padding: 0; border-radius: 6px; }
+button.barre-colonna.scelta { background: var(--riempimento); }
+.barre-dettaglio { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 4px 14px; font-size: 13px; padding-top: 6px; font-variant-numeric: tabular-nums; }
+.barre-dettaglio i { display: inline-block; width: 9px; height: 9px; border-radius: 3px; margin-right: 4px; }
 .barre { background: var(--cella); padding: 12px 12px 8px; }
 .barre-area { display: flex; gap: 4px; padding-top: 16px; }
 .barre-colonna { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; }
@@ -632,3 +643,26 @@ table.tabella { border-collapse: collapse; width: 100%; font-size: 14px; font-va
     .griglia-impianti .tessera-impianto { animation: none; }
     .dissolvenza-enter-active, .dissolvenza-leave-active, .dissolvenza-move { transition: none; }
 }
+
+/* Bollette luce: andamento in stile app Borsa e numeri chiave */
+.scheda-borsa { background: var(--cella); border-radius: var(--raggio); box-shadow: var(--ombra); padding: 12px 4px 10px; }
+.scheda-borsa > .segmenti { margin: 0 12px 6px; }
+.borsa-testa { display: flex; flex-direction: column; gap: 1px; padding: 6px 16px 2px; min-height: 74px; }
+.borsa-testa small { font-size: 13px; color: var(--secondario); font-weight: 500; }
+.borsa-testa b { font-size: 30px; font-weight: 700; letter-spacing: -0.6px; font-variant-numeric: tabular-nums; }
+.borsa-variazione { font-size: 14px; font-weight: 600; color: var(--secondario); font-variant-numeric: tabular-nums; }
+.borsa-variazione.meglio { color: var(--verde); }
+.borsa-variazione.peggio { color: var(--rosso); }
+.scheda-borsa .grafico-borsa { padding-left: 12px; padding-right: 12px; }
+.segmenti-intervallo { margin: 4px 12px 0; background: transparent; }
+.segmenti-intervallo button { font-weight: 600; color: var(--secondario); }
+.segmenti-intervallo button.attivo { background: var(--riempimento); color: var(--testo); box-shadow: none; }
+.borsa-nota { margin: 8px 16px 0; font-size: 12px; color: var(--secondario); }
+.numeri-chiave { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); background: var(--cella);
+    border-radius: var(--raggio); overflow: hidden; box-shadow: var(--ombra); }
+/* Linee sottili tra le celle, senza riempire di grigio le celle vuote dell'ultima riga */
+.numeri-chiave > div { box-shadow: inset -0.5px -0.5px 0 var(--separatore); padding: 11px 14px; display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.numeri-chiave small { font-size: 12px; color: var(--secondario); }
+.numeri-chiave b { font-size: 17px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.numeri-chiave span { font-size: 12px; color: var(--secondario); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sezione-operazione + .scheda-borsa, .sezione-operazione + .numeri-chiave { margin-top: 10px; }

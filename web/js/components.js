@@ -375,6 +375,127 @@ export const Cronometro = {
     }
 };
 
+/// Grafico in stile app Borsa: linea mese per mese con area sfumata, asse a destra, media tratteggiata
+/// e lettura del valore scorrendo col dito (o col mouse). punti: [{ x: Date, y }] (y null = dato mancante).
+export const GraficoBorsa = {
+    props: { punti: Array, colore: { type: String, default: 'var(--accento)' }, formato: { type: Function, default: v => String(Math.round(v)) },
+             altezza: { type: Number, default: 210 }, media: Number,
+             zero: { type: Boolean, default: true } },  // false: l'asse parte vicino al valore più basso (es. prezzo)
+    emits: ['scorri'],
+    template: `
+      <div class="grafico-borsa">
+        <svg :viewBox="'0 0 ' + L + ' ' + altezza" :style="{ height: altezza + 'px' }"
+             @pointerdown="tocca" @pointermove="tocca" @pointerleave="lascia" @pointerup="e => e.pointerType !== 'mouse' && lascia()" @pointercancel="lascia">
+          <defs>
+            <linearGradient :id="idSfumatura" x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0%" :stop-color="colore" stop-opacity="0.32"/>
+              <stop offset="100%" :stop-color="colore" stop-opacity="0"/>
+            </linearGradient>
+          </defs>
+          <g v-for="t in tacche" :key="t">
+            <line :x1="0" :x2="larghezzaPiano" :y1="y(t)" :y2="y(t)" class="grafico-griglia"/>
+            <text :x="L - 2" :y="y(t) + 4" text-anchor="end" class="grafico-etichetta">{{ formato(t) }}</text>
+          </g>
+          <path v-for="(tratto, i) in tratti" :key="'a' + i" :d="area(tratto)" :fill="'url(#' + idSfumatura + ')'"/>
+          <path v-for="(tratto, i) in tratti" :key="'l' + i" :d="linea(tratto)" :stroke="colore" class="grafico-borsa-linea"/>
+          <line v-if="media != null && media > 0" :x1="0" :x2="larghezzaPiano" :y1="y(media)" :y2="y(media)" class="grafico-borsa-media"/>
+          <text v-for="(e, i) in etichetteX" :key="'x' + i" :x="e.x" :y="altezza - 4" :text-anchor="e.ancora" class="grafico-etichetta">{{ e.testo }}</text>
+          <g v-if="scelto !== null && punti[scelto]">
+            <line :x1="x(scelto)" :x2="x(scelto)" :y1="6" :y2="altezza - 20" class="grafico-borsa-cursore"/>
+            <circle v-if="punti[scelto].y !== null" :cx="x(scelto)" :cy="y(punti[scelto].y)" r="5" :fill="colore" stroke="var(--cella)" stroke-width="2"/>
+          </g>
+        </svg>
+      </div>`,
+    data() { return { L: 600, scelto: null, idSfumatura: 'sf' + Math.random().toString(36).slice(2, 8) }; },
+    mounted() {
+        const misura = () => { const w = this.$el.clientWidth - 24; if (w > 100) this.L = Math.round(w); };
+        misura();
+        this.osservatore = new ResizeObserver(misura);
+        this.osservatore.observe(this.$el);
+    },
+    unmounted() { this.osservatore?.disconnect(); },
+    watch: { punti() { this.scelto = null; } },
+    computed: {
+        valori() { return this.punti.map(p => p.y).filter(v => v !== null && v !== undefined); },
+        /// Larghezza del piano (a destra c'è l'asse dei valori).
+        larghezzaPiano() { return this.L - 8 - Math.max(...this.tacche.map(t => this.formato(t).length)) * 6.4; },
+        passo() {
+            const valori = [...this.valori, ...(this.media ? [this.media] : [])];
+            const max = Math.max(this.zero ? 1 : 0, ...valori), minimo = this.zero ? 0 : Math.min(...valori);
+            const grezzo = Math.max((max - minimo) / 4, max * 0.02, 1e-6), ordine = 10 ** Math.floor(Math.log10(grezzo));
+            const passo = [1, 2, 2.5, 5, 10].map(m => m * ordine).find(v => v >= grezzo);
+            const min = this.zero ? 0 : Math.max(0, Math.floor(minimo / passo) * passo - passo);
+            return { passo, min, max: Math.ceil(max / passo) * passo + (this.zero ? 0 : passo) };
+        },
+        tacche() { const t = []; for (let v = this.passo.min; v <= this.passo.max + this.passo.passo / 2; v += this.passo.passo) t.push(Math.round(v * 1000) / 1000); return t; },
+        /// Tratti continui di punti con dato (un mese mancante interrompe la linea).
+        tratti() {
+            const tratti = []; let corrente = [];
+            this.punti.forEach((p, i) => { if (p.y === null || p.y === undefined) { if (corrente.length) tratti.push(corrente); corrente = []; } else corrente.push(i); });
+            if (corrente.length) tratti.push(corrente);
+            return tratti;
+        },
+        etichetteX() {
+            const n = this.punti.length;
+            if (!n) return [];
+            const quante = Math.min(n, this.L > 520 ? 6 : 4);
+            const f = new Intl.DateTimeFormat('it-IT', { month: 'short', year: '2-digit' });
+            const indici = [...new Set(Array.from({ length: quante }, (_, k) => Math.round(k * (n - 1) / Math.max(1, quante - 1))))];
+            return indici.map((i, k) => ({ x: this.x(i), testo: f.format(this.punti[i].x), ancora: k === 0 ? 'start' : k === indici.length - 1 ? 'end' : 'middle' }));
+        }
+    },
+    methods: {
+        x(i) { const n = this.punti.length; return n > 1 ? 4 + i / (n - 1) * (this.larghezzaPiano - 8) : this.larghezzaPiano / 2; },
+        y(v) { const { min, max } = this.passo; return 10 + (1 - (v - min) / (max - min || 1)) * (this.altezza - 34); },
+        linea(indici) { return indici.map((i, k) => `${k ? 'L' : 'M'}${this.x(i).toFixed(1)},${this.y(this.punti[i].y).toFixed(1)}`).join(' ') + (indici.length === 1 ? ' h1' : ''); },
+        area(indici) {
+            const base = this.y(this.passo.min).toFixed(1);
+            return `${this.linea(indici)} L${this.x(indici.at(-1)).toFixed(1)},${base} L${this.x(indici[0]).toFixed(1)},${base} Z`;
+        },
+        tocca(e) {
+            const r = e.currentTarget.getBoundingClientRect();
+            const px = (e.clientX - r.left) / r.width * this.L, n = this.punti.length;
+            if (!n) return;
+            const i = Math.max(0, Math.min(n - 1, Math.round((px - 4) / Math.max(1, this.larghezzaPiano - 8) * (n - 1))));
+            if (i !== this.scelto) { this.scelto = i; this.$emit('scorri', i); }
+        },
+        lascia() { if (this.scelto !== null) { this.scelto = null; this.$emit('scorri', null); } }
+    }
+};
+
+/// Barre raggruppate per mese, una per anno (gen 24 · gen 25 · gen 26…). Tocca un mese per leggere i valori.
+/// serie: [{ anno, colore, valori: [12 numeri o null] }]
+export const BarreAnni = {
+    props: { serie: Array, formato: { type: Function, default: v => String(Math.round(v)) }, altezza: { type: Number, default: 170 } },
+    template: `
+      <div class="barre">
+        <div class="barre-area" :style="{ height: altezza + 'px' }">
+          <button v-for="(m, i) in mesi" :key="i" type="button" class="barre-colonna" :class="{ scelta: scelto === i }" @click="scelto = scelto === i ? null : i">
+            <span class="barre-coppia barre-gruppo">
+              <i v-for="s in serie" :key="s.anno" class="barre-barra" :style="stile(s, i)"></i>
+            </span>
+            <small class="barre-etichetta">{{ m }}</small>
+          </button>
+        </div>
+        <div v-if="scelto !== null" class="barre-dettaglio">
+          <b>{{ nomiMesi[scelto] }}</b>
+          <span v-for="s in serie" :key="s.anno"><i :style="{ background: s.colore }"></i>{{ s.anno }} {{ s.valori[scelto] !== null ? formato(s.valori[scelto]) : '–' }}</span>
+        </div>
+        <div v-else class="grafico-legenda"><span v-for="s in serie" :key="s.anno"><i :style="{ background: s.colore }"></i>{{ s.anno }}</span></div>
+      </div>`,
+    data() {
+        return { scelto: null, mesi: 'GFMAMGLASOND'.split(''),
+                 nomiMesi: ['Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno', 'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre'] };
+    },
+    computed: { massimo() { return Math.max(1, ...this.serie.flatMap(s => s.valori.map(v => Number(v) || 0))); } },
+    methods: {
+        stile(s, i) {
+            const v = s.valori[i];
+            return { height: v === null || v === undefined ? '0' : `max(3px, ${Number(v) / this.massimo * 100}%)`, background: s.colore };
+        }
+    }
+};
+
 /// Grafico a barre: una barra per voce, con accanto (più chiara) quella dello stesso periodo dell'anno prima.
 /// voci: [{ chiave, etichetta, valore, confronto }] (null = dato mancante)
 export const Barre = {
@@ -552,5 +673,5 @@ export const ImmagineFile = {
 
 export const componenti = {
     Icona, IconaQuadrata, Pagina, Gruppo, Riga, BadgeScadenza, Vuoto, Foglio, CampoTesto, CampoNumero,
-    CampoData, CampoScelta, Interruttore, Passo, Azioni, Cronometro, Grafico, Barre, ImmagineFile, RigaEspandi, SceltaIcona
+    CampoData, CampoScelta, Interruttore, Passo, Azioni, Cronometro, Grafico, GraficoBorsa, Barre, BarreAnni, ImmagineFile, RigaEspandi, SceltaIcona
 };

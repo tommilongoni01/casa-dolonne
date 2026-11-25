@@ -337,11 +337,13 @@ export function vociCosto(anno) {
             importo: Number(m.costo), pagina: o ? { nome: 'operazione', id: o.id } : null });
     }
     for (const b of db.bollette) {
-        if (b.anno !== anno || !(Number(b.importo) > 0)) continue;
+        const data = dataBolletta(b);
+        if (Number(data.slice(0, 4)) !== anno || !(Number(b.importo) > 0)) continue;
         const o = db.operazioni.find(o => o.id === b.operazione_id);
-        voci.push({ id: 'b' + b.id, tipo: 'bollette', sezione_id: o?.sezione_id ?? null, titolo: `Bolletta luce ${nomeBimestre(b.anno, b.bimestre)}`,
-            dettaglio: [mesiBimestre(b.bimestre), b.kwh ? quantita(b.kwh, 'kWh') : ''].filter(Boolean).join(' · '),
-            data: b.al ?? b.dal ?? `${anno}-01-01`, importo: Number(b.importo), pagina: o ? { nome: 'operazione', id: o.id } : null });
+        voci.push({ id: 'b' + b.id, tipo: 'bollette', sezione_id: o?.sezione_id ?? null,
+            titolo: eAltroCosto(b) ? (b.note?.trim() || 'Altro costo energia') : `Bolletta luce ${nomeBimestre(b.anno, b.bimestre)}`,
+            dettaglio: [b.fornitore, !eAltroCosto(b) && b.kwh ? quantita(b.kwh, 'kWh') : ''].filter(Boolean).join(' · '),
+            data, importo: Number(b.importo), pagina: o ? { nome: 'operazione', id: o.id } : null });
     }
     return voci.sort((a, b) => (b.data ?? '').localeCompare(a.data ?? ''));
 }
@@ -351,7 +353,7 @@ export function anniCosti() {
     const anni = new Set([new Date().getFullYear()]);
     for (const m of db.movimenti) if (m.tipo === 'acquisto' && m.data && Number(m.costo) > 0) anni.add(Number(m.data.slice(0, 4)));
     for (const i of db.interventi) if (i.data && Number(i.costo) > 0) anni.add(Number(i.data.slice(0, 4)));
-    for (const b of db.bollette) if (Number(b.importo) > 0) anni.add(Number(b.anno));
+    for (const b of db.bollette) if (Number(b.importo) > 0) anni.add(Number(dataBolletta(b).slice(0, 4)));
     for (const c of db.contratti) {
         if (!c.inizio) continue;
         const inizio = giorno(c.inizio), mesi = mesiContratto(c);
@@ -482,73 +484,84 @@ export function prossime(giorniAvanti = 30) {
 }
 
 // ---------------------------------------------------------------------
-// Bollette luce (bimestrali)
+// Bollette luce: una per bimestre, più gli altri costi (es. allacciamento)
 // ---------------------------------------------------------------------
 const MESI_BREVI = ['gen', 'feb', 'mar', 'apr', 'mag', 'giu', 'lug', 'ago', 'set', 'ott', 'nov', 'dic'];
 export const nomeMese = m => MESI_BREVI[m];
 export const nomeMeseLungo = m => ['gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno', 'luglio', 'agosto', 'settembre', 'ottobre', 'novembre', 'dicembre'][m];
-/// "1° 2026 · gen – feb"
-export const nomeBimestre = (anno, b) => `${b}° ${anno}`;
 export const mesiBimestre = b => `${MESI_BREVI[(b - 1) * 2]} – ${MESI_BREVI[(b - 1) * 2 + 1]}`;
+/// "gen – feb 2026"
+export const nomeBimestre = (anno, b) => `${mesiBimestre(b)} ${anno}`;
+/// "mar 2026"
+export const nomeMeseAnno = chiave => `${MESI_BREVI[Number(chiave.slice(5, 7)) - 1]} ${chiave.slice(0, 4)}`;
 /// Periodo standard di un bimestre: dal primo giorno del primo mese all'ultimo del secondo.
 export function periodoBimestre(anno, b) {
     const iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     return { dal: iso(new Date(anno, (b - 1) * 2, 1)), al: iso(new Date(anno, (b - 1) * 2 + 2, 0)) };
 }
-/// Bollette dalla più recente.
-export const bolletteOrdinate = () => db.bollette.slice().sort((a, b) => (b.anno - a.anno) || (b.bimestre - a.bimestre));
-export const bollettaDi = (anno, b) => db.bollette.find(x => x.anno === anno && x.bimestre === b) ?? null;
+export const eAltroCosto = b => b.tipo === 'altro';
+const bimestrali = () => db.bollette.filter(b => !eAltroCosto(b));
+/// Bollette e altri costi dal più recente.
+export const bolletteOrdinate = () => db.bollette.slice().sort((a, b) => dataBolletta(b).localeCompare(dataBolletta(a)));
+/// Data di riferimento: fine del periodo (bollette) o data del costo (altro).
+export const dataBolletta = b => b.al ?? b.dal ?? (b.bimestre ? periodoBimestre(b.anno, b.bimestre).al : `${b.anno}-01-01`);
+export const bollettaDi = (anno, b) => bimestrali().find(x => x.anno === anno && x.bimestre === b) ?? null;
 const numeroONull = v => v === null || v === undefined || v === '' ? null : Number(v);
+const chiaveMese = (a, m) => `${a}-${String(m + 1).padStart(2, '0')}`;
 
-/// kWh di ogni mese ({ 'AAAA-MM': kWh }): quelli scritti nella bolletta, altrimenti il totale diviso in base ai giorni.
-export function consumiMensili() {
+/// Serie mese per mese, dal primo all'ultimo mese con una bolletta: [{ chiave 'AAAA-MM', data, kwh, euro }].
+/// kWh: quelli dei singoli mesi scritti nella bolletta, altrimenti il totale diviso in base ai giorni.
+/// Euro: l'importo del bimestre diviso in proporzione ai kWh di ogni mese (come nel foglio Excel).
+/// Gli altri costi (allacciamenti…) non entrano nella serie.
+export function serieEnergia() {
     const mesi = {};
-    const chiave = (a, m) => `${a}-${String(m + 1).padStart(2, '0')}`;
-    for (const b of db.bollette) {
+    const aggiungi = (k, kwh, euro) => {
+        const m = (mesi[k] ??= { kwh: null, euro: null });
+        if (kwh !== null) m.kwh = (m.kwh ?? 0) + kwh;
+        if (euro !== null) m.euro = (m.euro ?? 0) + euro;
+    };
+    for (const b of bimestrali()) {
         const primo = (b.bimestre - 1) * 2;
-        const m1 = numeroONull(b.kwh_mese1), m2 = numeroONull(b.kwh_mese2), tot = numeroONull(b.kwh);
+        const m1 = numeroONull(b.kwh_mese1), m2 = numeroONull(b.kwh_mese2), tot = numeroONull(b.kwh), euro = numeroONull(b.importo);
+        let parti;
         if (m1 !== null || m2 !== null) {
-            if (m1 !== null) mesi[chiave(b.anno, primo)] = (mesi[chiave(b.anno, primo)] ?? 0) + m1;
-            if (m2 !== null) mesi[chiave(b.anno, primo + 1)] = (mesi[chiave(b.anno, primo + 1)] ?? 0) + m2;
-            continue;
+            parti = [[chiaveMese(b.anno, primo), m1 ?? (tot !== null && m2 !== null ? tot - m2 : null)], [chiaveMese(b.anno, primo + 1), m2 ?? (tot !== null && m1 !== null ? tot - m1 : null)]];
+        } else {
+            // Divisione per giorni del periodo (dal – al), mese per mese.
+            const per = periodoBimestre(b.anno, b.bimestre);
+            const dal = giorno(b.dal ?? per.dal), al = giorno(b.al ?? per.al), giorniTot = giorniTra(dal, al) + 1;
+            const giorni = {};
+            for (let d = new Date(dal); d <= al; d.setDate(d.getDate() + 1)) { const k = chiaveMese(d.getFullYear(), d.getMonth()); giorni[k] = (giorni[k] ?? 0) + 1; }
+            parti = Object.entries(giorni).map(([k, g]) => [k, tot !== null && giorniTot > 0 ? tot * g / giorniTot : null, g / giorniTot]);
         }
-        if (tot === null) continue;
-        // Divisione per giorni del periodo (dal – al), mese per mese.
-        const dal = giorno(b.dal ?? periodoBimestre(b.anno, b.bimestre).dal), al = giorno(b.al ?? periodoBimestre(b.anno, b.bimestre).al);
-        const totaleGiorni = giorniTra(dal, al) + 1;
-        if (!(totaleGiorni > 0)) continue;
-        for (let d = new Date(dal); d <= al; d.setDate(d.getDate() + 1)) {
-            const k = chiave(d.getFullYear(), d.getMonth());
-            mesi[k] = (mesi[k] ?? 0) + tot / totaleGiorni;
+        const kwhNoti = parti.reduce((t, p) => t + (p[1] ?? 0), 0);
+        for (const [k, kwh, quota] of parti) {
+            const peso = kwhNoti > 0 ? (kwh ?? 0) / kwhNoti : (quota ?? 1 / parti.length);
+            aggiungi(k, kwh, euro !== null ? euro * peso : null);
         }
     }
-    return mesi;
+    const chiavi = Object.keys(mesi).sort();
+    if (!chiavi.length) return [];
+    const serie = [];
+    const [a0, m0] = chiavi[0].split('-').map(Number), [a1, m1] = chiavi.at(-1).split('-').map(Number);
+    for (let d = new Date(a0, m0 - 1, 1); d <= new Date(a1, m1 - 1, 1); d.setMonth(d.getMonth() + 1)) {
+        const k = chiaveMese(d.getFullYear(), d.getMonth());
+        serie.push({ chiave: k, data: new Date(d), kwh: mesi[k]?.kwh ?? null, euro: mesi[k]?.euro ?? null });
+    }
+    return serie;
 }
 
-/// Totali di un anno di bollette: kWh, euro (solo le bollette con l'importo) e potenza massima.
-/// bimestri: per confrontare lo stesso periodo di un altro anno (solo quei bimestri).
-export function totaliBollette(anno, bimestri = null) {
-    const voci = db.bollette.filter(b => b.anno === anno && (!bimestri || bimestri.includes(b.bimestre)));
-    const conImporto = voci.filter(b => numeroONull(b.importo) !== null);
-    return {
-        numero: voci.length,
-        kwh: voci.reduce((t, b) => t + (Number(b.kwh) || 0), 0),
-        euro: conImporto.reduce((t, b) => t + Number(b.importo), 0),
-        conImporto: conImporto.length,
-        potenza: Math.max(0, ...voci.map(b => Number(b.potenza_max) || 0))
-    };
+/// Somme di un tratto della serie mensile (i mesi senza dato non contano).
+export function sommaEnergia(mesi) {
+    const kwh = mesi.reduce((t, m) => t + (m.kwh ?? 0), 0), euro = mesi.reduce((t, m) => t + (m.euro ?? 0), 0);
+    // Prezzo medio solo sui mesi che hanno sia kWh sia importo.
+    const completi = mesi.filter(m => m.kwh > 0 && m.euro !== null);
+    const kwhC = completi.reduce((t, m) => t + m.kwh, 0), euroC = completi.reduce((t, m) => t + m.euro, 0);
+    return { kwh, euro, prezzo: kwhC > 0 ? euroC / kwhC : null, mesi: mesi.length };
 }
 
-/// Ultimi 12 mesi: le ultime sei bollette.
-export function ultimoAnnoBollette() {
-    const ultime = bolletteOrdinate().slice(0, 6);
-    return {
-        bollette: ultime,
-        kwh: ultime.reduce((t, b) => t + (Number(b.kwh) || 0), 0),
-        euro: ultime.reduce((t, b) => t + (Number(b.importo) || 0), 0),
-        completo: ultime.length === 6 && ultime.every(b => numeroONull(b.importo) !== null)
-    };
-}
+/// Altri costi dell'energia (allacciamenti, lavori sul contatore…).
+export const altriCostiEnergia = () => db.bollette.filter(eAltroCosto).sort((a, b) => dataBolletta(b).localeCompare(dataBolletta(a)));
 
 /// Tutte le scadenze con una data (passate in ritardo, imminenti e future), per il calendario della casa.
 export function calendarioScadenze() {

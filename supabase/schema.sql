@@ -226,7 +226,10 @@ create table if not exists bollette (
     id uuid primary key default gen_random_uuid(),
     operazione_id uuid references operazioni(id) on delete cascade,
     anno int not null,
-    bimestre int not null check (bimestre between 1 and 6),
+    bimestre int check (bimestre between 1 and 6),
+    -- 'bimestre' = bolletta; 'altro' = altro costo dell'energia (es. allacciamento), con solo data, importo e note.
+    tipo text not null default 'bimestre',
+    fornitore text not null default '',
     dal date,
     al date,
     importo numeric,
@@ -250,6 +253,8 @@ alter table interventi add column if not exists eseguito_da text not null defaul
 alter table interventi add column if not exists esecutore text not null default '';
 alter table interventi add column if not exists costo numeric not null default 0;
 alter table sezioni add column if not exists speciale text not null default '';
+-- Dati della fornitura (POD, fornitore, numero cliente…) per le bollette, vedi aggiornamento-16.
+alter table operazioni add column if not exists fornitura jsonb not null default '{}';
 alter table interventi add column if not exists titolo text not null default '';
 alter table interventi add column if not exists allegati jsonb not null default '[]';
 

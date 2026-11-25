@@ -191,7 +191,7 @@ export function riepilogoOperazione(o) {
             break;
         }
         case 'bollette': {
-            const ultima = bolletteOrdinate()[0];
+            const ultima = bolletteOrdinate().find(b => b.tipo !== 'altro');
             if (ultima) parti.push(`Ultima ${nomeBimestre(ultima.anno, ultima.bimestre)}${Number(ultima.importo) > 0 ? ' · ' + f.euro(ultima.importo) : ''}${Number(ultima.kwh) > 0 ? ' · ' + f.quantita(ultima.kwh, 'kWh') : ''}`);
             break;
         }
