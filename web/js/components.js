@@ -380,7 +380,8 @@ export const Cronometro = {
 export const GraficoBorsa = {
     props: { punti: Array, colore: { type: String, default: 'var(--accento)' }, formato: { type: Function, default: v => String(Math.round(v)) },
              altezza: { type: Number, default: 210 }, media: Number,
-             zero: { type: Boolean, default: true } },  // false: l'asse parte vicino al valore più basso (es. prezzo)
+             zero: { type: Boolean, default: true },   // false: l'asse parte vicino al valore più basso (es. prezzo)
+             unita: String },                          // unità dell'asse, scritta sopra i valori (es. kWh)
     emits: ['scorri'],
     template: `
       <div class="grafico-borsa">
@@ -396,6 +397,7 @@ export const GraficoBorsa = {
             <line :x1="0" :x2="larghezzaPiano" :y1="y(t)" :y2="y(t)" class="grafico-griglia"/>
             <text :x="L - 2" :y="y(t) + 4" text-anchor="end" class="grafico-etichetta">{{ formato(t) }}</text>
           </g>
+          <text v-if="unita" :x="L - 2" :y="y(tacche.at(-1)) - 10" text-anchor="end" class="grafico-etichetta grafico-unita">{{ unita }}</text>
           <path v-for="(tratto, i) in tratti" :key="'a' + i" :d="area(tratto)" :fill="'url(#' + idSfumatura + ')'"/>
           <path v-for="(tratto, i) in tratti" :key="'l' + i" :d="linea(tratto)" :stroke="colore" class="grafico-borsa-linea"/>
           <line v-if="media != null && media > 0" :x1="0" :x2="larghezzaPiano" :y1="y(media)" :y2="y(media)" class="grafico-borsa-media"/>
@@ -446,7 +448,7 @@ export const GraficoBorsa = {
     },
     methods: {
         x(i) { const n = this.punti.length; return n > 1 ? 4 + i / (n - 1) * (this.larghezzaPiano - 8) : this.larghezzaPiano / 2; },
-        y(v) { const { min, max } = this.passo; return 10 + (1 - (v - min) / (max - min || 1)) * (this.altezza - 34); },
+        y(v) { const { min, max } = this.passo; return 24 + (1 - (v - min) / (max - min || 1)) * (this.altezza - 48); },
         linea(indici) { return indici.map((i, k) => `${k ? 'L' : 'M'}${this.x(i).toFixed(1)},${this.y(this.punti[i].y).toFixed(1)}`).join(' ') + (indici.length === 1 ? ' h1' : ''); },
         area(indici) {
             const base = this.y(this.passo.min).toFixed(1);

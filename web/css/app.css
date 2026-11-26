@@ -489,6 +489,7 @@ table.tabella { border-collapse: collapse; width: 100%; font-size: 14px; font-va
 .grafico-borsa svg { width: 100%; display: block; overflow: visible; cursor: crosshair; }
 .grafico-borsa-linea { fill: none; stroke-width: 2.2; stroke-linejoin: round; stroke-linecap: round; }
 .grafico-borsa-media { stroke: var(--secondario); stroke-width: 1; stroke-dasharray: 2 4; opacity: .7; }
+.grafico-unita { font-weight: 600; }
 .grafico-borsa-cursore { stroke: var(--secondario); stroke-width: 1; }
 .barre-gruppo { max-width: 56px; gap: 1px; }
 .barre-gruppo .barre-barra { max-width: 12px; }

@@ -731,13 +731,13 @@ const INTERVALLI = [
     { id: 'Tutto', mesi: null }
 ];
 const MISURE = {
-    kwh: { nome: 'Consumo', colore: '#FF9F0A', valore: m => m.kwh, somma: t => t.kwh, testo: v => f.quantita(Math.round(v), 'kWh'), asse: v => f.numero(v) },
-    euro: { nome: 'Spesa', colore: '#0A84FF', valore: m => m.euro, somma: t => t.euro, testo: v => f.euro(v), asse: v => f.numero(v) + ' €' },
-    prezzo: { nome: 'Prezzo', colore: '#BF5AF2', valore: m => (m.kwh > 0 && m.euro !== null ? m.euro / m.kwh : null), somma: t => t.prezzo,
+    kwh: { nome: 'Consumo', unita: 'kWh', colore: '#FF9F0A', valore: m => m.kwh, somma: t => t.kwh, testo: v => f.quantita(Math.round(v), 'kWh'), asse: v => f.numero(v) },
+    euro: { nome: 'Costo', unita: '', colore: '#0A84FF', valore: m => m.euro, somma: t => t.euro, testo: v => f.euro(v), asse: v => f.numero(v) + ' €' },
+    prezzo: { nome: 'Prezzo', unita: '€/kWh', colore: '#BF5AF2', valore: m => (m.kwh > 0 && m.euro !== null ? m.euro / m.kwh : null), somma: t => t.prezzo,
               testo: v => prezzoKwh(v), asse: v => formatoPrezzo.format(v) }
 };
 const CAMPI_FORNITURA = [
-    ['pod', 'POD'], ['fornitore', 'Fornitore'], ['numero_cliente', 'Numero cliente'],
+    ['pod', 'POD'], ['codice_contatore', 'Codice contatore'], ['fornitore', 'Fornitore'], ['numero_cliente', 'Numero cliente'],
     ['codice_fiscale', 'C.F. / Partita IVA'], ['indirizzo', 'Indirizzo di fornitura']
 ];
 
@@ -763,7 +763,7 @@ const Bollette = {
             <b>{{ testa.valore }}</b>
             <span v-if="testa.variazione" class="borsa-variazione" :class="testa.verso">{{ testa.variazione }}</span>
           </div>
-          <GraficoBorsa :punti="punti" :colore="coloreLinea" :formato="MISURE[misura].asse" :media="mediaFinestra" :zero="misura !== 'prezzo'" @scorri="i => scorso = i"/>
+          <GraficoBorsa :punti="punti" :colore="coloreLinea" :formato="MISURE[misura].asse" :media="mediaFinestra" :zero="misura !== 'prezzo'" :unita="MISURE[misura].unita" @scorri="i => scorso = i"/>
           <div class="segmenti segmenti-intervallo">
             <button v-for="r in intervalli" :key="r.id" :class="{ attivo: intervallo === r.id }" @click="intervallo = r.id">{{ r.id }}</button>
           </div>
@@ -773,7 +773,7 @@ const Bollette = {
         <h2 class="sezione-operazione">Confronto per mese</h2>
         <div class="segmenti">
           <button :class="{ attivo: misuraConfronto === 'kwh' }" @click="misuraConfronto = 'kwh'">Consumo</button>
-          <button :class="{ attivo: misuraConfronto === 'euro' }" @click="misuraConfronto = 'euro'">Spesa</button>
+          <button :class="{ attivo: misuraConfronto === 'euro' }" @click="misuraConfronto = 'euro'">Costo</button>
         </div>
         <Gruppo nota="Lo stesso mese negli ultimi anni: tocca un mese per leggere i valori." nota-sempre>
           <BarreAnni :serie="serieAnni" :formato="misuraConfronto === 'kwh' ? v => f.quantita(Math.round(v), 'kWh') : v => f.euro(v)"/>
@@ -878,7 +878,7 @@ const Bollette = {
                      variazione: p === 0 ? 'Uguale rispetto ' + r.prima : `${p < 0 ? '▼' : '▲'} ${Math.abs(p)}% rispetto ${r.prima}` };
         },
         notaGrafico() {
-            return this.misura === 'euro' ? "La spesa di ogni mese è l'importo del bimestre diviso in base ai kWh. Gli altri costi (allacciamenti…) non sono nel grafico."
+            return this.misura === 'euro' ? "Il costo di ogni mese è l'importo del bimestre diviso in base ai kWh. Gli altri costi (allacciamenti…) non sono nel grafico."
                 : this.misura === 'prezzo' ? 'Prezzo pagato per ogni kWh, tutto compreso (importo ÷ consumo).'
                 : 'La linea tratteggiata è la media mensile del periodo. Scorri sul grafico per leggere ogni mese.';
         },
@@ -903,7 +903,7 @@ const Bollette = {
             const altri = altriCostiEnergia().reduce((t, b) => t + (Number(b.importo) || 0), 0);
             const voci = [
                 { nome: 'Consumo totale', valore: f.quantita(Math.round(tutto.kwh), 'kWh'), dettaglio: 'dal ' + nomeMeseAnno(this.serie[0].chiave) },
-                { nome: 'Spesa totale', valore: f.euro(tutto.euro + altri), dettaglio: altri ? `di cui altri costi ${f.euro(altri)}` : 'bollette' },
+                { nome: 'Costo totale', valore: f.euro(tutto.euro + altri), dettaglio: altri ? `di cui altri costi ${f.euro(altri)}` : 'bollette' },
                 { nome: 'Ultimi 12 mesi', valore: f.quantita(Math.round(anno.kwh), 'kWh'), dettaglio: f.euro(anno.euro) },
                 { nome: 'Media mensile', valore: f.quantita(Math.round(tutto.kwh / Math.max(1, conKwh.length)), 'kWh'), dettaglio: f.euro(tutto.euro / Math.max(1, conEuro.length)) },
                 { nome: 'Prezzo medio', valore: tutto.prezzo ? prezzoKwh(tutto.prezzo) : '–', dettaglio: anno.prezzo ? `ultimi 12 mesi ${prezzoKwh(anno.prezzo)}` : '' }
