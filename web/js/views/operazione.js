@@ -882,12 +882,14 @@ const Bollette = {
                 : this.misura === 'prezzo' ? 'Prezzo pagato per ogni kWh, tutto compreso (importo ÷ consumo).'
                 : 'La linea tratteggiata è la media mensile del periodo. Scorri sul grafico per leggere ogni mese.';
         },
-        /// Ultimi quattro anni con dati, dal più vecchio (più chiaro) al più recente.
+        /// Ultimi quattro anni con dati, dal più vecchio al più recente.
         serieAnni() {
             const anni = [...new Set(this.serie.map(p => Number(p.chiave.slice(0, 4))))].slice(-4);
-            const colore = this.misuraConfronto === 'kwh' ? '#FF9F0A' : '#0A84FF', opacita = [100, 72, 46, 26];
+            // Un colore ben distinto per anno (palette leggibile anche da chi distingue male i colori);
+            // l'anno più recente è sempre l'arancione.
+            const palette = ['#56B4E9', '#009E73', '#CC79A7', '#E69F00'];
             return anni.map((anno, i) => ({
-                anno, colore: `color-mix(in srgb, ${colore} ${opacita[anni.length - 1 - i]}%, var(--cella))`,
+                anno, colore: palette[palette.length - anni.length + i],
                 valori: Array.from({ length: 12 }, (_, m) => {
                     const p = this.serie.find(x => x.chiave === `${anno}-${String(m + 1).padStart(2, '0')}`);
                     return p ? (this.misuraConfronto === 'kwh' ? p.kwh : p.euro) : null;
