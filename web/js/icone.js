@@ -41,6 +41,8 @@ const P = {
     righello: '<path d="M4 16 16 4l4 4L8 20z"/><path d="m8 12 2 2M11 9l2 2M14 6l2 2"/>',
     bandiera: '<path d="M5 21V4M5 4h11l-2 4 2 4H5"/>',
     avviso: '<path d="M12 3 2 20h20z"/><path d="M12 10v4M12 17h.01"/>',
+    andamento: '<path d="M3 17l5-5 4 3 8-8"/><path d="M15 7h5v5"/>',
+    altro: '<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>',
     orologio: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
     calendario: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
     stampa: '<path d="M7 9V3h10v6M7 17H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2"/><rect x="7" y="14" width="10" height="7" rx="1"/>',

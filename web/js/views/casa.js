@@ -7,7 +7,7 @@ import * as f from '../format.js';
 import { COLORE_SEZIONE, ICONE_SEZIONE } from '../icone.js';
 import {
     avvisi, prossime, operazioniDi, statoOperazione, TIPI_OPERAZIONE, sezioneDi, nomeContatto, sottotitoloContatto, calendarioScadenze,
-    iconaOperazione, coloreImpianto, vociCosto, anniCosti, totale, eGenerale, prodottiOperazione, analisiScorta, sottoScorta, pelletDallUltimoSvuotamento
+    iconaOperazione, coloreImpianto, vociCosto, anniCosti, totale, eGenerale, prodottiOperazione, analisiScorta, sottoScorta, pelletDallUltimoSvuotamento, lettureDeposito, carichiOrdinati
 } from '../logic.js';
 import { riassuntoImpianto, riepilogoOperazione, TesseraImpianto, RigaAvviso } from './manutenzione.js';
 import { ContattoFoglio } from './contatti.js';
@@ -34,9 +34,29 @@ function nomeGiorno(d) {
     return testo.charAt(0).toUpperCase() + testo.slice(1);
 }
 
+/// Mini-andamento senza assi (come nei widget di Salute e Borsa). punti: [{ x: numero/Date, y }]
+const MiniLinea = {
+    props: { punti: Array, colore: String },
+    template: `
+      <svg class="mini-linea" viewBox="0 0 100 24" preserveAspectRatio="none" aria-hidden="true">
+        <path :d="area" :fill="colore" opacity=".14"/>
+        <path :d="linea" fill="none" :stroke="colore" stroke-width="2" vector-effect="non-scaling-stroke" stroke-linejoin="round" stroke-linecap="round"/>
+      </svg>`,
+    computed: {
+        coordinate() {
+            const xs = this.punti.map(p => +p.x), ys = this.punti.map(p => p.y);
+            const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+            return this.punti.map(p => [((+p.x - x0) / (x1 - x0 || 1)) * 100, 21 - ((p.y - y0) / (y1 - y0 || 1)) * 18]);
+        },
+        linea() { return this.coordinate.map(([x, y], i) => `${i ? 'L' : 'M'}${x.toFixed(1)},${y.toFixed(1)}`).join(' '); },
+        area() { const c = this.coordinate; return `${this.linea} L${c.at(-1)[0].toFixed(1)},24 L${c[0][0].toFixed(1)},24 Z`; }
+    }
+};
+
 /// Pillole in cima alla home: i valori da tenere d'occhio (pellet, pellet bruciato, ossigeno), come i riepiloghi dell'app Casa.
 /// Si colorano solo quando c'è qualcosa da fare.
 const PilloleStato = {
+    components: { MiniLinea },
     emits: ['apri'],
     template: `
       <div v-if="pillole.length" class="pillole-stato">
@@ -45,8 +65,8 @@ const PilloleStato = {
           <span class="voce-stato-testi">
             <small>{{ p.nome }}</small>
             <b><span v-conta="p.valore">{{ p.valore }}</span> <i v-if="p.pallino" class="pallino" :class="p.pallino"></i></b>
-            <span v-if="p.livello != null" class="barra-livello"><i :style="{ width: p.livello + '%' }"></i></span>
-            <small v-else-if="p.nota" class="voce-stato-nota">{{ p.nota }}</small>
+            <small v-if="p.nota" class="voce-stato-nota">{{ p.nota }}</small>
+            <span v-if="p.punti && p.punti.length > 1" class="voce-stato-andamento"><MiniLinea :punti="p.punti" :colore="p.colore"/></span>
           </span>
         </button>
       </div>`,
@@ -59,23 +79,33 @@ const PilloleStato = {
             const op = operazione('pellet'), pel = prodotto(op, 'pellet');
             if (pel) {
                 const kg = analisiScorta(pel).giacenza * 100;
+                // Andamento: le ultime letture del deposito.
+                const punti = lettureDeposito(pel).slice(0, 12).reverse().map(l => ({ x: new Date(l.momento), y: Number(l.kg) }));
                 elenco.push({ id: 'pellet', nome: 'Pellet - Silos', icona: iconaOperazione(op), colore: coloreImpianto(op.sezione_id), valore: f.quantita(kg, 'kg'),
-                    livello: Math.max(0, Math.min(100, kg / 3600 * 100)), stato: sottoScorta(pel) ? 'attenzione' : '', pagine: pagineOperazione(op) });
+                    nota: `${Math.round(Math.max(0, Math.min(100, kg / 3600 * 100)))}% del silo`, punti,
+                    stato: sottoScorta(pel) ? 'attenzione' : '', pagine: pagineOperazione(op) });
             }
             // Pellet bruciato dall'ultimo svuotamento della cenere (al posto del pH, che resta nella sua operazione).
             const oc = operazione('cenere'), br = pelletDallUltimoSvuotamento();
             if (oc && br) {
                 const giorni = br.giorni === 1 ? '1 giorno' : `${br.giorni} giorni`;
-                elenco.push({ id: 'cenere', nome: 'Pellet - Combusto', icona: iconaOperazione(oc), colore: coloreImpianto(oc.sezione_id),
+                // Andamento: pellet bruciato dallo svuotamento a ogni lettura del deposito successiva (parte da 0).
+                const pel2 = db.prodotti.find(p => p.categoria === 'pellet');
+                const carichiFino = d => carichiOrdinati().filter(c => c.data > br.svuotamento.data && c.data <= d).reduce((t, c) => t + (Number(c.quantita) || 0) * 100, 0);
+                const puntiBr = [{ x: new Date(br.svuotamento.data), y: 0 }, ...(pel2 ? lettureDeposito(pel2) : [])
+                    .filter(l => l.momento.slice(0, 10) >= br.svuotamento.data).reverse()
+                    .map(l => ({ x: new Date(l.momento), y: Math.max(0, Number(br.svuotamento.scorta_kg) + carichiFino(l.momento.slice(0, 10)) - Number(l.kg)) }))];
+                elenco.push({ id: 'cenere', nome: 'Pellet - Combusto', icona: 'andamento', colore: coloreImpianto(oc.sezione_id), punti: puntiBr,
                     valore: br.kg !== null ? f.quantita(Math.round(br.kg), 'kg') : '–',
-                    nota: br.kg !== null ? `in ${giorni} dallo svuotamento cenere` : 'serve una lettura del deposito',
+                    nota: br.kg !== null ? `in ${giorni}, da svuotamento cenere` : 'serve una lettura del deposito',
                     stato: '', pagine: pagineOperazione(oc) });
             }
             // Ossigeno attivo della piscina, confrontato con la scorta minima.
             const oo = operazione('ossigeno'), oss = prodotto(oo, 'ossigeno');
             if (oss) {
                 const litri = analisiScorta(oss).giacenza, minimo = Number(oss.scorta_minima) || 0;
-                elenco.push({ id: 'ossigeno', nome: 'Ossigeno piscina', icona: iconaOperazione(oo), colore: coloreImpianto(oo.sezione_id),
+                const puntiOss = (analisiScorta(oss).andamento ?? []).slice(-12).map(a => ({ x: new Date(a.data), y: Number(a.valore) }));
+                elenco.push({ id: 'ossigeno', nome: 'Ossigeno piscina', icona: iconaOperazione(oo), colore: coloreImpianto(oo.sezione_id), punti: puntiOss,
                     valore: f.quantita(litri, oss.unita || 'l'), nota: minimo ? `Scorta minima ${f.quantita(minimo, oss.unita || 'l')}` : '',
                     stato: minimo > 0 && litri <= minimo ? 'attenzione' : '', pagine: pagineOperazione(oo) });
             }
@@ -138,7 +168,7 @@ const RigaProgramma = {
         <IconaQuadrata :nome="voce.icona" :colore="colore" :dimensione="30"/>
         <span class="riga-testi">
           <span class="riga-titolo">{{ maiuscola(voce.titolo) }}</span>
-          <span class="riga-sottotitolo">{{ [sezione?.nome, voce.dettaglio].filter(Boolean).join(' · ') }}</span>
+          <span class="riga-sottotitolo" :title="voce.dettaglio">{{ sezione?.nome || voce.dettaglio }}</span>
         </span>
         <span class="programma-quando" :class="{ vicino }">{{ quando }}</span>
       </button>`,
@@ -325,10 +355,24 @@ export const CasaHome = {
     template: `
       <Pagina titolo="Casa Dolonne" grande :sottotitolo="sottotitolo" :con-indietro="false">
         <template #azioni>
-          <button v-if="sezioni.length" class="pulsante-barra" @click="apriRicerca" aria-label="Cerca"><Icona nome="ricerca" :dimensione="20"/></button>
-          <button class="pulsante-barra" @click="cambiaScheda('impostazioni')" aria-label="Impostazioni"><Icona nome="ingranaggio" :dimensione="20"/></button>
-          <button v-if="puoModificare() && sezioni.length" class="pulsante-barra" @click="modificaImpianti = !modificaImpianti">{{ modificaImpianti ? 'Fine' : 'Modifica' }}</button>
-          <button v-if="puoModificare()" class="pulsante-barra" @click="nuova = { nome: '', icona: 'chiave' }" aria-label="Nuovo impianto"><Icona nome="piu"/></button>
+          <!-- Pulsanti raggruppati in una capsula, come nelle barre degli strumenti di iOS; "Riordina" sta nel menu … -->
+          <button v-if="modificaImpianti" class="pulsante-barra pulsante-fine" @click="modificaImpianti = false">Fine</button>
+          <span v-else class="capsula-strumenti">
+            <button v-if="sezioni.length" @click="apriRicerca" aria-label="Cerca" title="Cerca"><Icona nome="ricerca" :dimensione="19"/></button>
+            <button @click="cambiaScheda('impostazioni')" aria-label="Impostazioni" title="Impostazioni"><Icona nome="ingranaggio" :dimensione="19"/></button>
+            <button v-if="puoModificare()" @click="nuova = { nome: '', icona: 'chiave' }" aria-label="Nuovo impianto" title="Nuovo impianto"><Icona nome="piu" :dimensione="19"/></button>
+            <span v-if="puoModificare() && sezioni.length" class="menu-contenitore">
+              <button @click="menu = !menu" aria-label="Altro" title="Altro"><Icona nome="altro" :dimensione="19"/></button>
+              <template v-if="menu">
+                <div class="menu-sfondo" @click="menu = false"></div>
+                <div class="menu-tendina" role="menu">
+                  <button role="menuitem" @click="menu = false; modificaImpianti = true"><Icona nome="lista" :dimensione="18"/>Riordina e modifica impianti</button>
+                  <button role="menuitem" @click="menu = false; nuova = { nome: '', icona: 'chiave' }"><Icona nome="piu" :dimensione="18"/>Nuovo impianto</button>
+                  <button role="menuitem" @click="menu = false; apriDaElenco({ nome: 'costi' })"><Icona nome="carrello" :dimensione="18"/>Costi della casa</button>
+                </div>
+              </template>
+            </span>
+          </span>
         </template>
         <Vuoto v-if="!sezioni.length" icona="casa" titolo="Ancora nessun impianto"
                testo="Chi può modificare apre Impostazioni → Carica contenuti iniziali: verranno creati impianti, operazioni, guide e carichi pellet."/>
@@ -401,6 +445,7 @@ export const CasaHome = {
 
               <!-- Impianti -->
               <div class="cruscotto-impianti">
+                <h3 v-if="!modificaImpianti" class="gruppo-titolo intestazione-cruscotto">Impianti</h3>
                 <div v-if="!modificaImpianti" class="griglia-impianti">
                   <TesseraImpianto v-for="(s, i) in sezioni" :key="s.id" :sezione="s" :style="{ '--i': i }"
                                    :selezionata="selezionata({ nome: 'impianto', id: s.id })" @click="apriDaElenco({ nome: 'impianto', id: s.id })"/>
@@ -416,6 +461,7 @@ export const CasaHome = {
                   </Riga>
                 </Gruppo>
                 <!-- Su schermo largo la scheda si allunga fino in fondo alla colonna del calendario -->
+                <h3 class="gruppo-titolo intestazione-cruscotto intestazione-costi">Costi</h3>
                 <button class="scheda-costi" @click="apriDaElenco({ nome: 'costi' })">
                   <span class="scheda-costi-testa">
                     <IconaQuadrata nome="carrello" colore="var(--accento)" :dimensione="34"/>
@@ -465,7 +511,7 @@ export const CasaHome = {
           <Gruppo v-if="modifica"><Riga distruttiva titolo="Elimina impianto" @click="eliminaImpianto"/></Gruppo>
         </Foglio>
       </Pagina>`,
-    data() { return { ricerca: '', cercando: false, recenti: JSON.parse(localStorage.getItem('ricercheRecenti') || '[]'), nuova: null, modifica: null, modificaImpianti: false, icone: ICONE_SEZIONE }; },
+    data() { return { menu: false, ricerca: '', cercando: false, recenti: JSON.parse(localStorage.getItem('ricercheRecenti') || '[]'), nuova: null, modifica: null, modificaImpianti: false, icone: ICONE_SEZIONE }; },
     setup() {
         const elencoAvvisi = computed(() => avvisi());
         const urgenti = computed(() => elencoAvvisi.value.filter(a => a.gravita === 'scaduto' || a.gravita === 'inCorso' || !a.data));

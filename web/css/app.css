@@ -321,6 +321,8 @@ table.tabella { border-collapse: collapse; width: 100%; font-size: 14px; font-va
     backdrop-filter: saturate(180%) blur(30px); -webkit-backdrop-filter: saturate(180%) blur(30px);
     border-right: 0.5px solid var(--separatore);
 }
+/* La barra laterale si stacca un po' dal contenuto, come in iPadOS e macOS */
+.largo .barra-laterale { background: color-mix(in srgb, var(--cella) 60%, var(--sfondo)); }
 .marchio { display: flex; align-items: center; gap: 10px; padding: 4px 8px 18px; font-size: 17px; font-weight: 700; letter-spacing: -0.2px; }
 .marchio img { width: 34px; height: 34px; border-radius: 9px; box-shadow: 0 2px 6px rgba(0,0,0,.15); flex: none; }
 .laterale-voci { display: flex; flex-direction: column; gap: 2px; flex: 1; }
@@ -330,9 +332,8 @@ table.tabella { border-collapse: collapse; width: 100%; font-size: 14px; font-va
 }
 .laterale-voce .icona { color: var(--accento); }
 .laterale-voce .laterale-nome { flex: 1; }
-.laterale-voce.attiva { background: var(--accento); color: #fff; }
-.laterale-voce.attiva .icona { color: #fff; }
-.laterale-voce.attiva .contatore-avvisi { background: #fff; color: var(--accento); }
+.laterale-voce.attiva { background: color-mix(in srgb, var(--accento) 18%, transparent); color: var(--testo); font-weight: 600; }
+.laterale-voce.attiva .icona { color: var(--accento); }
 .laterale-utente { display: flex; align-items: center; gap: 10px; padding: 10px 8px 2px; border-top: 0.5px solid var(--separatore); font-size: 14px; }
 .laterale-utente .laterale-nome { display: flex; flex-direction: column; min-width: 0; }
 .laterale-utente .laterale-nome > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600; }
@@ -719,3 +720,34 @@ button.barre-colonna.scelta { background: var(--riempimento); }
 .vuoto.compatto .vuoto-titolo { font-size: 17px; }
 .vuoto.compatto .vuoto-testo { font-size: 14px; }
 .sezione-operazione + .vuoto.compatto { margin-top: 26px; }
+
+/* Pulsanti della home in una capsula */
+.capsula-strumenti { display: inline-flex; align-items: center; gap: 2px; padding: 3px; border-radius: 999px;
+    background: color-mix(in srgb, var(--cella) 85%, transparent); box-shadow: var(--ombra), inset 0 0 0 0.5px var(--separatore);
+    -webkit-backdrop-filter: blur(20px) saturate(160%); backdrop-filter: blur(20px) saturate(160%); }
+.capsula-strumenti > button, .menu-contenitore > button { width: 36px; height: 36px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: var(--accento); }
+.capsula-strumenti > button:active, .menu-contenitore > button:active { background: var(--cella-premuta); }
+@media (hover: hover) and (pointer: fine) { .capsula-strumenti > button:hover, .menu-contenitore > button:hover { background: var(--cella-sopra); } }
+.pulsante-fine { font-weight: 600; }
+.menu-contenitore { position: relative; display: inline-flex; }
+.menu-sfondo { position: fixed; inset: 0; z-index: 40; }
+.menu-tendina { position: absolute; top: calc(100% + 8px); right: 0; z-index: 41; min-width: 250px; padding: 6px;
+    background: color-mix(in srgb, var(--cella) 97%, transparent); border-radius: 14px; box-shadow: var(--ombra-alta), inset 0 0 0 0.5px var(--separatore);
+    -webkit-backdrop-filter: blur(24px) saturate(170%); backdrop-filter: blur(24px) saturate(170%); animation: menuApre .16s ease-out; transform-origin: top right; }
+.menu-tendina button { display: flex; align-items: center; justify-content: flex-start; gap: 10px; width: 100%; white-space: nowrap; padding: 9px 10px; border-radius: 9px; font-size: 15px; color: var(--testo); text-align: left; }
+.menu-tendina button .icona { color: var(--accento); }
+.menu-tendina button:active, .menu-tendina button:hover { background: var(--cella-sopra); }
+@keyframes menuApre { from { opacity: 0; transform: scale(.94); } }
+
+/* Intestazioni dei blocchi della home, allineate con "In programma" */
+.intestazione-cruscotto, .cruscotto-calendario .calendario-testa { min-height: 36px; display: flex; align-items: center; margin: 0 4px 8px; }
+.intestazione-costi { margin-top: 22px; }
+.cruscotto .intestazione-costi + .scheda-costi { margin-top: 0; }
+
+/* Righe di In programma su una sola linea */
+.riga-programma .riga-sottotitolo, .riga-programma .riga-titolo { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Mini-andamento nelle voci di stato */
+.voce-stato-andamento { display: block; width: 100%; height: 18px; margin-top: 4px; }
+.mini-linea { width: 100%; height: 100%; display: block; overflow: visible; }
+.cruscotto-impianti > .intestazione-cruscotto:first-child { margin-top: 6px; }
