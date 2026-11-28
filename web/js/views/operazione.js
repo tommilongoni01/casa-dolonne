@@ -252,7 +252,10 @@ export const NotificheOperazione = {
 // ---------------------------------------------------------------------
 const MisurePH = {
     template: `
-      <Gruppo titolo="Misure pH">
+      <Vuoto v-if="!ultima" compatto icona="provetta" colore="var(--blu)" titolo="Nessuna misura del pH"
+             testo="Registra il pH letto sul dosimetro o con lo Scuba: il grafico mostra l'andamento e la fascia ideale 6,8 – 7,8."
+             azione="Registra la prima misura" @azione="foglio = {}"/>
+      <Gruppo v-else titolo="Misure pH">
         <template v-if="ultima">
           <div class="due-valori">
             <div><div class="secondario" style="font-size:13px">Dosimetro</div><div class="numero" :class="colore(ultima.dosimetro)">{{ f.ph(ultima.dosimetro) }}</div></div>
@@ -267,9 +270,11 @@ const MisurePH = {
         <Grafico :serie="serie" :fascia="{ min: 6.8, max: 7.8 }" :formato-y="v => f.ph(v)" valori/>
       </Gruppo>
       <Gruppo v-if="misure.length" titolo="Storico misure">
-        <Riga v-for="m in (tutti ? misure : misure.slice(0, 1))" :key="m.id" :titolo="f.data(m.data)" :sottotitolo="m.note"
+        <RigaScorrevole v-for="m in (tutti ? misure : misure.slice(0, 1))" :key="m.id" tabella="misure_ph" :id="m.id" cosa="la misura" @modifica="foglio = { voce: m }">
+          <Riga :titolo="f.data(m.data)" :sottotitolo="m.note"
               :valore="'Dosimetro ' + f.ph(m.dosimetro) + ' · Scuba ' + f.ph(m.scuba)"
               @click="puoModificare() && (foglio = { voce: m })"/>
+        </RigaScorrevole>
         <RigaEspandi :totale="misure.length" v-model:aperto="tutti"/>
       </Gruppo>
       <MisuraFoglio v-if="foglio" :misura="foglio.voce" @chiudi="foglio = null"/>`,
@@ -588,7 +593,7 @@ const DepositoPellet = {
       <Gruppo titolo="Scorta">
         <div class="valore-grande">
           <div class="etichetta">Pellet nel deposito</div>
-          <div class="numero" :class="{ rosso: basso }">{{ quantitaScorta(prodotto, giacenza) }}</div>
+          <div class="numero" :class="{ rosso: basso }" v-conta="quantitaScorta(prodotto, giacenza)">{{ quantitaScorta(prodotto, giacenza) }}</div>
           <div v-if="basso" class="arancione-t" style="font-size:14px">Sotto la scorta minima ({{ quantitaScorta(prodotto, prodotto.scorta_minima) }})</div>
         </div>
         <Riga v-if="letture[0]" titolo="Ultima lettura" :valore="f.dataOra(letture[0].momento) + ' · ' + f.quantita(letture[0].kg, 'kg')"/>
@@ -608,13 +613,15 @@ const DepositoPellet = {
                  :riferimento="Number(prodotto.scorta_minima) > 0 ? prodotto.scorta_minima * 100 : null" valori/>
       </Gruppo>
       <Gruppo v-if="letture.length" titolo="Letture del deposito">
-        <Riga v-for="(l, i) in (tutti ? letture : letture.slice(0, 1))" :key="l.id" :titolo="f.dataOra(l.momento)" :sottotitolo="descriviPiani(l)"
+        <RigaScorrevole v-for="(l, i) in (tutti ? letture : letture.slice(0, 1))" :key="l.id" tabella="letture_deposito" :id="l.id" cosa="la lettura" @modifica="lettura = { voce: l }">
+          <Riga :titolo="f.dataOra(l.momento)" :sottotitolo="descriviPiani(l)"
               @click="puoModificare() && (lettura = { voce: l })">
           <template #fine>
             <span class="riga-valore">{{ f.quantita(l.kg, 'kg') }}<br v-if="delta(i) !== null">
               <small v-if="delta(i) !== null" class="secondario">{{ delta(i) >= 0 ? '−' : '+' }}{{ f.quantita(Math.abs(delta(i)), 'kg') }}</small></span>
           </template>
         </Riga>
+        </RigaScorrevole>
         <RigaEspandi :totale="letture.length" v-model:aperto="tutti"/>
       </Gruppo>
       <MovimentoFoglio v-if="acquisto" :prodotto-iniziale="prodotto" tipo="acquisto" @chiudi="acquisto = false"/>
@@ -676,7 +683,10 @@ const DepositoPellet = {
 // ---------------------------------------------------------------------
 const Cenere = {
     template: `
-      <Gruppo titolo="Svuotamento cenere">
+      <Vuoto v-if="!svuotamenti.length" compatto icona="cestino" colore="var(--arancione)" titolo="Nessuno svuotamento"
+             testo="Quando svuoti la cenere registra la data e il pellet nel deposito: così si calcola quanto pellet è stato bruciato."
+             azione="Registra il primo svuotamento" @azione="foglio = {}"/>
+      <Gruppo v-else titolo="Svuotamento cenere">
         <template v-if="svuotamenti[0]">
           <Riga titolo="Ultimo svuotamento" :valore="f.data(svuotamenti[0].data)"/>
           <Riga titolo="Giorni trascorsi" :valore="f.giorniTrascorsi(svuotamenti[0].data)"/>
@@ -692,13 +702,15 @@ const Cenere = {
         <Riga v-if="puoModificare()" azione icona="piuCerchio" titolo="Registra svuotamento" @click="foglio = {}"/>
       </Gruppo>
       <Gruppo v-if="svuotamenti.length" titolo="Storico" nota="Il consumo è calcolato dalla scorta dello svuotamento precedente, più i carichi di pellet registrati nel frattempo.">
-        <Riga v-for="(s, i) in (tutti ? svuotamenti : svuotamenti.slice(0, 1))" :key="s.id" :titolo="f.data(s.data)" :sottotitolo="s.note"
+        <RigaScorrevole v-for="(s, i) in (tutti ? svuotamenti : svuotamenti.slice(0, 1))" :key="s.id" tabella="svuotamenti_cenere" :id="s.id" cosa="lo svuotamento" @modifica="foglio = { voce: s }">
+          <Riga :titolo="f.data(s.data)" :sottotitolo="s.note"
               @click="puoModificare() && (foglio = { voce: s })">
           <template #fine>
             <span class="riga-valore">{{ s.scorta_kg !== null ? f.quantita(s.scorta_kg, 'kg') : '–' }}
               <br v-if="consumo(i) !== null"><small v-if="consumo(i) !== null">consumati {{ f.quantita(consumo(i), 'kg') }}</small></span>
           </template>
         </Riga>
+        </RigaScorrevole>
         <RigaEspandi :totale="svuotamenti.length" v-model:aperto="tutti"/>
       </Gruppo>
       <Foglio v-if="foglio" :titolo="foglio.voce ? 'Modifica svuotamento' : 'Svuotamento cenere'" @annulla="foglio = null" @conferma="salvaSvuotamento">
@@ -776,7 +788,7 @@ const Bollette = {
           </div>
           <div class="borsa-testa">
             <small>{{ testa.etichetta }}</small>
-            <b>{{ testa.valore }}</b>
+            <b v-conta="scorso === null ? testa.valore : null">{{ testa.valore }}</b>
             <span v-if="testa.variazione" class="borsa-variazione" :class="testa.verso">{{ testa.variazione }}</span>
           </div>
           <GraficoBorsa :punti="punti" :colore="coloreLinea" :formato="MISURE[misura].asse" :media="mediaFinestra" :zero="misura !== 'prezzo'" :unita="MISURE[misura].unita" @scorri="i => scorso = i"/>
@@ -797,20 +809,25 @@ const Bollette = {
 
         <h2 class="sezione-operazione">Numeri chiave</h2>
         <div class="numeri-chiave">
-          <div v-for="n in numeriChiave" :key="n.nome"><small>{{ n.nome }}</small><b>{{ n.valore }}</b><span v-if="n.dettaglio">{{ n.dettaglio }}</span></div>
+          <div v-for="n in numeriChiave" :key="n.nome"><small>{{ n.nome }}</small><b v-conta="n.valore">{{ n.valore }}</b><span v-if="n.dettaglio">{{ n.dettaglio }}</span></div>
         </div>
       </template>
 
       <h2 class="sezione-operazione">Bollette</h2>
+      <Vuoto v-if="!tutte.length" compatto icona="lampadina" colore="#FFB800" titolo="Nessuna bolletta"
+             testo="Inserisci importo e consumo di ogni bimestre: i grafici mostrano consumi, costi e prezzo nel tempo."
+             azione="Inserisci la prima bolletta" @azione="foglio = {}"/>
       <div v-if="anni.length > 1" class="segmenti segmenti-anni">
         <button v-for="a in anni" :key="a" :class="{ attivo: a === anno }" @click="annoScelto = a">{{ a }}</button>
       </div>
-      <Gruppo>
+      <Gruppo v-if="tutte.length">
         <Riga v-if="puoModificare()" azione icona="piuCerchio" titolo="Nuova bolletta o altro costo" @click="foglio = {}"/>
         <Riga v-if="!vociAnno.length" titolo="Nessuna bolletta registrata" class="secondario"/>
-        <Riga v-for="b in vociAnno" :key="b.id" :icona="b.tipo === 'altro' ? 'carrello' : 'lampadina'" :colore="b.tipo === 'altro' ? 'var(--secondario)' : '#FFB800'"
+        <RigaScorrevole v-for="b in vociAnno" :key="b.id" tabella="bollette" :id="b.id" :cosa="b.tipo === 'altro' ? 'questo costo' : 'la bolletta'" @modifica="foglio = { voce: b }">
+          <Riga :icona="b.tipo === 'altro' ? 'carrello' : 'lampadina'" :colore="b.tipo === 'altro' ? 'var(--secondario)' : '#FFB800'"
               :titolo="titoloVoce(b)" :sottotitolo="dettaglio(b)"
               :valore="b.importo !== null && b.importo !== undefined ? f.euro(b.importo) : '–'" :freccia="puoModificare()" @click="puoModificare() && (foglio = { voce: b })"/>
+        </RigaScorrevole>
       </Gruppo>
 
       <Foglio v-if="foglio" :titolo="foglio.voce ? 'Modifica' : 'Nuova voce'" :conferma-disabilitata="altro ? !b.dal : !b.anno || !b.bimestre"
@@ -1013,9 +1030,12 @@ const Storico = {
     props: { operazione: Object },
     template: `
       <h2 class="sezione-operazione">{{ lavori ? 'Registro lavori' : 'Registro interventi' }}</h2>
-      <Gruppo>
-        <Riga v-if="!interventi.length" :titolo="lavori ? 'Nessun lavoro registrato' : 'Nessun intervento registrato'" class="secondario"/>
-        <Riga v-for="i in (tutti ? interventi : interventi.slice(0, 3))" :key="i.id" :titolo="i.titolo || f.data(i.data)"
+      <Vuoto v-if="!interventi.length" compatto :icona="lavori ? 'pennello' : 'chiave'" :colore="coloreImpianto(operazione.sezione_id)"
+             :titolo="lavori ? 'Nessun lavoro registrato' : 'Nessun intervento registrato'" :testo="testoVuoto"
+             :azione="lavori ? 'Registra il primo lavoro' : 'Registra il primo intervento'" @azione="foglio = {}"/>
+      <Gruppo v-else>
+        <RigaScorrevole v-for="i in (tutti ? interventi : interventi.slice(0, 3))" :key="i.id" tabella="interventi" :id="i.id" :cosa="lavori ? 'il lavoro' : 'questo intervento'" @modifica="foglio = { voce: i }">
+          <Riga :titolo="i.titolo || f.data(i.data)"
               :sottotitolo="(i.titolo ? f.dataBreve(i.data) + ' · ' : '') + dettaglioIntervento(i)"
               @click="puoModificare() ? (foglio = { voce: i }) : (dettaglio = i)">
           <template #fine>
@@ -1023,6 +1043,7 @@ const Storico = {
               <small v-if="(i.allegati ?? []).length" class="secondario">{{ i.allegati.length }} allegat{{ i.allegati.length === 1 ? 'o' : 'i' }}</small></span>
           </template>
         </Riga>
+        </RigaScorrevole>
         <Riga v-if="interventi.length > 3" azione :icona="tutti ? 'frecciaSu' : 'frecciaGiu'" :titolo="tutti ? 'Mostra meno' : 'Mostra tutti (' + interventi.length + ')'" @click="tutti = !tutti"/>
         <Riga v-if="puoModificare()" azione icona="piuCerchio" :titolo="lavori ? 'Registra lavoro' : 'Registra intervento'" @click="foglio = {}"/>
       </Gruppo>
@@ -1042,12 +1063,16 @@ const Storico = {
         tipologie() { return tipologieDi(this.operazione); },
         interventi() { return interventiDi(this.operazione); },
         lavori() { return this.operazione.tipo === 'lavori'; },
+        testoVuoto() {
+            return this.lavori ? 'Registra i lavori di questa categoria con data, descrizione, costo, foto e fatture.'
+                : 'Registra manutenzioni e riparazioni con data, ditta, costo e documenti: lo storico resta qui per tutti.';
+        },
         spesa() { return this.interventi.reduce((t, i) => t + (Number(i.costo) || 0), 0); },
         sezione() { return sezioneDi(this.operazione.sezione_id); },
         contratti() { return db.contratti.filter(c => c.sezione_id === this.operazione.sezione_id); }
     },
     methods: {
-        apri, puoModificare,
+        apri, puoModificare, coloreImpianto,
         scadenza: t => prossimaScadenza(t),
         stato: t => statoScadenza(prossimaScadenza(t), 14),
         sottotitolo(t) {

@@ -44,7 +44,7 @@ const PilloleStato = {
           <IconaQuadrata :nome="p.icona" :colore="p.colore" :dimensione="32"/>
           <span class="voce-stato-testi">
             <small>{{ p.nome }}</small>
-            <b>{{ p.valore }} <i v-if="p.pallino" class="pallino" :class="p.pallino"></i></b>
+            <b><span v-conta="p.valore">{{ p.valore }}</span> <i v-if="p.pallino" class="pallino" :class="p.pallino"></i></b>
             <span v-if="p.livello != null" class="barra-livello"><i :style="{ width: p.livello + '%' }"></i></span>
             <small v-else-if="p.nota" class="voce-stato-nota">{{ p.nota }}</small>
           </span>
@@ -266,7 +266,7 @@ export const CostiPagina = {
         </div>
         <div class="valore-grande totale-costi">
           <div class="etichetta">{{ sezione ? 'Spesa per ' + sezione.nome : 'Spesa totale della casa' }} nel {{ anno }}</div>
-          <div class="numero">{{ f.euro(totale(voci)) }}</div>
+          <div class="numero" v-conta="f.euro(totale(voci))">{{ f.euro(totale(voci)) }}</div>
         </div>
 
         <Gruppo titolo="Per voce" nota="I contratti pluriennali sono divisi per anno; i prodotti contano nell'anno in cui li compri." nota-sempre>
@@ -336,32 +336,55 @@ export const CasaHome = {
         <template v-if="sezioni.length">
           <!-- Ricerca: si apre dalla lente in alto -->
           <label v-if="cercando" class="campo-ricerca"><Icona nome="ricerca" :dimensione="18"/>
-            <input ref="ricerca" v-model="ricerca" placeholder="Cerca impianti, operazioni, guide, documenti, prodotti" type="search"
-                   @keyup.esc="chiudiRicerca" @blur="!ricerca.trim() && chiudiRicerca()">
+            <input ref="ricerca" v-model="ricerca" placeholder="Cerca in Casa Dolonne" type="search"
+                   @keyup.esc="chiudiRicerca" @keyup.enter="ricorda" @blur="!ricerca.trim() && chiudiRicerca()">
             <button type="button" class="pulsante-testo" style="padding:0 2px" @mousedown.prevent @click="chiudiRicerca">Annulla</button>
           </label>
 
-          <!-- Ricerca unica -->
-          <template v-if="ricerca.trim()">
-            <Vuoto v-if="!risultati.totale" icona="ricerca" :titolo="'Nessun risultato per “' + ricerca.trim() + '”'"/>
-            <Gruppo v-if="risultati.impianti.length" titolo="Impianti">
-              <Riga v-for="s in risultati.impianti" :key="s.id" :icona="s.icona" quadrata :titolo="s.nome" freccia
-                    @click="apriDaElenco({ nome: 'impianto', id: s.id })"/>
+          <!-- Ricerca in stile Spotlight: ricerche recenti, risultato migliore, risultati per tipo con le parti trovate in grassetto -->
+          <template v-if="cercando && !ricerca.trim() && recenti.length">
+            <Gruppo>
+              <template #intestazione>
+                <span class="ricerca-intestazione">Ricerche recenti
+                  <button type="button" class="pulsante-testo" @mousedown.prevent @click="cancellaRecenti">Cancella</button></span>
+              </template>
+              <Riga v-for="r in recenti" :key="r" icona="orologio" colore="var(--secondario)" :titolo="r" @mousedown.prevent @click="ricerca = r"/>
             </Gruppo>
-            <Gruppo v-if="risultati.operazioni.length" titolo="Operazioni">
-              <Riga v-for="o in risultati.operazioni" :key="o.id" :icona="iconaOperazione(o)" :titolo="o.titolo" :sottotitolo="nomeImpianto(o.sezione_id)" freccia
-                    @click="apriOperazione(o)"/>
+          </template>
+          <template v-if="ricerca.trim()">
+            <Vuoto v-if="!risultati.totale" icona="ricerca" :titolo="'Nessun risultato per “' + ricerca.trim() + '”'"
+                   testo="Prova con un'altra parola: si cercano nomi, descrizioni, testi delle guide, documenti e prodotti."/>
+            <Gruppo v-if="migliore" titolo="Risultato migliore">
+              <button type="button" class="ricerca-migliore toccabile" @click="apriRisultato(migliore)">
+                <IconaQuadrata :nome="migliore.icona" :colore="migliore.colore" :dimensione="52"/>
+                <span class="riga-testi"><span class="ricerca-migliore-titolo" v-html="evidenzia(migliore.titolo)"></span>
+                  <span class="riga-sottotitolo">{{ migliore.dettaglio }}</span></span>
+                <Icona nome="avanti" :dimensione="16" class="secondario"/>
+              </button>
+            </Gruppo>
+            <Gruppo v-if="altriImpianti.length" titolo="Impianti">
+              <Riga v-for="s in altriImpianti" :key="s.id" :icona="s.icona" quadrata freccia @click="apriRisultato({ tipo: 'impianto', voce: s })">
+                <template #titolo><span v-html="evidenzia(s.nome)"></span></template>
+              </Riga>
+            </Gruppo>
+            <Gruppo v-if="altreOperazioni.length" titolo="Operazioni">
+              <Riga v-for="o in altreOperazioni" :key="o.id" :icona="iconaOperazione(o)" quadrata :colore="coloreImpianto(o.sezione_id)"
+                    :sottotitolo="nomeImpianto(o.sezione_id)" freccia @click="apriRisultato({ tipo: 'operazione', voce: o })">
+                <template #titolo><span v-html="evidenzia(o.titolo)"></span></template>
+              </Riga>
             </Gruppo>
             <Gruppo v-if="risultati.guide.length" titolo="Guide">
-              <Riga v-for="g in risultati.guide" :key="g.id" icona="libro" :titolo="g.titolo" :sottotitolo="nomeImpianto(g.sezione_id)" freccia
-                    @click="apriDaElenco({ nome: 'guida', id: g.id })"/>
+              <Riga v-for="g in risultati.guide" :key="g.id" icona="libro" quadrata :colore="coloreImpianto(g.sezione_id)"
+                    :sottotitolo="nomeImpianto(g.sezione_id)" freccia @click="apriRisultato({ tipo: 'guida', voce: g })">
+                <template #titolo><span v-html="evidenzia(g.titolo)"></span></template>
+              </Riga>
             </Gruppo>
             <Gruppo v-if="risultati.documenti.length" titolo="Documenti">
-              <RigaDocumento v-for="d in risultati.documenti" :key="d.id" :documento="d"/>
+              <RigaDocumento v-for="d in risultati.documenti" :key="d.id" :documento="d" @click.capture="ricorda"/>
             </Gruppo>
             <Gruppo v-if="risultati.prodotti.length" titolo="Prodotti">
               <RigaProdotto v-for="p in risultati.prodotti" :key="p.id" :prodotto="p" con-operazione
-                            @click="apriDaElenco({ nome: 'prodotto', id: p.id })"/>
+                            @click="apriRisultato({ tipo: 'prodotto', voce: p })"/>
             </Gruppo>
           </template>
 
@@ -397,7 +420,7 @@ export const CasaHome = {
                   <span class="scheda-costi-testa">
                     <IconaQuadrata nome="carrello" colore="var(--accento)" :dimensione="34"/>
                     <span class="scheda-costi-testi">
-                      <span class="secondario">Costi {{ annoCorrente }}</span><b>{{ f.euro(costiAnno) }}</b>
+                      <span class="secondario">Costi {{ annoCorrente }}</span><b v-conta="f.euro(costiAnno)">{{ f.euro(costiAnno) }}</b>
                       <span v-if="costiAnnoPrima" class="secondario">{{ confrontoCosti }}</span>
                     </span>
                     <Icona nome="avanti" :dimensione="16" class="secondario"/>
@@ -442,7 +465,7 @@ export const CasaHome = {
           <Gruppo v-if="modifica"><Riga distruttiva titolo="Elimina impianto" @click="eliminaImpianto"/></Gruppo>
         </Foglio>
       </Pagina>`,
-    data() { return { ricerca: '', cercando: false, nuova: null, modifica: null, modificaImpianti: false, icone: ICONE_SEZIONE }; },
+    data() { return { ricerca: '', cercando: false, recenti: JSON.parse(localStorage.getItem('ricercheRecenti') || '[]'), nuova: null, modifica: null, modificaImpianti: false, icone: ICONE_SEZIONE }; },
     setup() {
         const elencoAvvisi = computed(() => avvisi());
         const urgenti = computed(() => elencoAvvisi.value.filter(a => a.gravita === 'scaduto' || a.gravita === 'inCorso' || !a.data));
@@ -510,10 +533,22 @@ export const CasaHome = {
             };
             r.totale = Object.values(r).reduce((n, v) => n + v.length, 0);
             return r;
+        },
+        /// Elenchi senza il risultato migliore (già mostrato in grande sopra).
+        altriImpianti() { return this.risultati.impianti.filter(x => x !== this.migliore?.voce); },
+        altreOperazioni() { return this.risultati.operazioni.filter(x => x !== this.migliore?.voce); },
+        /// Risultato migliore: un impianto o un'operazione il cui nome comincia con la parola cercata.
+        migliore() {
+            const q = this.ricerca.trim().toLowerCase(), inizia = t => (t ?? '').toLowerCase().startsWith(q);
+            const s = this.risultati.impianti.find(x => inizia(x.nome));
+            if (s) return { tipo: 'impianto', voce: s, titolo: s.nome, icona: s.icona, colore: coloreImpianto(s.id), dettaglio: 'Impianto' };
+            const o = this.risultati.operazioni.find(x => inizia(x.titolo));
+            if (o) return { tipo: 'operazione', voce: o, titolo: o.titolo, icona: iconaOperazione(o), colore: coloreImpianto(o.sezione_id), dettaglio: `Operazione · ${this.nomeImpianto(o.sezione_id)}` };
+            return null;
         }
     },
     methods: {
-        puoModificare, apriDaElenco, iconaOperazione, cambiaScheda,
+        puoModificare, apriDaElenco, iconaOperazione, coloreImpianto, cambiaScheda,
         tipo: o => TIPI_OPERAZIONE[o.tipo] ?? TIPI_OPERAZIONE.generica,
         nomeImpianto: id => sezioneDi(id)?.nome ?? '',
         selezionata(p) { return nav.largo && stessaPagina(pila()[0], p); },
@@ -523,6 +558,28 @@ export const CasaHome = {
             this.$refs.ricerca?.focus();
         },
         chiudiRicerca() { this.ricerca = ''; this.cercando = false; },
+        /// Parte trovata in grassetto (il testo viene prima reso sicuro per l'HTML).
+        evidenzia(testo) {
+            const sicuro = String(testo ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+            const q = this.ricerca.trim();
+            if (!q) return sicuro;
+            const i = sicuro.toLowerCase().indexOf(q.toLowerCase().replace(/[&<>"]/g, ''));
+            return i < 0 ? sicuro : `${sicuro.slice(0, i)}<b>${sicuro.slice(i, i + q.length)}</b>${sicuro.slice(i + q.length)}`;
+        },
+        /// Ricorda la ricerca tra le recenti (al massimo sei, la più nuova in cima).
+        ricorda() {
+            const q = this.ricerca.trim();
+            if (!q) return;
+            this.recenti = [q, ...this.recenti.filter(r => r.toLowerCase() !== q.toLowerCase())].slice(0, 6);
+            localStorage.setItem('ricercheRecenti', JSON.stringify(this.recenti));
+        },
+        cancellaRecenti() { this.recenti = []; localStorage.removeItem('ricercheRecenti'); },
+        apriRisultato({ tipo, voce }) {
+            this.ricorda();
+            if (tipo === 'impianto') apriDaElenco({ nome: 'impianto', id: voce.id });
+            else if (tipo === 'operazione') this.apriOperazione(voce);
+            else apriDaElenco({ nome: tipo, id: voce.id });
+        },
         /// Apre una sequenza di pagine (es. impianto → operazione) dalla scheda di stato.
         /// Pagina di un'operazione aperta dentro il suo impianto (così "indietro" porta all'impianto).
         apriPagina(p) {

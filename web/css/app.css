@@ -110,10 +110,11 @@ a { color: var(--accento); text-decoration: none; }
 /* ---------- Gruppi e righe ---------- */
 .gruppo { margin: 26px 0 0; }
 .gruppo:first-child { margin-top: 6px; }
-.gruppo-titolo { margin: 0 4px 8px; font-size: 15px; font-weight: 600; color: var(--testo); letter-spacing: -0.1px; }
+/* Intestazioni dei gruppi come in Impostazioni di iOS: piccole, grigie, in maiuscoletto */
+.gruppo-titolo { margin: 0 16px 7px; font-size: 13px; font-weight: 500; color: var(--secondario); text-transform: uppercase; letter-spacing: .2px; }
 .gruppo-celle { background: var(--cella); border-radius: var(--raggio); overflow: hidden; box-shadow: var(--ombra); }
 .gruppo-celle:empty { display: none; }
-.gruppo-nota { margin: 8px 4px 0; font-size: 13px; line-height: 1.4; color: var(--secondario); }
+.gruppo-nota { margin: 7px 16px 0; font-size: 13px; line-height: 1.4; color: var(--secondario); }
 .gruppo.trasparente .gruppo-celle { background: transparent; overflow: visible; box-shadow: none; }
 
 .riga {
@@ -229,7 +230,13 @@ a { color: var(--accento); text-decoration: none; }
 }
 @keyframes sale { from { transform: translateY(40%); opacity: 0; } to { transform: none; opacity: 1; } }
 @keyframes sfuma { from { opacity: 0; } }
-.foglio-barra { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; padding: 12px 16px; border-bottom: 0.5px solid var(--separatore); }
+.foglio-maniglia { display: flex; justify-content: center; padding: 6px 0 0; cursor: grab; touch-action: none; }
+.foglio-maniglia i { width: 36px; height: 5px; border-radius: 3px; background: var(--terziario); opacity: .6; }
+.foglio-barra { touch-action: none; }
+.foglio.trascinato { transition: none; animation: none; }
+.foglio:not(.trascinato) { transition: transform .25s cubic-bezier(.2,.8,.2,1); }
+@media (min-width: 700px) { .foglio-maniglia { padding-top: 5px; } .foglio-maniglia i { width: 32px; height: 4px; } }
+.foglio-barra { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; padding: 6px 16px 12px; border-bottom: 0.5px solid var(--separatore); }
 .foglio-barra > :last-child { justify-self: end; }
 .foglio-barra > :first-child { justify-self: start; }
 .foglio-titolo { font-weight: 600; }
@@ -392,7 +399,9 @@ table.tabella { border-collapse: collapse; width: 100%; font-size: 14px; font-va
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
 
 /* Sezioni standard della pagina operazione (Prodotti, Gestione scorte, Altre operazioni, Avvisi, Manuale) */
-.sezione-operazione { margin: 34px 4px -14px; font-size: 22px; font-weight: 700; letter-spacing: -0.3px; }
+/* Come i titoli di sezione di Impostazioni: un po' più marcati dei titoli dei gruppi, con più spazio sopra */
+.sezione-operazione { margin: 36px 16px -18px; font-size: 13px; font-weight: 600; color: var(--secondario); text-transform: uppercase; letter-spacing: .3px; }
+.sezione-operazione + .gruppo .gruppo-titolo { color: var(--terziario); }
 .sezione-operazione + .segmenti { margin-top: 22px; }
 
 /* Riquadri degli impianti (home Manutenzione) */
@@ -588,10 +597,13 @@ button.barre-colonna.scelta { background: var(--riempimento); }
 .voce-stato-testi { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
 .voce-stato-testi small { font-size: 12px; color: var(--secondario); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .voce-stato-testi b { font-size: 17px; font-weight: 700; letter-spacing: -0.2px; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.voce-stato.attenzione { background: color-mix(in srgb, var(--arancione) 18%, transparent); }
-.voce-stato.attenzione .voce-stato-testi small { color: color-mix(in srgb, var(--arancione) 75%, var(--testo)); }
-.voce-stato.problema { background: color-mix(in srgb, var(--rosso) 18%, transparent); }
-.voce-stato.problema .voce-stato-testi small { color: color-mix(in srgb, var(--rosso) 80%, var(--testo)); }
+/* Avvisi con i colori di sistema: fondo chiaro e pieno (non mescolato alla barra), testo nel colore dell'avviso */
+.voce-stato.attenzione, .voce-stato.problema { --c: var(--arancione); background: color-mix(in srgb, var(--c) 12%, var(--cella)); }
+.voce-stato.problema { --c: var(--rosso); }
+.voce-stato.attenzione .voce-stato-testi small, .voce-stato.problema .voce-stato-testi small { color: var(--c); font-weight: 500; }
+.voce-stato.attenzione .voce-stato-testi b, .voce-stato.problema .voce-stato-testi b { color: var(--c); }
+.voce-stato.attenzione + .voce-stato::before, .voce-stato + .voce-stato.attenzione::before,
+.voce-stato.problema + .voce-stato::before, .voce-stato + .voce-stato.problema::before { display: none; }
 .barra-livello { width: 100%; height: 4px; border-radius: 2px; background: color-mix(in srgb, var(--accento) 18%, transparent); overflow: hidden; margin-top: 4px; }
 .barra-livello i { display: block; height: 100%; background: var(--arancione); border-radius: 2px; }
 .pallino { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
@@ -672,3 +684,38 @@ button.barre-colonna.scelta { background: var(--riempimento); }
 .sezione-operazione + .scheda-borsa, .sezione-operazione + .numeri-chiave { margin-top: 10px; }
 /* La nota delle voci di stato può andare a capo (es. "in 14 giorni dallo svuotamento cenere") */
 .voce-stato-testi .voce-stato-nota { white-space: normal; line-height: 1.25; }
+
+/* Righe che si fanno scorrere per Modifica / Elimina */
+.riga-scorrevole { position: relative; overflow: hidden; }
+.scorrevole-contenuto { position: relative; z-index: 1; background: var(--cella); touch-action: pan-y; transition: transform .25s cubic-bezier(.2,.8,.2,1); }
+.scorrevole-contenuto.trascina { transition: none; }
+.scorrevole-azioni { position: absolute; top: 0; right: 0; bottom: 0; display: flex; }
+.scorrevole-azioni button { flex: 1; color: #fff; font-size: 15px; font-weight: 500; }
+.scorrevole-modifica { background: var(--grigio, #8E8E93); }
+.scorrevole-elimina { background: var(--rosso); }
+/* Separatori tra righe anche quando sono avvolte */
+.riga-scorrevole + .riga-scorrevole .riga::before, .riga + .riga-scorrevole .riga::before, .riga-scorrevole + .riga::before {
+    content: ""; position: absolute; top: 0; right: 0; left: 16px; border-top: 0.5px solid var(--separatore);
+}
+
+/* Ricerca in stile Spotlight */
+.ricerca-intestazione { display: flex; justify-content: space-between; align-items: baseline; width: 100%; }
+.ricerca-intestazione .pulsante-testo { padding: 0; font-size: 13px; text-transform: none; font-weight: 500; }
+.gruppo-titolo:has(.ricerca-intestazione) { display: block; }
+.ricerca-migliore { display: flex; align-items: center; gap: 14px; width: 100%; padding: 14px 16px; text-align: left; background: var(--cella); }
+.ricerca-migliore:active { background: var(--cella-premuta); }
+.ricerca-migliore-titolo { font-size: 19px; font-weight: 600; letter-spacing: -0.2px; }
+.riga-titolo b, .ricerca-migliore-titolo b { font-weight: 700; color: var(--accento); }
+
+/* Schermate vuote */
+.vuoto { --colore-vuoto: var(--accento); gap: 6px; }
+.vuoto-icona { width: 76px; height: 76px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 8px;
+    color: var(--colore-vuoto); background: color-mix(in srgb, var(--colore-vuoto) 14%, transparent); }
+.vuoto-testo { max-width: 420px; font-size: 15px; line-height: 1.4; }
+.vuoto-azione { margin-top: 12px; padding: 10px 20px; border-radius: 999px; font-weight: 600; font-size: 15px; color: #fff; background: var(--colore-vuoto); }
+.vuoto-azione:active { opacity: .75; }
+.vuoto.compatto { margin-top: 26px; padding: 26px 20px 22px; background: var(--cella); border-radius: var(--raggio); box-shadow: var(--ombra); }
+.vuoto.compatto .vuoto-icona { width: 56px; height: 56px; margin-bottom: 4px; }
+.vuoto.compatto .vuoto-titolo { font-size: 17px; }
+.vuoto.compatto .vuoto-testo { font-size: 14px; }
+.sezione-operazione + .vuoto.compatto { margin-top: 26px; }

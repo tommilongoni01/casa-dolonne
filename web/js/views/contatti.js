@@ -25,7 +25,7 @@ export const ContattiLista = {
           <button :class="{ attivo: per === 'sistema' }" @click="per = 'sistema'">Per sistema</button>
           <button :class="{ attivo: per === 'alfabetico' }" @click="per = 'alfabetico'">A–Z</button>
         </div>
-        <Vuoto v-if="!db.contatti.length" icona="persone" titolo="Nessun contatto" testo="Aggiungi tecnici e fornitori dei vari impianti, o importa un file vCard dalla Rubrica."/>
+        <Vuoto v-if="!db.contatti.length" icona="persone" colore="var(--verde)" azione="Nuovo contatto" @azione="nuovo = true" titolo="Nessun contatto" testo="Aggiungi tecnici e fornitori dei vari impianti, o importa un file vCard dalla Rubrica."/>
         <Gruppo v-if="preferiti.length && !ricerca" titolo="Preferiti">
           <RigaContattoLista v-for="c in preferiti" :key="c.id" :contatto="c"/>
         </Gruppo>

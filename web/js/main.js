@@ -1,6 +1,6 @@
 // Avvio della web app Casa Dolonne.
 import { createApp, computed } from 'vue';
-import { componenti } from './components.js';
+import { componenti, vConta } from './components.js';
 import { db, stato, avvia, puoModificare } from './store.js';
 import { nav, pila, cambiaScheda, SCHEDE, diviso } from './nav.js';
 import { avvisi } from './logic.js';
@@ -128,6 +128,7 @@ const App = {
 const app = createApp(App);
 const globali = { ...componenti, ...manutenzione.componentiManutenzione, RigaAvviso: manutenzione.RigaAvviso, ...manuale.componentiManuale };
 for (const [nome, componente] of Object.entries(globali)) app.component(nome, componente);
+app.directive('conta', vConta);
 app.config.errorHandler = (errore) => { console.error(errore); mostraErrore(errore?.message ?? String(errore)); };
 app.mount('#app');
 

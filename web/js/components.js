@@ -3,7 +3,7 @@ import { computed, ref, watch, onMounted, onUnmounted, nextTick } from 'vue';
 import { svg, COLORE_SEZIONE, ICONE_SIMBOLI } from './icone.js';
 import { leggiNumero, numeroCampo, dataBreve } from './format.js';
 import { indietro, nav, pila, diviso } from './nav.js';
-import { puoModificare } from './store.js';
+import { puoModificare, elimina } from './store.js';
 
 export const Icona = {
     props: { nome: String, dimensione: { type: Number, default: 22 } },
@@ -124,22 +124,112 @@ export const Riga = {
     inheritAttrs: true
 };
 
+/// v-conta: quando il numero scritto nell'elemento cambia, scorre dal vecchio al nuovo valore (come in Borsa e Salute).
+/// Uso: <b v-conta="testo">{{ testo }}</b>. Funziona su testi come "6.996 kWh", "0,27 €/kWh", "1.884,05 €".
+const NUMERO_IT = /-?\d{1,3}(?:\.\d{3})+(?:,\d+)?|-?\d+(?:,\d+)?/;
+const leggiIt = t => Number(t.replace(/\./g, '').replace(',', '.'));
+function testoDi(el) { return [...el.childNodes].find(n => n.nodeType === 3 && n.nodeValue.trim()) ?? null; }
+function animaNumero(nodo, vecchio, nuovo) {
+    const a = vecchio.match(NUMERO_IT), b = nuovo.match(NUMERO_IT);
+    cancelAnimationFrame(nodo._conta ?? 0);
+    if (!a || !b || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const da = leggiIt(a[0]), a1 = leggiIt(b[0]);
+    if (!isFinite(da) || !isFinite(a1) || da === a1) return;
+    const decimali = (b[0].split(',')[1] ?? '').length;
+    const formato = new Intl.NumberFormat('it-IT', { minimumFractionDigits: decimali, maximumFractionDigits: decimali, useGrouping: 'always' });
+    const prima = nuovo.slice(0, b.index), dopo = nuovo.slice(b.index + b[0].length);
+    const t0 = performance.now(), durata = 450;
+    const passo = t => {
+        const k = Math.min(1, (t - t0) / durata), e = 1 - (1 - k) ** 3;
+        nodo.nodeValue = k < 1 ? prima + formato.format(da + (a1 - da) * e) + dopo : nuovo;
+        if (k < 1) nodo._conta = requestAnimationFrame(passo);
+    };
+    nodo._conta = requestAnimationFrame(passo);
+}
+export const vConta = {
+    // Il valore della direttiva è lo stesso testo mostrato: così si sa sempre da dove a dove scorrere,
+    // anche se l'elemento si aggiorna mentre l'animazione è in corso. null = nessuna animazione.
+    updated(el, { value, oldValue }) {
+        const nodo = testoDi(el);
+        if (!nodo) return;
+        if (value == null || oldValue == null) { cancelAnimationFrame(nodo._conta ?? 0); return; }
+        if (value !== oldValue) animaNumero(nodo, String(oldValue), String(value));
+    }
+};
+
+/// Riga che si fa scorrere verso sinistra per mostrare "Modifica" ed "Elimina", come in Mail e Promemoria.
+/// Elimina chiede conferma e cancella la voce (tabella + id); Modifica emette "modifica". Solo per chi può modificare.
+export const RigaScorrevole = {
+    props: { tabella: String, id: String, cosa: { type: String, default: 'la voce' }, modificabile: { type: Boolean, default: true } },
+    emits: ['modifica'],
+    template: `
+      <div class="riga-scorrevole" :class="{ aperta: spostamento < 0 }">
+        <div v-if="attiva" class="scorrevole-azioni" :style="{ width: larghezza + 'px' }">
+          <button v-if="modificabile" type="button" class="scorrevole-modifica" @click="chiudi(); $emit('modifica')">Modifica</button>
+          <button type="button" class="scorrevole-elimina" @click="cancella">Elimina</button>
+        </div>
+        <div class="scorrevole-contenuto" :class="{ trascina: trascinando }" :style="spostamento ? { transform: 'translateX(' + spostamento + 'px)' } : null"
+             @pointerdown="inizia" @click.capture="clic"><slot/></div>
+      </div>`,
+    data() { return { spostamento: 0, trascinando: false, mosso: false }; },
+    computed: {
+        attiva() { return puoModificare(); },
+        larghezza() { return this.modificabile ? 176 : 88; }
+    },
+    methods: {
+        inizia(e) {
+            if (!this.attiva || e.button > 0) return;
+            const x0 = e.clientX, y0 = e.clientY, base = this.spostamento;
+            let orizzontale = null;
+            this.mosso = false;
+            const muovi = ev => {
+                const dx = ev.clientX - x0, dy = ev.clientY - y0;
+                if (orizzontale === null && Math.hypot(dx, dy) > 8) orizzontale = Math.abs(dx) > Math.abs(dy);
+                if (!orizzontale) return;
+                this.mosso = true; this.trascinando = true;
+                this.spostamento = Math.min(0, Math.max(-this.larghezza - 40, base + dx));
+            };
+            const fine = () => {
+                removeEventListener('pointermove', muovi); removeEventListener('pointerup', fine); removeEventListener('pointercancel', fine);
+                this.trascinando = false;
+                if (orizzontale) this.spostamento = this.spostamento < -this.larghezza / 2 ? -this.larghezza : 0;
+            };
+            addEventListener('pointermove', muovi); addEventListener('pointerup', fine); addEventListener('pointercancel', fine);
+        },
+        /// Dopo uno scorrimento il tocco non apre la voce; con la riga aperta un tocco la richiude.
+        clic(e) {
+            if (this.mosso || this.spostamento < 0) { e.stopPropagation(); e.preventDefault(); if (!this.mosso) this.chiudi(); }
+            this.mosso = false;
+        },
+        chiudi() { this.spostamento = 0; },
+        async cancella() {
+            this.chiudi();
+            if (confirm(`Eliminare ${this.cosa}?`)) await elimina(this.tabella, this.id);
+        }
+    }
+};
+
 export const BadgeScadenza = {
     props: { data: [Date, String], stato: String },
     template: `<span class="badge" :class="stato">{{ testo }}</span>`,
     computed: { testo() { return dataBreve(this.data); } }
 };
 
+/// Schermata vuota: icona grande in un cerchio colorato, titolo, spiegazione e (per chi può modificare) il pulsante per cominciare.
+/// compatto: dentro una pagina, al posto di un elenco ancora vuoto.
 export const Vuoto = {
     components: { Icona },
-    props: { icona: String, titolo: String, testo: String },
+    props: { icona: String, titolo: String, testo: String, azione: String, colore: String, compatto: Boolean },
+    emits: ['azione'],
     template: `
-      <div class="vuoto">
-        <Icona :nome="icona || 'lista'" :dimensione="44"/>
+      <div class="vuoto" :class="{ compatto }" :style="colore ? { '--colore-vuoto': colore } : null">
+        <span class="vuoto-icona"><Icona :nome="icona || 'lista'" :dimensione="compatto ? 28 : 36"/></span>
         <div class="vuoto-titolo">{{ titolo }}</div>
         <div class="vuoto-testo" v-if="testo">{{ testo }}</div>
+        <button v-if="azione && puoModificare()" type="button" class="vuoto-azione" @click="$emit('azione')">{{ azione }}</button>
         <slot/>
-      </div>`
+      </div>`,
+    methods: { puoModificare }
 };
 
 /// Pannello modale con Annulla / Fine, come i fogli di iOS.
@@ -152,9 +242,12 @@ export const Foglio = {
     emits: ['annulla'],
     template: `
       <Teleport to="body">
-        <div class="foglio-sfondo" @click.self="$emit('annulla')">
-          <div class="foglio" :class="{ largo }" role="dialog" :aria-label="titolo">
-            <header class="foglio-barra">
+        <div ref="sfondo" class="foglio-sfondo" @click.self="$emit('annulla')">
+          <div class="foglio" :class="{ largo, trascinato: spostamento > 0 }" role="dialog" :aria-label="titolo"
+               :style="spostamento ? { transform: 'translateY(' + spostamento + 'px)' } : null">
+            <!-- Barretta e intestazione si trascinano verso il basso per chiudere, come i fogli di iOS -->
+            <div class="foglio-maniglia" @pointerdown="inizia" aria-hidden="true"><i></i></div>
+            <header class="foglio-barra" @pointerdown="e => !e.target.closest('button') && inizia(e)">
               <button class="pulsante-testo" @click="$emit('annulla')">{{ soloChiudi ? 'Chiudi' : 'Annulla' }}</button>
               <div class="foglio-titolo">{{ titolo }}</div>
               <button v-if="!soloChiudi" class="pulsante-testo forte" :disabled="confermaDisabilitata || inCorso"
@@ -165,8 +258,23 @@ export const Foglio = {
           </div>
         </div>
       </Teleport>`,
-    data() { return { inCorso: false }; },
+    data() { return { inCorso: false, spostamento: 0 }; },
     methods: {
+        inizia(e) {
+            if (e.button > 0) return;
+            const y0 = e.clientY, t0 = performance.now();
+            const muovi = ev => { this.spostamento = Math.max(0, ev.clientY - y0); };
+            const fine = ev => {
+                removeEventListener('pointermove', muovi); removeEventListener('pointerup', fine); removeEventListener('pointercancel', fine);
+                const dy = Math.max(0, ev.clientY - y0), velocita = dy / Math.max(1, performance.now() - t0);
+                // Chiude se trascinato abbastanza in basso o con un gesto veloce.
+                if (dy > 140 || (dy > 40 && velocita > 0.6)) this.$emit('annulla');
+                else this.spostamento = 0;
+            };
+            addEventListener('pointermove', muovi); addEventListener('pointerup', fine); addEventListener('pointercancel', fine);
+        },
+        /// Esc chiude solo il foglio in primo piano.
+        tasto(e) { if (e.key === 'Escape' && [...document.querySelectorAll('.foglio-sfondo')].at(-1) === this.$refs.sfondo) this.$emit('annulla'); },
         // Nome diverso dal prop "conferma" (testo del pulsante): con lo stesso nome Vue usa il prop e il clic non fa nulla.
         async confermaFoglio() {
             // Il genitore può restituire una Promise: il pulsante resta disattivato finché non finisce.
@@ -177,8 +285,8 @@ export const Foglio = {
         }
     },
     inheritAttrs: false,
-    mounted() { document.body.classList.add('con-foglio'); },
-    unmounted() { if (!document.querySelector('.foglio')) document.body.classList.remove('con-foglio'); }
+    mounted() { document.body.classList.add('con-foglio'); addEventListener('keydown', this.tasto); },
+    unmounted() { removeEventListener('keydown', this.tasto); if (!document.querySelector('.foglio')) document.body.classList.remove('con-foglio'); }
 };
 
 // ---- Campi ----------------------------------------------------------------
@@ -675,5 +783,5 @@ export const ImmagineFile = {
 
 export const componenti = {
     Icona, IconaQuadrata, Pagina, Gruppo, Riga, BadgeScadenza, Vuoto, Foglio, CampoTesto, CampoNumero,
-    CampoData, CampoScelta, Interruttore, Passo, Azioni, Cronometro, Grafico, GraficoBorsa, Barre, BarreAnni, ImmagineFile, RigaEspandi, SceltaIcona
+    CampoData, CampoScelta, Interruttore, Passo, Azioni, Cronometro, RigaScorrevole, Grafico, GraficoBorsa, Barre, BarreAnni, ImmagineFile, RigaEspandi, SceltaIcona
 };

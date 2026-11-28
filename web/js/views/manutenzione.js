@@ -248,7 +248,7 @@ export const Contratti = {
         <template #azioni>
           <button v-if="puoModificare()" class="pulsante-barra" @click="nuovo = true" aria-label="Nuovo contratto"><Icona nome="piu"/></button>
         </template>
-        <Vuoto v-if="!db.contratti.length" icona="documento" titolo="Nessun contratto" testo="Aggiungi i contratti di manutenzione, assistenza e verifica degli impianti."/>
+        <Vuoto v-if="!db.contratti.length" icona="documento" colore="var(--blu)" azione="Nuovo contratto" @azione="nuovo = true" titolo="Nessun contratto" testo="Aggiungi i contratti di manutenzione, assistenza e verifica degli impianti."/>
         <template v-else>
           <Gruppo v-for="g in gruppi" :key="g.id" :titolo="g.nome">
             <RigaContratto v-for="c in g.contratti" :key="c.id" :contratto="c" :selezionata="selezionata(c)" @click="apriDaElenco({ nome: 'contratto', id: c.id })"/>
@@ -454,7 +454,7 @@ export const Magazzino = {
         </template>
         <label v-if="db.prodotti.length > 4" class="campo-ricerca"><Icona nome="ricerca" :dimensione="18"/>
           <input v-model="ricerca" placeholder="Cerca nome, codice, fornitore" type="search"></label>
-        <Vuoto v-if="!db.prodotti.length" icona="scatola" titolo="Magazzino vuoto"
+        <Vuoto v-if="!db.prodotti.length" icona="scatola" colore="var(--arancione)" azione="Nuovo prodotto" @azione="nuovo = true" titolo="Magazzino vuoto"
                testo="Aggiungi i prodotti che usate (ossigeno, correttori pH…) e collegali all'operazione in cui si usano: acquisti e consumi si registrano lì."/>
         <Gruppo v-for="g in gruppi" :key="g.id" :titolo="g.nome">
           <RigaProdotto v-for="p in g.prodotti" :key="p.id" :prodotto="p" con-operazione
@@ -561,7 +561,8 @@ export const SezioniScorta = {
       </Gruppo>
       <Gruppo :titolo="'Acquisti e ' + nomeMovimento('consumo', prodotto.categoria).toLowerCase()">
         <Riga v-if="!movimenti.length" titolo="Nessun movimento registrato" class="secondario"/>
-        <Riga v-for="m in (tutti ? movimenti : movimenti.slice(0, 1))" :key="m.id" :icona="icona(m.tipo)" :colore="colore(m.tipo)"
+        <RigaScorrevole v-for="m in (tutti ? movimenti : movimenti.slice(0, 1))" :key="m.id" tabella="movimenti" :id="m.id" cosa="il movimento" @modifica="movimento = { tipo: m.tipo, voce: m }">
+          <Riga :icona="icona(m.tipo)" :colore="colore(m.tipo)"
               :titolo="nomeMovimento(m.tipo, prodotto.categoria)" :sottotitolo="sottotitolo(m)"
               @click="puoModificare() && (movimento = { tipo: m.tipo, voce: m })">
           <template #fine>
@@ -569,6 +570,7 @@ export const SezioniScorta = {
               <small v-if="m.costo" class="secondario">{{ f.euro(m.costo) }}</small></span>
           </template>
         </Riga>
+        </RigaScorrevole>
         <RigaEspandi :totale="movimenti.length" v-model:aperto="tutti"/>
       </Gruppo>
       <MovimentoFoglio v-if="movimento" :prodotto-iniziale="prodotto" :tipo="movimento.tipo" :movimento="movimento.voce" @chiudi="movimento = null"/>`,
