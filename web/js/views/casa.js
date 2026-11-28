@@ -59,14 +59,14 @@ const PilloleStato = {
             const op = operazione('pellet'), pel = prodotto(op, 'pellet');
             if (pel) {
                 const kg = analisiScorta(pel).giacenza * 100;
-                elenco.push({ id: 'pellet', nome: 'Pellet', icona: iconaOperazione(op), colore: coloreImpianto(op.sezione_id), valore: f.quantita(kg, 'kg'),
+                elenco.push({ id: 'pellet', nome: 'Pellet - Silos', icona: iconaOperazione(op), colore: coloreImpianto(op.sezione_id), valore: f.quantita(kg, 'kg'),
                     livello: Math.max(0, Math.min(100, kg / 3600 * 100)), stato: sottoScorta(pel) ? 'attenzione' : '', pagine: pagineOperazione(op) });
             }
             // Pellet bruciato dall'ultimo svuotamento della cenere (al posto del pH, che resta nella sua operazione).
             const oc = operazione('cenere'), br = pelletDallUltimoSvuotamento();
             if (oc && br) {
                 const giorni = br.giorni === 1 ? '1 giorno' : `${br.giorni} giorni`;
-                elenco.push({ id: 'cenere', nome: 'Pellet bruciato', icona: iconaOperazione(oc), colore: coloreImpianto(oc.sezione_id),
+                elenco.push({ id: 'cenere', nome: 'Pellet - Combusto', icona: iconaOperazione(oc), colore: coloreImpianto(oc.sezione_id),
                     valore: br.kg !== null ? f.quantita(Math.round(br.kg), 'kg') : '–',
                     nota: br.kg !== null ? `in ${giorni} dallo svuotamento cenere` : 'serve una lettura del deposito',
                     stato: '', pagine: pagineOperazione(oc) });
@@ -512,21 +512,7 @@ export const CasaHome = {
             return r;
         }
     },
-    // Su schermo largo la colonna degli impianti prende l'altezza di quella del calendario (vedi --altezza-calendario nel CSS).
-    mounted() {
-        this.osservatore = new ResizeObserver(([e]) => e.target.parentElement?.style.setProperty('--altezza-calendario', `${e.target.offsetHeight}px`));
-        this.collegaCalendario();
-    },
-    updated() { this.collegaCalendario(); },
-    unmounted() { this.osservatore.disconnect(); },
     methods: {
-        collegaCalendario() {
-            const el = this.$el.querySelector?.('.cruscotto-calendario') ?? null;
-            if (el === this.calendarioOsservato) return;
-            this.osservatore.disconnect();
-            if (el) this.osservatore.observe(el);
-            this.calendarioOsservato = el;
-        },
         puoModificare, apriDaElenco, iconaOperazione, cambiaScheda,
         tipo: o => TIPI_OPERAZIONE[o.tipo] ?? TIPI_OPERAZIONE.generica,
         nomeImpianto: id => sezioneDi(id)?.nome ?? '',
