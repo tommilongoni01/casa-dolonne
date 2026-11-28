@@ -652,6 +652,25 @@ export function consumoCenere(precedente, attuale) {
     return valore >= 0 ? valore : null;
 }
 
+/// Pellet bruciato dall'ultimo svuotamento della cenere a oggi (kg):
+/// scorta registrata allo svuotamento + carichi successivi − pellet ora nel deposito (ultima lettura + carichi dopo).
+/// datoVecchio: l'ultima lettura del deposito è precedente allo svuotamento, quindi serve una lettura nuova.
+export function pelletDallUltimoSvuotamento() {
+    const ultimo = svuotamentiOrdinati().find(s => s.scorta_kg != null);
+    const prodotto = db.prodotti.find(p => p.categoria === 'pellet');
+    if (!ultimo || !prodotto) return null;
+    const lettura = lettureDeposito(prodotto)[0] ?? null;
+    const deposito = analisiScorta(prodotto).giacenza * 100;
+    const caricati = carichiOrdinati().filter(c => c.data > ultimo.data).reduce((t, c) => t + (Number(c.quantita) || 0) * 100, 0);
+    const giorni = giorniTrascorsi(ultimo.data);
+    const datoVecchio = !lettura || isoLocale(new Date(lettura.momento)) < ultimo.data;
+    const kg = Number(ultimo.scorta_kg) + caricati - deposito;
+    return {
+        kg: datoVecchio || kg < 0 ? null : kg, svuotamento: ultimo, deposito, caricati, lettura, giorni, datoVecchio,
+        alGiorno: !datoVecchio && kg >= 0 && giorni > 0 ? kg / giorni : null
+    };
+}
+
 // ---------------------------------------------------------------------
 // Contatti
 // ---------------------------------------------------------------------

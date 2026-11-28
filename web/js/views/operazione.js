@@ -9,7 +9,7 @@ import {
     prodottoDi, prodottiOperazione, operazioneDiProdotto, categoriaPerOperazione, sezioneDi, nomeMovimento, nomeEsecuzione,
     coloreImpianto, fornitoreContratto, lettureDeposito, PIANI, STATI_PIANO, analisiScorta, sottoScorta,
     unitaScorta, quantitaScorta, movimentiDi, nomeBimestre, mesiBimestre, nomeMeseLungo, nomeMeseAnno, periodoBimestre, bolletteOrdinate, bollettaDi,
-    dataBolletta, serieEnergia, sommaEnergia, altriCostiEnergia
+    dataBolletta, serieEnergia, sommaEnergia, altriCostiEnergia, pelletDallUltimoSvuotamento
 } from '../logic.js';
 
 // ---------------------------------------------------------------------
@@ -681,6 +681,13 @@ const Cenere = {
           <Riga titolo="Ultimo svuotamento" :valore="f.data(svuotamenti[0].data)"/>
           <Riga titolo="Giorni trascorsi" :valore="f.giorniTrascorsi(svuotamenti[0].data)"/>
         </template>
+        <!-- Pellet bruciato da allora: scorta allo svuotamento + carichi − deposito attuale -->
+        <template v-if="bruciato">
+          <Riga v-if="bruciato.kg !== null" titolo="Pellet bruciato da allora" :valore="f.quantita(Math.round(bruciato.kg), 'kg')" :sottotitolo="dettaglioBruciato"/>
+          <Riga v-else-if="bruciato.datoVecchio" titolo="Pellet bruciato da allora" valore="–"
+                sottotitolo="Registra una nuova lettura del deposito (operazione Pellet) per calcolarlo."/>
+          <Riga v-else titolo="Pellet bruciato da allora" valore="–" sottotitolo="I dati non tornano: controlla la scorta dello svuotamento e l'ultima lettura del deposito."/>
+        </template>
         <Riga v-else titolo="Nessuno svuotamento registrato" class="secondario"/>
         <Riga v-if="puoModificare()" azione icona="piuCerchio" titolo="Registra svuotamento" @click="foglio = {}"/>
       </Gruppo>
@@ -703,7 +710,16 @@ const Cenere = {
         <Gruppo v-if="foglio.voce"><Riga distruttiva titolo="Elimina" @click="eliminaSvuotamento"/></Gruppo>
       </Foglio>`,
     data() { return { foglio: null, b: {}, tutti: false }; },
-    computed: { svuotamenti() { return svuotamentiOrdinati(); } },
+    computed: {
+        svuotamenti() { return svuotamentiOrdinati(); },
+        bruciato() { return pelletDallUltimoSvuotamento(); },
+        dettaglioBruciato() {
+            const b = this.bruciato;
+            return [`Deposito ora ${f.quantita(Math.round(b.deposito), 'kg')} (lettura del ${f.dataBreve(b.lettura.momento)})`,
+                    b.caricati ? `carichi nel frattempo ${f.quantita(b.caricati, 'kg')}` : '',
+                    b.alGiorno !== null ? `circa ${f.quantita(Math.round(b.alGiorno), 'kg')} al giorno` : ''].filter(Boolean).join(' · ');
+        }
+    },
     watch: {
         foglio(v) { if (v) { const s = v.voce ?? {}; this.b = { data: s.data ?? f.oggiISO(), scorta_kg: s.scorta_kg ?? null, note: s.note ?? '' }; } }
     },

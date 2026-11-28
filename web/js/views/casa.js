@@ -7,7 +7,7 @@ import * as f from '../format.js';
 import { COLORE_SEZIONE, ICONE_SEZIONE } from '../icone.js';
 import {
     avvisi, prossime, operazioniDi, statoOperazione, TIPI_OPERAZIONE, sezioneDi, nomeContatto, sottotitoloContatto, calendarioScadenze,
-    iconaOperazione, coloreImpianto, vociCosto, anniCosti, totale, eGenerale, prodottiOperazione, analisiScorta, sottoScorta
+    iconaOperazione, coloreImpianto, vociCosto, anniCosti, totale, eGenerale, prodottiOperazione, analisiScorta, sottoScorta, pelletDallUltimoSvuotamento
 } from '../logic.js';
 import { riassuntoImpianto, riepilogoOperazione, TesseraImpianto, RigaAvviso } from './manutenzione.js';
 import { ContattoFoglio } from './contatti.js';
@@ -34,7 +34,7 @@ function nomeGiorno(d) {
     return testo.charAt(0).toUpperCase() + testo.slice(1);
 }
 
-/// Pillole in cima alla home: i valori da tenere d'occhio (pellet, pH, ossigeno), come i riepiloghi dell'app Casa.
+/// Pillole in cima alla home: i valori da tenere d'occhio (pellet, pellet bruciato, ossigeno), come i riepiloghi dell'app Casa.
 /// Si colorano solo quando c'è qualcosa da fare.
 const PilloleStato = {
     emits: ['apri'],
@@ -62,15 +62,14 @@ const PilloleStato = {
                 elenco.push({ id: 'pellet', nome: 'Pellet', icona: iconaOperazione(op), colore: coloreImpianto(op.sezione_id), valore: f.quantita(kg, 'kg'),
                     livello: Math.max(0, Math.min(100, kg / 3600 * 100)), stato: sottoScorta(pel) ? 'attenzione' : '', pagine: pagineOperazione(op) });
             }
-            // Ultima misura del pH (dosimetro, altrimenti scuba), con la fascia ideale 6,8 – 7,8.
-            const oph = operazione('ph'), m = db.misure_ph.slice().sort((a, b) => b.data.localeCompare(a.data))[0];
-            if (oph && m) {
-                const v = Number(m.dosimetro ?? m.scuba);
-                const pallino = v >= 6.8 && v <= 7.8 ? 'verde' : v >= 6.6 && v <= 8 ? 'arancione' : 'rosso';
-                const giorni = f.giorniTrascorsi(m.data);
-                elenco.push({ id: 'ph', nome: 'pH piscina', icona: iconaOperazione(oph), colore: coloreImpianto(oph.sezione_id), valore: f.ph(v), pallino,
-                    nota: giorni === 0 ? 'Misurato oggi' : giorni === 1 ? 'Misurato ieri' : `Misurato ${giorni} giorni fa`,
-                    stato: pallino === 'rosso' ? 'problema' : pallino === 'arancione' ? 'attenzione' : '', pagine: pagineOperazione(oph) });
+            // Pellet bruciato dall'ultimo svuotamento della cenere (al posto del pH, che resta nella sua operazione).
+            const oc = operazione('cenere'), br = pelletDallUltimoSvuotamento();
+            if (oc && br) {
+                const giorni = br.giorni === 1 ? '1 giorno' : `${br.giorni} giorni`;
+                elenco.push({ id: 'cenere', nome: 'Pellet bruciato', icona: iconaOperazione(oc), colore: coloreImpianto(oc.sezione_id),
+                    valore: br.kg !== null ? f.quantita(Math.round(br.kg), 'kg') : '–',
+                    nota: br.kg !== null ? `in ${giorni} dallo svuotamento cenere` : 'serve una lettura del deposito',
+                    stato: '', pagine: pagineOperazione(oc) });
             }
             // Ossigeno attivo della piscina, confrontato con la scorta minima.
             const oo = operazione('ossigeno'), oss = prodotto(oo, 'ossigeno');
